@@ -1,0 +1,11 @@
+import std; 
+
+func hello(msg:str):void =>
+  std.print(msg);  
+
+func world(msg:str):void =>
+  std.print(msg);  
+
+func main():void =>
+  hello("Hello");
+  world(" World");
