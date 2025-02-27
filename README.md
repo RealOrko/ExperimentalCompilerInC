@@ -52,7 +52,6 @@ fn add(x:int, y:int):int =>
    return x + y;
 
 fn main(argv:str[], argc:int):int =>
-{
    var a:int = 5;
    var b:int = 10;
    var result:int = add(a, b);
@@ -62,7 +61,6 @@ fn main(argv:str[], argc:int):int =>
    print("\n");
    
    return 0;
-}
 ```
 
 To compile and run this program:
