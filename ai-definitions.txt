@@ -1,0 +1,79 @@
+Can you please write me a production ready 3 stage compiler in C. The language should be type safe and be able to declare variables like so: 
+
+fn main => 
+   var i:int; // initialises to nil
+   var j:double = 1.2d;
+
+It should also have the ability to do expression like the following: 
+
+fn main(argv:str[], argc:int):void => 
+   var i:long = 1l; 
+   var j:int = 2 + i; // Answer should be 3
+   print("j is: ", j);
+   var k:int = 1; 
+   var l:int = 4; 
+   k = k + l; // Answer should be 5   
+   print("k is: ", k);
+
+It should also have the ability to do string operations and have a type for char. 
+
+fn main(argv:str[], argc:int):void => 
+   var i:char = 'a'; 
+   var j:str = "Hello"; 
+   print(j + " " + i); // Answer should be "Hello a"
+
+Then it should also have the ability to do for, while and if statements like so: 
+
+fn main(argv:str[], argc:int):void => 
+   for(var i:int = 0; i < 10; i++) => 
+      print("i is: \n", i);
+
+   var shouldContinue:bool = false;
+   var counter:int = 0;
+   while (shouldContinue) =>
+      counter++;
+      if (counter == 3) => 
+         shouldContinue = false;
+
+Can you also make it deal with functions like so: 
+
+fn hello() => 
+   print("hello"); 
+
+fn world() => 
+   print(" world\n")
+
+fn main(argv:str[], argc:int):void => 
+   hello(); world();
+
+The functions should also be able to take arguments. 
+
+It should also be able to import functions from other files like so: 
+
+// defined in lib.sn
+fn hello() => 
+   print("hello"); 
+
+fn world() => 
+   print(" world\n")
+
+// defined in main.sn
+import lib;
+fn main(argv:str[], argc:int):void => 
+   hello(); world();
+
+Functions should be able to return values too:
+
+fn hello():str => 
+   return "hello";
+
+fn world():str =>
+   return "world";
+
+fn main(argv:str[], argc:int):void =>
+   print(hello() + " " + world());
+
+Please make the lexer comprehensive and allow for a parser to generate and abstract syntax tree. The code generator can output assembly that is automatically compiled using nasm on linux.  
+
+Can you please also make it modular by separating headers and implementations in separate files? 
+

@@ -1,67 +1,96 @@
-# Experimental Compiler in C
+# Three-Stage Compiler for a Statically Typed Language
 
-This is an experimental compiler written in C that translates a simple scripting language into x86-64 assembly for execution on Linux systems. It supports basic function definitions, parameter passing, and a `std.print` function for outputting strings. The project is modular, with separate components for lexing, parsing, and code generation.
+This is a production-ready three-stage compiler for a statically typed language implemented in C. The compiler supports a variety of language features including variable declarations, functions, control flow statements, and more.
 
-**Note**: This compiler currently only works on Linux due to its use of Linux-specific syscalls (e.g., `sys_write`, `sys_exit`) and the ELF64 assembly format generated for `nasm` and `ld`.
+## Language Features
 
-## Current Progress
+The language supports the following features:
 
-### Features
-- **Language Syntax**:
-  - Function definitions with single string parameters: `func name(param:str):void =>`.
-  - Calls to functions with string literals: `name("string")`.
-  - Import statement: `import std;` (currently only supports `std.print`).
-  - `std.print(msg)`: Outputs a string followed by a newline.
+- **Variables**: Declaration and initialization with types (`int`, `long`, `double`, `char`, `str`, `bool`)
+- **Expressions**: Arithmetic, comparison, logical operations
+- **Control Flow**: `if`, `while`, `for` statements
+- **Functions**: Definition, parameters, return values
+- **Imports**: Importing functions from other files
+- **String Operations**: String concatenation
 
-- **Compilation Pipeline**:
-  - **Lexer**: Tokenizes the input script into a sequence of tokens (e.g., `TOK_IDENT`, `TOK_STRING`, `TOK_INDENT`).
-  - **Parser**: Builds an Abstract Syntax Tree (AST) from tokens, handling function definitions and calls.
-  - **Code Generator**: Produces x86-64 assembly for Linux, using stack-based parameter passing.
+## Compiler Architecture
 
-- **Debug Mode**:
-  - Supports a `-d` flag to enable detailed debug output, showing tokenization, statement parsing, and function generation steps.
+The compiler is structured in three stages:
 
-- **Output**:
-  - Generates an `output.asm` file, assembled with `nasm` and linked with `ld` into an executable binary.
-  - Example script outputs "Hello World" as intended.
+1. **Lexical Analysis**: Implemented in `lexer.c`, converts source code into tokens.
+2. **Parsing**: Implemented in `parser.c`, converts tokens into an Abstract Syntax Tree (AST).
+3. **Code Generation**: Implemented in `code_gen.c`, converts the AST into x86-64 assembly code.
 
-### Example Script
-The following script demonstrates the current capabilities:
+Additionally, the compiler performs type checking implemented in `type_checker.c` between parsing and code generation.
+
+## Building the Compiler
+
+To build the compiler, simply run:
 
 ```
-import std;
-func hello(msg:str):void =>
-std.print(msg);
-
-func world(msg:str):void =>
-std.print(msg);
-
-func main():void =>
-hello("Hello");
-world(" World");
+make
 ```
 
-- **Output**: "Hello\n World" (two lines due to newlines in `std.print`).
-
-### Limitations
-- Only supports single string parameters per function.
-- No type checking beyond basic syntax.
-- Limited `std` library (only `std.print`).
-- No support for expressions (e.g., string concatenation), multiple statements beyond calls, or complex control flow.
-- Linux-specific due to assembly and syscall usage.
+This will compile all source files and create an executable called `compiler`.
 
 ## Usage
 
-### Prerequisites
-- **Linux**: The compiler targets x86-64 Linux systems.
-- **GCC**: To compile the C source code.
-- **NASM**: To assemble the generated assembly (`nasm -f elf64`).
-- **LD**: To link the object file into an executable.
+```
+./compiler <source_file> [-o <output_file>] [-v]
+```
 
-### Building the Compiler
+Options:
+- `-o <output_file>`: Specify the output assembly file (default: source_file.o)
+- `-v`: Verbose mode, prints additional information during compilation
 
-1. Place the source files (`lexer.c`, `lexer.h`, `parser.c`, `ast.h`, `codegen.c`, `codegen.h`, `main.c`) in a `compiler/` directory.
-2. Use the provided build script (`scripts/compiler.sh`):
-   ```bash
-   chmod +x scripts/compiler.sh
-   ./scripts/compiler.sh
+## Example
+
+Here's an example program in the language:
+
+```
+fn add(x:int, y:int):int => 
+   return x + y;
+
+fn main(argv:str[], argc:int):int =>
+{
+   var a:int = 5;
+   var b:int = 10;
+   var result:int = add(a, b);
+   
+   print("The sum is: ");
+   print(result);
+   print("\n");
+   
+   return 0;
+}
+```
+
+To compile and run this program:
+
+```
+./compiler example.sn -v
+```
+
+## Project Structure
+
+- `token.h/c`: Token definitions and operations
+- `lexer.h/c`: Lexical analyzer
+- `ast.h/c`: Abstract Syntax Tree definitions
+- `parser.h/c`: Parser implementation
+- `symbol_table.h/c`: Symbol table for tracking variables and functions
+- `type_checker.h/c`: Type checking implementation
+- `code_gen.h/c`: Code generator implementation
+- `compiler.h/c`: Main compiler module
+- `main.c`: Entry point
+
+## Limitations and Future Work
+
+- Array implementation is limited
+- No support for complex data structures or classes
+- Limited optimization
+- Basic error reporting
+- Limited standard library
+
+## License
+
+This compiler is provided as-is with no warranty.

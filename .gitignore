@@ -1,3 +1,2 @@
 bin/
-output.asm
-output.o
+*.o

@@ -1,11 +1,9 @@
-import std; 
+fn hello(msg:str):void =>
+  print(msg);  
 
-func hello(msg:str):void =>
-  std.print(msg);  
+fn world(msg:str):void =>
+  print(msg);  
 
-func world(msg:str):void =>
-  std.print(msg);  
-
-func main():void =>
+fn main():void =>
   hello("Hello");
   world(" World");
