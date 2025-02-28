@@ -196,15 +196,6 @@ static int tokens_equal(Token a, Token b)
     }
 }
 
-static int token_matches_string(Token token, const char *str)
-{
-    size_t str_len = strlen(str);
-    if (token.length != str_len)
-        return 0;
-
-    return memcmp(token.start, str, str_len) == 0;
-}
-
 /**
  * Create a deep clone of a Type structure
  * This ensures each component has its own copy to avoid double free issues
@@ -368,6 +359,12 @@ Symbol *lookup_symbol_current(SymbolTable *table, Token name)
 
 Symbol *lookup_symbol(SymbolTable *table, Token name)
 {
+    if (!table || !table->current) {
+        fprintf(stderr, "DEBUG: Null table or current scope in lookup_symbol\n");
+        return NULL;
+    }
+    
+    // Extract name as string for debugging and fallback matching
     char name_str[256];
     int name_len = name.length < 255 ? name.length : 255;
     strncpy(name_str, name.start, name_len);
@@ -386,6 +383,7 @@ Symbol *lookup_symbol(SymbolTable *table, Token name)
         Symbol *symbol = scope->symbols;
         while (symbol != NULL)
         {
+            // Get symbol name as string
             char sym_name[256];
             int sym_len = symbol->name.length < 255 ? symbol->name.length : 255;
             strncpy(sym_name, symbol->name.start, sym_len);
@@ -394,17 +392,23 @@ Symbol *lookup_symbol(SymbolTable *table, Token name)
             fprintf(stderr, "DEBUG:     Symbol '%s' at address %p, length %d\n",
                     sym_name, (void *)symbol->name.start, symbol->name.length);
 
-            // First check token equality
-            if (tokens_equal(symbol->name, name))
-            {
-                fprintf(stderr, "DEBUG: Found symbol '%s' in scope level %d\n",
+            // Step 1: Try exact token comparison
+            if (symbol->name.start == name.start && symbol->name.length == name.length) {
+                fprintf(stderr, "DEBUG: Found symbol '%s' in scope level %d (direct pointer match)\n",
+                        sym_name, scope_level);
+                return symbol;
+            }
+            
+            // Step 2: Try content comparison
+            if (symbol->name.length == name.length && 
+                memcmp(symbol->name.start, name.start, name.length) == 0) {
+                fprintf(stderr, "DEBUG: Found symbol '%s' in scope level %d (content match)\n",
                         sym_name, scope_level);
                 return symbol;
             }
 
-            // As a fallback, check string equality
-            if (strcmp(sym_name, name_str) == 0)
-            {
+            // Step 3: Fall back to string comparison
+            if (strcmp(sym_name, name_str) == 0) {
                 fprintf(stderr, "DEBUG: Found symbol '%s' by string comparison in scope level %d\n",
                         sym_name, scope_level);
                 return symbol;

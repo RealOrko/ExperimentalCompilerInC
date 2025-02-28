@@ -690,6 +690,9 @@ Stmt *parse_function_declaration(Parser *parser)
         while (!check(parser, TOKEN_RIGHT_BRACE) && !check(parser, TOKEN_EOF))
         {
             Stmt *stmt = parse_declaration(parser);
+            if (stmt == NULL) {
+                continue; // Skip NULL statements
+            }
 
             if (body_count >= body_capacity)
             {
@@ -704,12 +707,45 @@ Stmt *parse_function_declaration(Parser *parser)
     }
     else
     {
-        // Single statement body
+        // For single-statement functions, collect all statements until a clear terminator
+        int done = 0;
+        body_capacity = 4; // Start with space for a few statements
+        body = malloc(sizeof(Stmt *) * body_capacity);
+        
+        // Parse the first statement
         Stmt *stmt = parse_declaration(parser);
-
-        body = malloc(sizeof(Stmt *));
-        body[0] = stmt;
-        body_count = 1;
+        if (stmt != NULL) {
+            body[body_count++] = stmt;
+        }
+        
+        // Continue parsing statements until we find a clear function terminator
+        // This handles the case where a function without braces has multiple statements
+        while (!done && !parser_is_at_end(parser)) {
+            // Skip newlines
+            while (parser_match(parser, TOKEN_NEWLINE)) {
+                // Just consume newlines
+            }
+            
+            // Check if we've reached a token that would indicate the end of this function
+            if (check(parser, TOKEN_FN) || check(parser, TOKEN_EOF)) {
+                done = 1;
+                continue;
+            }
+            
+            // Parse the next statement
+            stmt = parse_declaration(parser);
+            if (stmt == NULL) {
+                continue;
+            }
+            
+            // Add it to the function body
+            if (body_count >= body_capacity) {
+                body_capacity *= 2;
+                body = realloc(body, sizeof(Stmt *) * body_capacity);
+            }
+            
+            body[body_count++] = stmt;
+        }
     }
 
     // Restore outer scope
