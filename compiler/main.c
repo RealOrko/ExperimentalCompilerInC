@@ -39,7 +39,7 @@ int can_assign_to_param(Type *param_type, Expr *arg_expr)
 int main(int argc, char **argv)
 {
     // Initialize debugging
-    init_debug(DEBUG_LEVEL_WARNING);
+    init_debug(DEBUG_LEVEL_VERBOSE);
 
     DEBUG_INFO("Compiler starting up");
 

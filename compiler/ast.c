@@ -41,7 +41,7 @@ Type *create_primitive_type(TypeKind kind)
     Type *type = malloc(sizeof(Type));
     if (type == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     type->kind = kind;
@@ -54,7 +54,7 @@ Type *create_array_type(Type *element_type)
     Type *type = malloc(sizeof(Type));
     if (type == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     type->kind = TYPE_ARRAY;
@@ -67,7 +67,7 @@ Type *create_function_type(Type *return_type, Type **param_types, int param_coun
     Type *type = malloc(sizeof(Type));
     if (type == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     type->kind = TYPE_FUNCTION;
@@ -257,7 +257,7 @@ Expr *create_binary_expr(Expr *left, TokenType operator, Expr * right)
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     expr->type = EXPR_BINARY;
@@ -273,7 +273,7 @@ Expr *create_unary_expr(TokenType operator, Expr * operand)
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     expr->type = EXPR_UNARY;
@@ -288,7 +288,7 @@ Expr *create_literal_expr(LiteralValue value, Type *type)
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     expr->type = EXPR_LITERAL;
@@ -303,7 +303,7 @@ Expr *create_variable_expr(Token name)
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     expr->type = EXPR_VARIABLE;
@@ -317,7 +317,7 @@ Expr *create_assign_expr(Token name, Expr *value)
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     expr->type = EXPR_ASSIGN;
@@ -332,7 +332,7 @@ Expr *create_call_expr(Expr *callee, Expr **arguments, int arg_count)
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     expr->type = EXPR_CALL;
@@ -348,7 +348,7 @@ Expr *create_array_expr(Expr **elements, int element_count)
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     expr->type = EXPR_ARRAY;
@@ -363,7 +363,7 @@ Expr *create_array_access_expr(Expr *array, Expr *index)
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     expr->type = EXPR_ARRAY_ACCESS;
@@ -378,7 +378,7 @@ Expr *create_increment_expr(Expr *operand)
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     expr->type = EXPR_INCREMENT;
@@ -392,7 +392,7 @@ Expr *create_decrement_expr(Expr *operand)
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     expr->type = EXPR_DECREMENT;
@@ -526,7 +526,7 @@ Stmt *create_expr_stmt(Expr *expression)
     Stmt *stmt = malloc(sizeof(Stmt));
     if (stmt == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     stmt->type = STMT_EXPR;
@@ -539,7 +539,7 @@ Stmt *create_var_decl_stmt(Token name, Type *type, Expr *initializer)
     Stmt *stmt = malloc(sizeof(Stmt));
     if (stmt == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     stmt->type = STMT_VAR_DECL;
@@ -555,7 +555,7 @@ Stmt *create_function_stmt(Token name, Parameter *params, int param_count,
     Stmt *stmt = malloc(sizeof(Stmt));
     if (stmt == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     stmt->type = STMT_FUNCTION;
@@ -573,7 +573,7 @@ Stmt *create_return_stmt(Token keyword, Expr *value)
     Stmt *stmt = malloc(sizeof(Stmt));
     if (stmt == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     stmt->type = STMT_RETURN;
@@ -587,7 +587,7 @@ Stmt *create_block_stmt(Stmt **statements, int count)
     Stmt *stmt = malloc(sizeof(Stmt));
     if (stmt == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     stmt->type = STMT_BLOCK;
@@ -601,7 +601,7 @@ Stmt *create_if_stmt(Expr *condition, Stmt *then_branch, Stmt *else_branch)
     Stmt *stmt = malloc(sizeof(Stmt));
     if (stmt == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     stmt->type = STMT_IF;
@@ -616,7 +616,7 @@ Stmt *create_while_stmt(Expr *condition, Stmt *body)
     Stmt *stmt = malloc(sizeof(Stmt));
     if (stmt == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     stmt->type = STMT_WHILE;
@@ -630,7 +630,7 @@ Stmt *create_for_stmt(Stmt *initializer, Expr *condition, Expr *increment, Stmt 
     Stmt *stmt = malloc(sizeof(Stmt));
     if (stmt == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     stmt->type = STMT_FOR;
@@ -646,7 +646,7 @@ Stmt *create_import_stmt(Token module_name)
     Stmt *stmt = malloc(sizeof(Stmt));
     if (stmt == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     stmt->type = STMT_IMPORT;
@@ -817,7 +817,7 @@ void init_module(Module *module, const char *filename)
     module->statements = malloc(sizeof(Stmt *) * module->capacity);
     if (module->statements == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
 
@@ -835,7 +835,7 @@ void module_add_statement(Module *module, Stmt *stmt)
         Stmt **new_statements = realloc(module->statements, sizeof(Stmt *) * module->capacity);
         if (new_statements == NULL)
         {
-            DEBUG_ERROR("Out of memory\n");
+            DEBUG_ERROR("Out of memory");
             exit(1);
         }
         module->statements = new_statements;
