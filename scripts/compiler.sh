@@ -10,4 +10,4 @@ valgrind --leak-check=full \
          --track-origins=yes \
          --verbose \
          --log-file=bin/valgrind-out.txt \
-         bin/sn samples/hello-world/simple.sn -o bin/hello-world.asm
+         bin/sn samples/hello-world/main.sn -o bin/hello-world.asm
