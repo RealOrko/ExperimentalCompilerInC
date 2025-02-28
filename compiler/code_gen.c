@@ -42,14 +42,8 @@ void init_function_stack(CodeGen *gen)
     }
 }
 
-// Push the current function onto the stack
 void push_function_context(CodeGen *gen)
 {
-    if (gen->current_function == NULL)
-    {
-        return; // Nothing to push if we're in global scope
-    }
-
     // Resize if needed
     if (gen->function_stack_size >= gen->function_stack_capacity)
     {
@@ -63,15 +57,22 @@ void push_function_context(CodeGen *gen)
         }
     }
 
-    // Make a copy of the current function name
-    gen->function_stack[gen->function_stack_size] = strdup(gen->current_function);
+    // Store current function (even if NULL)
+    if (gen->current_function != NULL)
+    {
+        gen->function_stack[gen->function_stack_size] = strdup(gen->current_function);
+    }
+    else
+    {
+        gen->function_stack[gen->function_stack_size] = NULL;
+    }
     gen->function_stack_size++;
 
     fprintf(stderr, "DEBUG: Pushed function context '%s', stack size now %d\n",
-            gen->current_function, gen->function_stack_size);
+            gen->current_function ? gen->current_function : "NULL", gen->function_stack_size);
 }
 
-// Pop and restore a function context from the stack
+// Fix the pop_function_context implementation
 void pop_function_context(CodeGen *gen)
 {
     if (gen->function_stack_size <= 0)
@@ -89,6 +90,8 @@ void pop_function_context(CodeGen *gen)
     // Pop and restore
     gen->function_stack_size--;
     gen->current_function = gen->function_stack[gen->function_stack_size];
+    // Remove the popped entry to avoid double-free
+    gen->function_stack[gen->function_stack_size] = NULL;
 
     fprintf(stderr, "DEBUG: Popped function context, restored to '%s', stack size now %d\n",
             gen->current_function ? gen->current_function : "NULL", gen->function_stack_size);
@@ -401,8 +404,6 @@ static int get_var_offset(CodeGen *gen, Token name)
 
 void generate_binary_expression(CodeGen *gen, BinaryExpr *expr)
 {
-    push_function_context(gen);
-
     fprintf(stderr, "DEBUG: Generating binary expression in function '%s' with operator %d\n",
             gen->current_function ? gen->current_function : "global", expr->operator);
 
@@ -511,8 +512,6 @@ void generate_binary_expression(CodeGen *gen, BinaryExpr *expr)
         fprintf(stderr, "Error: Unsupported binary operator\n");
         exit(1);
     }
-
-    pop_function_context(gen);
 }
 
 void generate_unary_expression(CodeGen *gen, UnaryExpr *expr)
