@@ -217,6 +217,8 @@ int compile_source(const char *source, const char *filename, const char *output_
 {
     DEBUG_INFO("Compiling %s...", filename);
 
+    (void)verbose;
+
     if (source == NULL)
     {
         DEBUG_ERROR("Null source pointer");
