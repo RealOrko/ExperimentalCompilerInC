@@ -4,6 +4,7 @@
  */
 
 #include "symbol_table.h"
+#include "debug.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
@@ -26,11 +27,11 @@ static char *token_to_string(Token token)
 // Print the entire symbol table state for debugging
 void debug_print_symbol_table(SymbolTable *table, const char *where)
 {
-    fprintf(stderr, "==== SYMBOL TABLE DUMP (%s) ====\n", where);
+    DEBUG_VERBOSE("==== SYMBOL TABLE DUMP (%s) ====\n", where);
 
     if (!table || !table->current)
     {
-        fprintf(stderr, "  [Empty symbol table or no current scope]\n");
+        DEBUG_VERBOSE("  [Empty symbol table or no current scope]\n");
         return;
     }
 
@@ -39,19 +40,19 @@ void debug_print_symbol_table(SymbolTable *table, const char *where)
 
     while (scope)
     {
-        fprintf(stderr, "  Scope Level %d:\n", scope_level);
-        fprintf(stderr, "    next_local_offset: %d, next_param_offset: %d\n",
+        DEBUG_VERBOSE("  Scope Level %d:\n", scope_level);
+        DEBUG_VERBOSE("    next_local_offset: %d, next_param_offset: %d\n",
                 scope->next_local_offset, scope->next_param_offset);
 
         Symbol *symbol = scope->symbols;
         if (!symbol)
         {
-            fprintf(stderr, "    [No symbols in this scope]\n");
+            DEBUG_VERBOSE("    [No symbols in this scope]\n");
         }
 
         while (symbol)
         {
-            fprintf(stderr, "    Symbol: '%s', Type: %s, Kind: %d, Offset: %d\n",
+            DEBUG_VERBOSE("    Symbol: '%s', Type: %s, Kind: %d, Offset: %d\n",
                     token_to_string(symbol->name),
                     type_to_string(symbol->type),
                     symbol->kind,
@@ -63,7 +64,7 @@ void debug_print_symbol_table(SymbolTable *table, const char *where)
         scope_level++;
     }
 
-    fprintf(stderr, "====================================\n");
+    DEBUG_VERBOSE("====================================\n");
 }
 
 SymbolTable *create_symbol_table()
@@ -71,7 +72,7 @@ SymbolTable *create_symbol_table()
     SymbolTable *table = malloc(sizeof(SymbolTable));
     if (table == NULL)
     {
-        fprintf(stderr, "Error: Out of memory creating symbol table\n");
+        DEBUG_ERROR("Out of memory creating symbol table\n");
         exit(1);
     }
     table->current = NULL;
@@ -120,7 +121,7 @@ void push_scope(SymbolTable *table)
     Scope *scope = malloc(sizeof(Scope));
     if (scope == NULL)
     {
-        fprintf(stderr, "Error: Out of memory creating scope\n");
+        DEBUG_ERROR("Out of memory creating scope\n");
         exit(1);
     }
 
@@ -164,14 +165,14 @@ static int tokens_equal(Token a, Token b)
         strncpy(b_str, b.start, b_len);
         b_str[b_len] = '\0';
         
-        fprintf(stderr, "DEBUG: Token length mismatch: '%s'(%d) vs '%s'(%d)\n", 
+        DEBUG_VERBOSE("Token length mismatch: '%s'(%d) vs '%s'(%d)\n", 
                 a_str, a.length, b_str, b.length);
         return 0;
     }
     
     // Check if the tokens have the same memory address
     if (a.start == b.start) {
-        fprintf(stderr, "DEBUG: Token address match at %p\n", (void*)a.start);
+        DEBUG_VERBOSE("Token address match at %p\n", (void*)a.start);
         return 1;
     }
     
@@ -188,10 +189,10 @@ static int tokens_equal(Token a, Token b)
     b_str[b_len] = '\0';
     
     if (result == 0) {
-        fprintf(stderr, "DEBUG: Token content match: '%s' == '%s'\n", a_str, b_str);
+        DEBUG_VERBOSE("Token content match: '%s' == '%s'\n", a_str, b_str);
         return 1;
     } else {
-        fprintf(stderr, "DEBUG: Token content mismatch: '%s' != '%s'\n", a_str, b_str);
+        DEBUG_VERBOSE("Token content mismatch: '%s' != '%s'\n", a_str, b_str);
         return 0;
     }
 }
@@ -208,7 +209,7 @@ Type *clone_type(Type *type)
     Type *clone = malloc(sizeof(Type));
     if (clone == NULL)
     {
-        fprintf(stderr, "Error: Out of memory when cloning type\n");
+        DEBUG_ERROR("Out of memory when cloning type\n");
         exit(1);
     }
 
@@ -246,7 +247,7 @@ Type *clone_type(Type *type)
             clone->as.function.param_types = malloc(sizeof(Type *) * type->as.function.param_count);
             if (clone->as.function.param_types == NULL)
             {
-                fprintf(stderr, "Error: Out of memory when cloning function param types\n");
+                DEBUG_ERROR("Out of memory when cloning function param types\n");
                 exit(1);
             }
 
@@ -272,7 +273,7 @@ void add_symbol_with_kind(SymbolTable *table, Token name, Type *type, SymbolKind
 {
     if (table->current == NULL)
     {
-        fprintf(stderr, "Error: No active scope when adding symbol\n");
+        DEBUG_ERROR("No active scope when adding symbol\n");
         return;
     }
 
@@ -291,7 +292,7 @@ void add_symbol_with_kind(SymbolTable *table, Token name, Type *type, SymbolKind
     Symbol *symbol = malloc(sizeof(Symbol));
     if (symbol == NULL)
     {
-        fprintf(stderr, "Error: Out of memory when creating symbol\n");
+        DEBUG_ERROR("Out of memory when creating symbol\n");
         exit(1);
     }
 
@@ -323,7 +324,7 @@ void add_symbol_with_kind(SymbolTable *table, Token name, Type *type, SymbolKind
     int name_len = name.length < 255 ? name.length : 255;
     strncpy(temp, name.start, name_len);
     temp[name_len] = '\0';
-    fprintf(stderr, "DEBUG: Added symbol '%s' with kind %d, offset %d\n",
+    DEBUG_VERBOSE("Added symbol '%s' with kind %d, offset %d\n",
             temp, kind, symbol->offset);
 
     // Add to current scope
@@ -360,7 +361,7 @@ Symbol *lookup_symbol_current(SymbolTable *table, Token name)
 Symbol *lookup_symbol(SymbolTable *table, Token name)
 {
     if (!table || !table->current) {
-        fprintf(stderr, "DEBUG: Null table or current scope in lookup_symbol\n");
+        DEBUG_VERBOSE("Null table or current scope in lookup_symbol\n");
         return NULL;
     }
     
@@ -370,7 +371,7 @@ Symbol *lookup_symbol(SymbolTable *table, Token name)
     strncpy(name_str, name.start, name_len);
     name_str[name_len] = '\0';
 
-    fprintf(stderr, "DEBUG: Looking up symbol '%s' at address %p, length %d\n",
+    DEBUG_VERBOSE("Looking up symbol '%s' at address %p, length %d\n",
             name_str, (void *)name.start, name.length);
 
     Scope *scope = table->current;
@@ -378,7 +379,7 @@ Symbol *lookup_symbol(SymbolTable *table, Token name)
 
     while (scope != NULL)
     {
-        fprintf(stderr, "DEBUG:   Checking scope level %d\n", scope_level);
+        DEBUG_VERBOSE("  Checking scope level %d\n", scope_level);
 
         Symbol *symbol = scope->symbols;
         while (symbol != NULL)
@@ -389,12 +390,12 @@ Symbol *lookup_symbol(SymbolTable *table, Token name)
             strncpy(sym_name, symbol->name.start, sym_len);
             sym_name[sym_len] = '\0';
 
-            fprintf(stderr, "DEBUG:     Symbol '%s' at address %p, length %d\n",
+            DEBUG_VERBOSE("    Symbol '%s' at address %p, length %d\n",
                     sym_name, (void *)symbol->name.start, symbol->name.length);
 
             // Step 1: Try exact token comparison
             if (symbol->name.start == name.start && symbol->name.length == name.length) {
-                fprintf(stderr, "DEBUG: Found symbol '%s' in scope level %d (direct pointer match)\n",
+                DEBUG_VERBOSE("Found symbol '%s' in scope level %d (direct pointer match)\n",
                         sym_name, scope_level);
                 return symbol;
             }
@@ -402,14 +403,14 @@ Symbol *lookup_symbol(SymbolTable *table, Token name)
             // Step 2: Try content comparison
             if (symbol->name.length == name.length && 
                 memcmp(symbol->name.start, name.start, name.length) == 0) {
-                fprintf(stderr, "DEBUG: Found symbol '%s' in scope level %d (content match)\n",
+                DEBUG_VERBOSE("Found symbol '%s' in scope level %d (content match)\n",
                         sym_name, scope_level);
                 return symbol;
             }
 
             // Step 3: Fall back to string comparison
             if (strcmp(sym_name, name_str) == 0) {
-                fprintf(stderr, "DEBUG: Found symbol '%s' by string comparison in scope level %d\n",
+                DEBUG_VERBOSE("Found symbol '%s' by string comparison in scope level %d\n",
                         sym_name, scope_level);
                 return symbol;
             }
@@ -421,7 +422,7 @@ Symbol *lookup_symbol(SymbolTable *table, Token name)
         scope_level++;
     }
 
-    fprintf(stderr, "DEBUG: Symbol '%s' not found in any scope\n", name_str);
+    DEBUG_VERBOSE("Symbol '%s' not found in any scope\n", name_str);
     return NULL;
 }
 
@@ -439,7 +440,7 @@ int get_symbol_offset(SymbolTable *table, Token name)
         int name_len = name.length < 255 ? name.length : 255;
         strncpy(temp, name.start, name_len);
         temp[name_len] = '\0';
-        fprintf(stderr, "Error: Symbol not found in get_symbol_offset: '%s'\n", temp);
+        DEBUG_ERROR("Symbol not found in get_symbol_offset: '%s'\n", temp);
         return -1;
     }
 
