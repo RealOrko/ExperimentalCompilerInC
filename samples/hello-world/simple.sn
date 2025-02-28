@@ -1,7 +1,7 @@
 
-fn add(x:int, y:int) => 
+fn add(x:int, y:int):int => 
   return x + y;
 
-fn main() => 
+fn main():void => 
   var z:int = add(1, 2); 
   print(z); 
