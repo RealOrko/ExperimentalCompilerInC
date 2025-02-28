@@ -38,7 +38,7 @@ void init_function_stack(CodeGen *gen)
     gen->function_stack = malloc(gen->function_stack_capacity * sizeof(char *));
     if (gen->function_stack == NULL)
     {
-        DEBUG_ERROR("Out of memory initializing function stack\n");
+        DEBUG_ERROR("Out of memory initializing function stack");
         exit(1);
     }
 }
@@ -53,7 +53,7 @@ void push_function_context(CodeGen *gen)
                                       gen->function_stack_capacity * sizeof(char *));
         if (gen->function_stack == NULL)
         {
-            DEBUG_ERROR("Out of memory expanding function stack\n");
+            DEBUG_ERROR("Out of memory expanding function stack");
             exit(1);
         }
     }
@@ -69,7 +69,7 @@ void push_function_context(CodeGen *gen)
     }
     gen->function_stack_size++;
 
-    DEBUG_VERBOSE("Pushed function context '%s', stack size now %d\n",
+    DEBUG_VERBOSE("Pushed function context '%s', stack size now %d",
             gen->current_function ? gen->current_function : "NULL", gen->function_stack_size);
 }
 
@@ -78,7 +78,7 @@ void pop_function_context(CodeGen *gen)
 {
     if (gen->function_stack_size <= 0)
     {
-        DEBUG_WARNING("Attempt to pop empty function stack\n");
+        DEBUG_WARNING("Attempt to pop empty function stack");
         return;
     }
 
@@ -94,7 +94,7 @@ void pop_function_context(CodeGen *gen)
     // Remove the popped entry to avoid double-free
     gen->function_stack[gen->function_stack_size] = NULL;
 
-    DEBUG_VERBOSE("Popped function context, restored to '%s', stack size now %d\n",
+    DEBUG_VERBOSE("Popped function context, restored to '%s', stack size now %d",
             gen->current_function ? gen->current_function : "NULL", gen->function_stack_size);
 }
 
@@ -134,7 +134,7 @@ void init_code_gen(CodeGen *gen, SymbolTable *symbol_table, const char *output_f
 
     if (gen->output == NULL)
     {
-        DEBUG_ERROR("Could not open output file '%s'\n", output_file);
+        DEBUG_ERROR("Could not open output file '%s'", output_file);
         exit(1);
     }
 
@@ -183,7 +183,7 @@ int add_string_literal(CodeGen *gen, const char *string)
 {
     if (string == NULL)
     {
-        DEBUG_ERROR("Null string passed to add_string_literal\n");
+        DEBUG_ERROR("Null string passed to add_string_literal");
         return -1;
     }
 
@@ -192,14 +192,14 @@ int add_string_literal(CodeGen *gen, const char *string)
     StringLiteral *literal = malloc(sizeof(StringLiteral));
     if (literal == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         exit(1);
     }
 
     literal->string = my_strdup(string);
     if (literal->string == NULL)
     {
-        DEBUG_ERROR("Out of memory\n");
+        DEBUG_ERROR("Out of memory");
         free(literal);
         exit(1);
     }
@@ -215,7 +215,7 @@ void generate_string_literal(CodeGen *gen, const char *string, int label)
 {
     if (string == NULL)
     {
-        DEBUG_ERROR("Null string passed to generate_string_literal\n");
+        DEBUG_ERROR("Null string passed to generate_string_literal");
         return;
     }
 
@@ -340,7 +340,7 @@ static int get_var_offset(CodeGen *gen, Token name)
     var_name[name_len] = '\0';
 
     // Debug output to see what variable we're trying to access
-    DEBUG_VERBOSE("Looking up variable '%s' in function '%s'\n",
+    DEBUG_VERBOSE("Looking up variable '%s' in function '%s'",
             var_name, gen->current_function ? gen->current_function : "global");
 
     // Use the symbol table to get the variable's offset
@@ -348,7 +348,7 @@ static int get_var_offset(CodeGen *gen, Token name)
 
     if (symbol == NULL)
     {
-        DEBUG_WARNING("Symbol not found in symbol table: '%s'\n", var_name);
+        DEBUG_WARNING("Symbol not found in symbol table: '%s'", var_name);
 
         // Manual string-based lookup for common variables
         if (gen->current_function)
@@ -378,7 +378,7 @@ static int get_var_offset(CodeGen *gen, Token name)
         }
 
         // For backward compatibility, fall back to hardcoded offsets
-        DEBUG_WARNING("Falling back to hardcoded offsets for '%s'\n", var_name);
+        DEBUG_WARNING("Falling back to hardcoded offsets for '%s'", var_name);
 
         // Hardcoded offsets for all variables in the factorial function
         if (gen->current_function && strcmp(gen->current_function, "factorial") == 0)
@@ -399,13 +399,13 @@ static int get_var_offset(CodeGen *gen, Token name)
         exit(1);
     }
 
-    DEBUG_VERBOSE("Found symbol '%s' with offset %d\n", var_name, symbol->offset);
+    DEBUG_VERBOSE("Found symbol '%s' with offset %d", var_name, symbol->offset);
     return symbol->offset;
 }
 
 void generate_binary_expression(CodeGen *gen, BinaryExpr *expr)
 {
-    DEBUG_VERBOSE("Generating binary expression in function '%s' with operator %d\n",
+    DEBUG_VERBOSE("Generating binary expression in function '%s' with operator %d",
             gen->current_function ? gen->current_function : "global", expr->operator);
 
     // Generate the right operand first and push it on the stack
@@ -592,14 +592,14 @@ void generate_variable_expression(CodeGen *gen, VariableExpr *expr)
     strncpy(var_name, expr->name.start, name_len);
     var_name[name_len] = '\0';
 
-    DEBUG_VERBOSE("Accessing variable '%s' in function '%s'\n",
+    DEBUG_VERBOSE("Accessing variable '%s' in function '%s'",
             var_name, gen->current_function ? gen->current_function : "global");
 
     // If we're in the function factorial and the variable is 'n', use the hardcoded offset
     if (gen->current_function && strcmp(gen->current_function, "factorial") == 0 &&
         strcmp(var_name, "n") == 0)
     {
-        DEBUG_VERBOSE("Direct handling of parameter 'n' in factorial function\n");
+        DEBUG_VERBOSE("Direct handling of parameter 'n' in factorial function");
         fprintf(gen->output, "    mov rax, [rbp-16]\n"); // n is at offset 16
         return;
     }
@@ -608,7 +608,7 @@ void generate_variable_expression(CodeGen *gen, VariableExpr *expr)
     if (gen->current_function && strcmp(gen->current_function, "is_prime") == 0 &&
         strcmp(var_name, "num") == 0)
     {
-        DEBUG_VERBOSE("Direct handling of parameter 'num' in is_prime function\n");
+        DEBUG_VERBOSE("Direct handling of parameter 'num' in is_prime function");
         fprintf(gen->output, "    mov rax, [rbp-16]\n"); // num is at offset 16
         return;
     }
@@ -618,13 +618,13 @@ void generate_variable_expression(CodeGen *gen, VariableExpr *expr)
     {
         if (strcmp(var_name, "text") == 0)
         {
-            DEBUG_VERBOSE("Direct handling of parameter 'text' in repeat_string function\n");
+            DEBUG_VERBOSE("Direct handling of parameter 'text' in repeat_string function");
             fprintf(gen->output, "    mov rax, [rbp-16]\n"); // text is at offset 16
             return;
         }
         if (strcmp(var_name, "count") == 0)
         {
-            DEBUG_VERBOSE("Direct handling of parameter 'count' in repeat_string function\n");
+            DEBUG_VERBOSE("Direct handling of parameter 'count' in repeat_string function");
             fprintf(gen->output, "    mov rax, [rbp-24]\n"); // count is at offset 24
             return;
         }
@@ -635,7 +635,7 @@ void generate_variable_expression(CodeGen *gen, VariableExpr *expr)
 
     if (symbol == NULL)
     {
-        DEBUG_VERBOSE("Symbol lookup failed for '%s', trying string comparison\n", var_name);
+        DEBUG_VERBOSE("Symbol lookup failed for '%s', trying string comparison", var_name);
 
         // Try a manual string comparison for all symbols
         Scope *scope = gen->symbol_table->current;
@@ -662,7 +662,7 @@ void generate_variable_expression(CodeGen *gen, VariableExpr *expr)
         }
 
         // Fall back to fully hardcoded behavior
-        DEBUG_VERBOSE("Falling back to hardcoded offsets for '%s'\n", var_name);
+        DEBUG_VERBOSE("Falling back to hardcoded offsets for '%s'", var_name);
         int offset = -1;
 
         if (gen->current_function && strcmp(gen->current_function, "factorial") == 0)
@@ -702,12 +702,12 @@ void generate_variable_expression(CodeGen *gen, VariableExpr *expr)
 
         if (offset != -1)
         {
-            DEBUG_VERBOSE("Using hardcoded offset %d for '%s'\n", offset, var_name);
+            DEBUG_VERBOSE("Using hardcoded offset %d for '%s'", offset, var_name);
             fprintf(gen->output, "    mov rax, [rbp-%d]\n", offset);
             return;
         }
 
-        DEBUG_ERROR("Undefined variable '%s'\n", var_name);
+        DEBUG_ERROR("Undefined variable '%s'", var_name);
         exit(1);
     }
 
@@ -722,7 +722,7 @@ void generate_assign_expression(CodeGen *gen, AssignExpr *expr)
     strncpy(var_name, expr->name.start, name_len);
     var_name[name_len] = '\0';
 
-    DEBUG_VERBOSE("Assigning to variable '%s' in function '%s'\n",
+    DEBUG_VERBOSE("Assigning to variable '%s' in function '%s'",
             var_name, gen->current_function ? gen->current_function : "global");
 
     // Evaluate the value
@@ -733,7 +733,7 @@ void generate_assign_expression(CodeGen *gen, AssignExpr *expr)
 
     if (symbol == NULL)
     {
-        DEBUG_VERBOSE("Symbol lookup failed for '%s', trying string comparison\n", var_name);
+        DEBUG_VERBOSE("Symbol lookup failed for '%s', trying string comparison", var_name);
 
         // Try a manual string comparison for parameters
         // This is needed because parameters might have been created with different token instances
@@ -749,11 +749,11 @@ void generate_assign_expression(CodeGen *gen, AssignExpr *expr)
                 strncpy(sym_name, sym->name.start, sym_len);
                 sym_name[sym_len] = '\0';
 
-                DEBUG_VERBOSE("Comparing '%s' with symbol '%s'\n", var_name, sym_name);
+                DEBUG_VERBOSE("Comparing '%s' with symbol '%s'", var_name, sym_name);
 
                 if (strcmp(sym_name, var_name) == 0)
                 {
-                    DEBUG_VERBOSE("Manual match found for '%s' with offset %d\n",
+                    DEBUG_VERBOSE("Manual match found for '%s' with offset %d",
                             var_name, sym->offset);
 
                     // Store the computed value in the variable
@@ -765,7 +765,7 @@ void generate_assign_expression(CodeGen *gen, AssignExpr *expr)
         }
 
         // If not found, use hardcoded logic as a final fallback
-        DEBUG_VERBOSE("Manual lookup failed for '%s', using hardcoded offsets\n", var_name);
+        DEBUG_VERBOSE("Manual lookup failed for '%s', using hardcoded offsets", var_name);
 
         int offset = -1;
 
@@ -783,17 +783,17 @@ void generate_assign_expression(CodeGen *gen, AssignExpr *expr)
 
         if (offset != -1)
         {
-            DEBUG_VERBOSE("Using hardcoded offset %d for '%s'\n", offset, var_name);
+            DEBUG_VERBOSE("Using hardcoded offset %d for '%s'", offset, var_name);
             fprintf(gen->output, "    mov [rbp-%d], rax\n", offset);
             return;
         }
 
-        DEBUG_ERROR("Undefined variable '%s'\n", var_name);
+        DEBUG_ERROR("Undefined variable '%s'", var_name);
         exit(1);
     }
 
     // If we got here, we found the symbol
-    DEBUG_VERBOSE("Found symbol '%s' with offset %d\n", var_name, symbol->offset);
+    DEBUG_VERBOSE("Found symbol '%s' with offset %d", var_name, symbol->offset);
 
     // Store the computed value in the variable
     fprintf(gen->output, "    mov [rbp-%d], rax\n", symbol->offset);
@@ -812,7 +812,7 @@ void generate_call_expression(CodeGen *gen, CallExpr *expr)
         char *name = malloc(var->name.length + 1);
         if (name == NULL)
         {
-            DEBUG_ERROR("Out of memory\n");
+            DEBUG_ERROR("Out of memory");
             exit(1);
         }
 
@@ -822,7 +822,7 @@ void generate_call_expression(CodeGen *gen, CallExpr *expr)
     }
     else
     {
-        DEBUG_ERROR("Complex function calls not supported\n");
+        DEBUG_ERROR("Complex function calls not supported");
         exit(1);
     }
 
@@ -919,23 +919,23 @@ void generate_expression(CodeGen *gen, Expr *expr)
     // Save the current function context
     push_function_context(gen);
 
-    DEBUG_VERBOSE("Generating expression type %d in function context '%s'\n",
+    DEBUG_VERBOSE("Generating expression type %d in function context '%s'",
             expr->type, gen->current_function ? gen->current_function : "global");
 
     switch (expr->type)
     {
     case EXPR_BINARY:
-        DEBUG_VERBOSE("Binary expression with operator %d\n", expr->as.binary.operator);
+        DEBUG_VERBOSE("Binary expression with operator %d", expr->as.binary.operator);
         generate_binary_expression(gen, &expr->as.binary);
         break;
     case EXPR_UNARY:
-        DEBUG_VERBOSE("Unary expression with operator %d\n", expr->as.unary.operator);
+        DEBUG_VERBOSE("Unary expression with operator %d", expr->as.unary.operator);
         generate_unary_expression(gen, &expr->as.unary);
         break;
     case EXPR_LITERAL:
         if (expr->as.literal.type)
         {
-            DEBUG_VERBOSE("Literal expression of type %s\n",
+            DEBUG_VERBOSE("Literal expression of type %s",
                     type_to_string(expr->as.literal.type));
         }
         generate_literal_expression(gen, &expr->as.literal);
@@ -946,7 +946,7 @@ void generate_expression(CodeGen *gen, Expr *expr)
         int name_len = expr->as.variable.name.length < 255 ? expr->as.variable.name.length : 255;
         strncpy(var_name, expr->as.variable.name.start, name_len);
         var_name[name_len] = '\0';
-        DEBUG_VERBOSE("Variable expression '%s' in function '%s'\n",
+        DEBUG_VERBOSE("Variable expression '%s' in function '%s'",
                 var_name, gen->current_function ? gen->current_function : "global");
 
         debug_print_symbol_table(gen->symbol_table, "before variable lookup");
@@ -959,7 +959,7 @@ void generate_expression(CodeGen *gen, Expr *expr)
         int name_len = expr->as.assign.name.length < 255 ? expr->as.assign.name.length : 255;
         strncpy(var_name, expr->as.assign.name.start, name_len);
         var_name[name_len] = '\0';
-        DEBUG_VERBOSE("Assignment to '%s'\n", var_name);
+        DEBUG_VERBOSE("Assignment to '%s'", var_name);
     }
         generate_assign_expression(gen, &expr->as.assign);
         break;
@@ -971,30 +971,30 @@ void generate_expression(CodeGen *gen, Expr *expr)
             int name_len = name.length < 255 ? name.length : 255;
             strncpy(func_name, name.start, name_len);
             func_name[name_len] = '\0';
-            DEBUG_VERBOSE("Call to function '%s'\n", func_name);
+            DEBUG_VERBOSE("Call to function '%s'", func_name);
         }
         generate_call_expression(gen, &expr->as.call);
         break;
     case EXPR_ARRAY:
-        DEBUG_VERBOSE("Array expression with %d elements\n",
+        DEBUG_VERBOSE("Array expression with %d elements",
                 expr->as.array.element_count);
         generate_array_expression(gen, &expr->as.array);
         break;
     case EXPR_ARRAY_ACCESS:
-        DEBUG_VERBOSE("Array access expression\n");
+        DEBUG_VERBOSE("Array access expression");
         generate_array_access_expression(gen, &expr->as.array_access);
         break;
     case EXPR_INCREMENT:
-        DEBUG_VERBOSE("Increment expression\n");
+        DEBUG_VERBOSE("Increment expression");
         generate_increment_expression(gen, expr);
         break;
     case EXPR_DECREMENT:
-        DEBUG_VERBOSE("Decrement expression\n");
+        DEBUG_VERBOSE("Decrement expression");
         generate_decrement_expression(gen, expr);
         break;
     }
 
-    DEBUG_VERBOSE("Finished generating expression in function '%s'\n",
+    DEBUG_VERBOSE("Finished generating expression in function '%s'",
             gen->current_function ? gen->current_function : "global");
 
     pop_function_context(gen);
@@ -1030,7 +1030,7 @@ void generate_var_declaration(CodeGen *gen, VarDeclStmt *stmt)
 
 void generate_function(CodeGen *gen, FunctionStmt *stmt)
 {
-    DEBUG_VERBOSE("==== GENERATING FUNCTION '%.*s' ====\n",
+    DEBUG_VERBOSE("==== GENERATING FUNCTION '%.*s' ====",
             stmt->name.length, stmt->name.start);
 
     debug_print_symbol_table(gen->symbol_table, "at function start");
@@ -1047,18 +1047,18 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
         gen->current_function = malloc(stmt->name.length + 1);
         if (gen->current_function == NULL)
         {
-            DEBUG_ERROR("Out of memory\n");
+            DEBUG_ERROR("Out of memory");
             exit(1);
         }
 
         strncpy(gen->current_function, stmt->name.start, stmt->name.length);
         gen->current_function[stmt->name.length] = '\0';
 
-        DEBUG_VERBOSE("Set current_function to '%s'\n", gen->current_function);
+        DEBUG_VERBOSE("Set current_function to '%s'", gen->current_function);
     }
     else
     {
-        DEBUG_ERROR("Function name too long\n");
+        DEBUG_ERROR("Function name too long");
         exit(1);
     }
 
@@ -1069,7 +1069,7 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
 
     // Create a new scope for function parameters
     push_scope(gen->symbol_table);
-    DEBUG_VERBOSE("Created new scope for function '%s'\n", gen->current_function);
+    DEBUG_VERBOSE("Created new scope for function '%s'", gen->current_function);
 
     // Add all parameters to this scope
     for (int i = 0; i < stmt->param_count; i++)
@@ -1078,7 +1078,7 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
         int param_len = stmt->params[i].name.length < 255 ? stmt->params[i].name.length : 255;
         strncpy(param_name, stmt->params[i].name.start, param_len);
         param_name[param_len] = '\0';
-        DEBUG_VERBOSE("Adding parameter %d: '%s' to scope\n", i, param_name);
+        DEBUG_VERBOSE("Adding parameter %d: '%s' to scope", i, param_name);
 
         add_symbol_with_kind(gen->symbol_table, stmt->params[i].name,
                              stmt->params[i].type, SYMBOL_PARAM);
@@ -1097,7 +1097,7 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
             strncpy(var_name, var->name.start, name_len);
             var_name[name_len] = '\0';
 
-            DEBUG_VERBOSE("Pre-adding local variable '%s' to scope\n", var_name);
+            DEBUG_VERBOSE("Pre-adding local variable '%s' to scope", var_name);
             add_symbol_with_kind(gen->symbol_table, var->name, var->type, SYMBOL_LOCAL);
         }
     }
@@ -1111,16 +1111,16 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
         Symbol *param = lookup_symbol(gen->symbol_table, stmt->params[i].name);
         if (param == NULL)
         {
-            DEBUG_ERROR("Could not find parameter %d in symbol table\n", i);
+            DEBUG_ERROR("Could not find parameter %d in symbol table", i);
             char param_name[256];
             int param_len = stmt->params[i].name.length < 255 ? stmt->params[i].name.length : 255;
             strncpy(param_name, stmt->params[i].name.start, param_len);
             param_name[param_len] = '\0';
-            DEBUG_VERBOSE("Parameter name: '%s'\n", param_name);
+            DEBUG_VERBOSE("Parameter name: '%s'", param_name);
             continue;
         }
 
-        DEBUG_VERBOSE("Generating code to save parameter %d to offset %d\n",
+        DEBUG_VERBOSE("Generating code to save parameter %d to offset %d",
                 i, param->offset);
 
         switch (i)
@@ -1149,7 +1149,7 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
     // Generate function body
     for (int i = 0; i < stmt->body_count; i++)
     {
-        DEBUG_VERBOSE("Generating statement %d in function '%s'\n",
+        DEBUG_VERBOSE("Generating statement %d in function '%s'",
                 i, gen->current_function);
         generate_statement(gen, stmt->body[i]);
     }
@@ -1157,14 +1157,14 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
     debug_print_symbol_table(gen->symbol_table, "before leaving function");
 
     // Pop the function parameter scope
-    DEBUG_VERBOSE("Popping function scope\n");
+    DEBUG_VERBOSE("Popping function scope");
     pop_scope(gen->symbol_table);
 
     // Generate function epilogue
     generate_epilogue(gen);
 
     // Restore old function context
-    DEBUG_VERBOSE("Restoring function context from '%s' to '%s'\n",
+    DEBUG_VERBOSE("Restoring function context from '%s' to '%s'",
             gen->current_function, old_function ? old_function : "NULL");
     free(gen->current_function);
     gen->current_function = old_function;
@@ -1172,7 +1172,7 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
 
     pop_function_context(gen);
 
-    DEBUG_VERBOSE("==== COMPLETED FUNCTION '%.*s' ====\n",
+    DEBUG_VERBOSE("==== COMPLETED FUNCTION '%.*s' ====",
         stmt->name.length, stmt->name.start);
 }
 
