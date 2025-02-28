@@ -273,6 +273,9 @@ typedef struct
     const char *filename;
 } Module;
 
+// Debug
+void print_ast(Stmt *stmt, int indent_level);
+
 // Type functions
 void mark_type_non_freeable(Type *type);
 Type *create_primitive_type(TypeKind kind);

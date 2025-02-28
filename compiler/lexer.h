@@ -25,6 +25,7 @@ typedef struct
 // Lexer initialization and scanning
 void init_lexer(Lexer *lexer, const char *source, const char *filename);
 Token scan_token(Lexer *lexer);
+void cleanup_lexer(Lexer *lexer);
 
 // Helper functions
 int is_at_end(Lexer *lexer);
@@ -45,5 +46,8 @@ Token scan_char(Lexer *lexer);
 // Identifier handling
 TokenType identifier_type(Lexer *lexer);
 TokenType check_keyword(Lexer *lexer, int start, int length, const char *rest, TokenType type);
+
+// Indentation handling
+void report_indentation_error(Lexer *lexer, int expected, int actual);
 
 #endif // LEXER_H

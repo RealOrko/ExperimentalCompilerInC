@@ -11,10 +11,56 @@
 // Function to skip over any newlines
 void skip_newlines(Parser *parser)
 {
+    // Skip newlines but capture INDENT/DEDENT tokens
     while (parser_match(parser, TOKEN_NEWLINE))
     {
-        // Just consume the newlines
+        // Check for INDENT/DEDENT after newline
+        if (check(parser, TOKEN_INDENT) || check(parser, TOKEN_DEDENT))
+        {
+            // Don't skip INDENT/DEDENT - let the caller handle it
+            break;
+        }
     }
+}
+
+// In parser.c, add a helper for detecting function boundaries
+int is_at_function_boundary(Parser *parser)
+{
+    // We're at a function boundary if:
+    // 1. We've dedented back to the same level as the function declaration
+    if (check(parser, TOKEN_DEDENT))
+    {
+        return 1;
+    }
+
+    // 2. We see another function declaration
+    if (check(parser, TOKEN_FN))
+    {
+        return 1;
+    }
+
+    // 3. We've reached EOF
+    if (check(parser, TOKEN_EOF))
+    {
+        return 1;
+    }
+
+    return 0;
+}
+
+Expr *parse_multi_line_expression(Parser *parser)
+{
+    Expr *expr = parse_expression(parser);
+
+    // Handle line continuation (using \ at end of line)
+    while (parser_match(parser, TOKEN_NEWLINE))
+    {
+        // Continue parsing the expression on the next line
+        Expr *right = parse_expression(parser);
+        expr = create_binary_expr(expr, TOKEN_PLUS, right);
+    }
+
+    return expr;
 }
 
 // Check if we've reached the end of the file
@@ -47,6 +93,7 @@ void init_parser(Parser *parser, Lexer *lexer)
 void parser_cleanup(Parser *parser)
 {
     free_symbol_table(parser->symbol_table);
+    cleanup_lexer(parser->lexer);
 }
 
 void parser_error(Parser *parser, const char *message)
@@ -68,20 +115,20 @@ void parser_error_at(Parser *parser, Token *token, const char *message)
 
     fprintf(stderr, "[%s:%d] Error", parser->lexer->filename, token->line);
 
-    if (token->type == TOKEN_EOF)
-    {
+    if (token->type == TOKEN_EOF) {
         fprintf(stderr, " at end");
     }
-    else if (token->type == TOKEN_ERROR)
-    {
+    else if (token->type == TOKEN_ERROR) {
         // Nothing
     }
-    else
-    {
+    else {
         fprintf(stderr, " at '%.*s'", token->length, token->start);
     }
 
     fprintf(stderr, ": %s\n", message);
+    
+    // If we're in panic mode, make sure to clean up any pending indentation
+    parser->lexer->indent_size = 1; // Reset to global scope
 }
 
 void parser_advance(Parser *parser)
@@ -672,46 +719,32 @@ Stmt *parse_function_declaration(Parser *parser)
         add_symbol_with_kind(parser->symbol_table, params[i].name, params[i].type, SYMBOL_PARAM);
     }
 
-    // Function body
-    // Function body
+    // Parse body
     consume(parser, TOKEN_ARROW, "Expected '=>' before function body");
-
     skip_newlines(parser);
 
     Stmt **body = NULL;
     int body_count = 0;
     int body_capacity = 0;
 
-    // For all function bodies, collect statements until a clear terminator
-    int done = 0;
+    // For all function bodies, collect statements until a function boundary
     body_capacity = 4; // Start with space for a few statements
     body = malloc(sizeof(Stmt *) * body_capacity);
 
-    // Parse the first statement
-    Stmt *stmt = parse_declaration(parser);
-    if (stmt != NULL)
+    // Continue parsing statements until we find a function boundary
+    while (!is_at_function_boundary(parser) && !parser_is_at_end(parser))
     {
-        body[body_count++] = stmt;
-    }
+        // Skip newlines between statements
+        skip_newlines(parser);
 
-    // Continue parsing statements until we find a clear function terminator
-    while (!done && !parser_is_at_end(parser))
-    {
-        // Skip newlines
-        while (parser_match(parser, TOKEN_NEWLINE))
+        // Check again after skipping newlines
+        if (is_at_function_boundary(parser))
         {
-            // Just consume newlines
-        }
-
-        // Check if we've reached a token that would indicate the end of this function
-        if (check(parser, TOKEN_FN) || check(parser, TOKEN_EOF))
-        {
-            done = 1;
-            continue;
+            break;
         }
 
         // Parse the next statement
-        stmt = parse_declaration(parser);
+        Stmt *stmt = parse_declaration(parser);
         if (stmt == NULL)
         {
             continue;
@@ -726,9 +759,6 @@ Stmt *parse_function_declaration(Parser *parser)
 
         body[body_count++] = stmt;
     }
-
-    // Restore outer scope
-    pop_scope(parser->symbol_table);
 
     return create_function_stmt(name, params, param_count, return_type, body, body_count);
 }
@@ -767,31 +797,22 @@ Stmt *parse_if_statement(Parser *parser)
     consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
     consume(parser, TOKEN_ARROW, "Expected '=>' before 'if' body");
 
-    // Skip any newlines after the arrow
-    while (parser_match(parser, TOKEN_NEWLINE))
-    {
-        // Just consume the newline token
-    }
+    // Skip newlines after arrow
+    skip_newlines(parser);
 
-    // Don't push a new scope here unless it's a block
+    // Parse the then branch
     Stmt *then_branch = parse_statement(parser);
     Stmt *else_branch = NULL;
 
     // Skip newlines before checking for else
-    while (parser_match(parser, TOKEN_NEWLINE))
-    {
-        // Just consume newlines
-    }
+    skip_newlines(parser);
 
     if (parser_match(parser, TOKEN_ELSE))
     {
-        // Skip any newlines after the else
-        while (parser_match(parser, TOKEN_NEWLINE))
-        {
-            // Just consume the newline token
-        }
+        // Skip newlines after else
+        skip_newlines(parser);
 
-        // Don't push a new scope here unless it's a block
+        // Parse the else branch
         else_branch = parse_statement(parser);
     }
 
@@ -805,13 +826,10 @@ Stmt *parse_while_statement(Parser *parser)
     consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
     consume(parser, TOKEN_ARROW, "Expected '=>' before 'while' body");
 
-    // Skip any newlines after the arrow
-    while (parser_match(parser, TOKEN_NEWLINE))
-    {
-        // Just consume the newline token
-    }
+    // Skip newlines after arrow
+    skip_newlines(parser);
 
-    // Don't push a new scope unless it's a block
+    // Parse the body
     Stmt *body = parse_statement(parser);
 
     return create_while_stmt(condition, body);

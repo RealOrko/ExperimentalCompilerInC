@@ -9,7 +9,45 @@
 #include <string.h>
 #include <stdio.h>
 
-// Type functions
+void print_ast(Stmt *stmt, int indent_level)
+{
+    if (stmt == NULL) return;
+    
+    // Print indentation
+    for (int i = 0; i < indent_level; i++) {
+        printf("  ");
+    }
+    
+    // Print statement type
+    switch (stmt->type) {
+        case STMT_EXPR:
+            printf("Expression\n");
+            break;
+        case STMT_VAR_DECL:
+            printf("Variable Declaration: %.*s\n", 
+                   stmt->as.var_decl.name.length, 
+                   stmt->as.var_decl.name.start);
+            break;
+        case STMT_FUNCTION:
+            printf("Function: %.*s\n", 
+                   stmt->as.function.name.length, 
+                   stmt->as.function.name.start);
+            for (int i = 0; i < stmt->as.function.body_count; i++) {
+                print_ast(stmt->as.function.body[i], indent_level + 1);
+            }
+            break;
+        case STMT_IF:
+            printf("If Statement\n");
+            print_ast(stmt->as.if_stmt.then_branch, indent_level + 1);
+            if (stmt->as.if_stmt.else_branch) {
+                for (int i = 0; i < indent_level; i++) printf("  ");
+                printf("Else\n");
+                print_ast(stmt->as.if_stmt.else_branch, indent_level + 1);
+            }
+            break;
+        // Handle other statement types
+    }
+}
 
 void mark_type_non_freeable(Type *type)
 {
