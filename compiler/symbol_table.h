@@ -39,6 +39,7 @@
  void pop_scope(SymbolTable* table);
  
  // Symbol management
+ Type* clone_type(Type* type);
  void add_symbol(SymbolTable* table, Token name, Type* type);
  Symbol* lookup_symbol(SymbolTable* table, Token name);
  Symbol* lookup_symbol_current(SymbolTable* table, Token name);
