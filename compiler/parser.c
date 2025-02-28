@@ -578,9 +578,6 @@ Stmt *parse_var_declaration(Parser *parser)
     return create_var_decl_stmt(name, type, initializer);
 }
 
-// Modify the function declaration parsing function in parser.c
-// Replace the existing parse_function_declaration function with this one
-
 Stmt *parse_function_declaration(Parser *parser)
 {
     Token name;
@@ -676,6 +673,7 @@ Stmt *parse_function_declaration(Parser *parser)
     }
 
     // Function body
+    // Function body
     consume(parser, TOKEN_ARROW, "Expected '=>' before function body");
 
     skip_newlines(parser);
@@ -684,68 +682,49 @@ Stmt *parse_function_declaration(Parser *parser)
     int body_count = 0;
     int body_capacity = 0;
 
-    if (parser_match(parser, TOKEN_LEFT_BRACE))
+    // For all function bodies, collect statements until a clear terminator
+    int done = 0;
+    body_capacity = 4; // Start with space for a few statements
+    body = malloc(sizeof(Stmt *) * body_capacity);
+
+    // Parse the first statement
+    Stmt *stmt = parse_declaration(parser);
+    if (stmt != NULL)
     {
-        // Block body
-        while (!check(parser, TOKEN_RIGHT_BRACE) && !check(parser, TOKEN_EOF))
-        {
-            Stmt *stmt = parse_declaration(parser);
-            if (stmt == NULL) {
-                continue; // Skip NULL statements
-            }
-
-            if (body_count >= body_capacity)
-            {
-                body_capacity = body_capacity == 0 ? 8 : body_capacity * 2;
-                body = realloc(body, sizeof(Stmt *) * body_capacity);
-            }
-
-            body[body_count++] = stmt;
-        }
-
-        consume(parser, TOKEN_RIGHT_BRACE, "Expected '}' after function body");
+        body[body_count++] = stmt;
     }
-    else
+
+    // Continue parsing statements until we find a clear function terminator
+    while (!done && !parser_is_at_end(parser))
     {
-        // For single-statement functions, collect all statements until a clear terminator
-        int done = 0;
-        body_capacity = 4; // Start with space for a few statements
-        body = malloc(sizeof(Stmt *) * body_capacity);
-        
-        // Parse the first statement
-        Stmt *stmt = parse_declaration(parser);
-        if (stmt != NULL) {
-            body[body_count++] = stmt;
+        // Skip newlines
+        while (parser_match(parser, TOKEN_NEWLINE))
+        {
+            // Just consume newlines
         }
-        
-        // Continue parsing statements until we find a clear function terminator
-        // This handles the case where a function without braces has multiple statements
-        while (!done && !parser_is_at_end(parser)) {
-            // Skip newlines
-            while (parser_match(parser, TOKEN_NEWLINE)) {
-                // Just consume newlines
-            }
-            
-            // Check if we've reached a token that would indicate the end of this function
-            if (check(parser, TOKEN_FN) || check(parser, TOKEN_EOF)) {
-                done = 1;
-                continue;
-            }
-            
-            // Parse the next statement
-            stmt = parse_declaration(parser);
-            if (stmt == NULL) {
-                continue;
-            }
-            
-            // Add it to the function body
-            if (body_count >= body_capacity) {
-                body_capacity *= 2;
-                body = realloc(body, sizeof(Stmt *) * body_capacity);
-            }
-            
-            body[body_count++] = stmt;
+
+        // Check if we've reached a token that would indicate the end of this function
+        if (check(parser, TOKEN_FN) || check(parser, TOKEN_EOF))
+        {
+            done = 1;
+            continue;
         }
+
+        // Parse the next statement
+        stmt = parse_declaration(parser);
+        if (stmt == NULL)
+        {
+            continue;
+        }
+
+        // Add it to the function body
+        if (body_count >= body_capacity)
+        {
+            body_capacity *= 2;
+            body = realloc(body, sizeof(Stmt *) * body_capacity);
+        }
+
+        body[body_count++] = stmt;
     }
 
     // Restore outer scope
@@ -892,7 +871,9 @@ Stmt *parse_block_statement(Parser *parser)
     // Create a new scope
     push_scope(parser->symbol_table);
 
-    while (!check(parser, TOKEN_RIGHT_BRACE) && !parser_is_at_end(parser))
+    // Parse statements until we reach a level of dedentation
+    // or another token that would indicate the end of a block
+    while (!parser_is_at_end(parser))
     {
         // Skip newlines between statements
         while (parser_match(parser, TOKEN_NEWLINE))
@@ -900,12 +881,17 @@ Stmt *parse_block_statement(Parser *parser)
             // Just consume newlines
         }
 
-        if (check(parser, TOKEN_RIGHT_BRACE) || parser_is_at_end(parser))
+        // If we hit the end or dedentation, break
+        if (parser_is_at_end(parser) || check(parser, TOKEN_DEDENT))
         {
             break;
         }
 
         Stmt *stmt = parse_declaration(parser);
+        if (stmt == NULL)
+        {
+            continue; // Skip NULL statements
+        }
 
         if (count >= capacity)
         {
@@ -915,8 +901,6 @@ Stmt *parse_block_statement(Parser *parser)
 
         statements[count++] = stmt;
     }
-
-    consume(parser, TOKEN_RIGHT_BRACE, "Expected '}' after block");
 
     // Restore outer scope
     pop_scope(parser->symbol_table);
