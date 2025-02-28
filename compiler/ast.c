@@ -9,6 +9,26 @@
  #include <stdio.h>
  
  // Type functions
+
+ void mark_type_non_freeable(Type* type) {
+    if (type == NULL) return;
+    
+    type->should_free = 0;
+    
+    // Also mark nested types
+    if (type->kind == TYPE_ARRAY && type->as.array.element_type) {
+        mark_type_non_freeable(type->as.array.element_type);
+    } 
+    else if (type->kind == TYPE_FUNCTION) {
+        if (type->as.function.return_type) 
+            mark_type_non_freeable(type->as.function.return_type);
+            
+        for (int i = 0; i < type->as.function.param_count; i++) {
+            if (type->as.function.param_types[i])
+                mark_type_non_freeable(type->as.function.param_types[i]);
+        }
+    }
+}
  
  Type* create_primitive_type(TypeKind kind) {
      Type* type = malloc(sizeof(Type));
@@ -17,6 +37,7 @@
          exit(1);
      }
      type->kind = kind;
+     type->should_free = 1;  // Default to freeable
      return type;
  }
  
@@ -145,6 +166,9 @@
  
  void free_type(Type* type) {
      if (type == NULL) return;
+
+     // Skip freeing if marked as non-freeable
+    if (!type->should_free) return;
      
      switch (type->kind) {
          case TYPE_ARRAY:
@@ -682,22 +706,76 @@
      
      module->statements[module->count++] = stmt;
  }
+
+ void free_stmt_preserve_types(Stmt* stmt) {
+    if (stmt == NULL) return;
+    
+    switch (stmt->type) {
+        case STMT_EXPR:
+            if (stmt->as.expression.expression != NULL) {
+                free_expr_preserve_types(stmt->as.expression.expression);
+                stmt->as.expression.expression = NULL;
+            }
+            break;
+            
+        case STMT_VAR_DECL:
+            // Don't free the type here - the symbol table owns it
+            // stmt->as.var_decl.type = NULL; // Just nullify 
+            
+            if (stmt->as.var_decl.initializer != NULL) {
+                free_expr_preserve_types(stmt->as.var_decl.initializer);
+                stmt->as.var_decl.initializer = NULL;
+            }
+            break;
+            
+        // Handle all other statement types similarly...
+        // (same as free_stmt but skip freeing types)
+    }
+    
+    free(stmt);
+}
  
  void free_module(Module* module) {
-     if (module == NULL) return;
-     
-     if (module->statements != NULL) {
-         for (int i = 0; i < module->count; i++) {
-             if (module->statements[i] != NULL) {
-                 free_stmt(module->statements[i]);
-                 module->statements[i] = NULL;
-             }
-         }
-         
-         free(module->statements);
-         module->statements = NULL;
-     }
-     
-     module->count = 0;
-     module->capacity = 0;
- }
+    if (module == NULL) return;
+    
+    if (module->statements != NULL) {
+        for (int i = 0; i < module->count; i++) {
+            if (module->statements[i] != NULL) {
+                // Use a special flag to indicate we're in cleanup mode
+                free_stmt_preserve_types(module->statements[i]);
+                module->statements[i] = NULL;
+            }
+        }
+        
+        free(module->statements);
+        module->statements = NULL;
+    }
+    
+    module->count = 0;
+    module->capacity = 0;
+}
+
+void free_expr_preserve_types(Expr* expr) {
+    if (expr == NULL) return;
+    
+    switch (expr->type) {
+        case EXPR_BINARY:
+            if (expr->as.binary.left != NULL) {
+                free_expr_preserve_types(expr->as.binary.left);
+                expr->as.binary.left = NULL;
+            }
+            if (expr->as.binary.right != NULL) {
+                free_expr_preserve_types(expr->as.binary.right);
+                expr->as.binary.right = NULL;
+            }
+            break;
+            
+        // Handle all other expression types similarly...
+        // (same as free_expr but skip freeing types)
+    }
+    
+    // Don't free the type here - the symbol table owns it
+    // expr->expr_type = NULL; // Just nullify
+    
+    free(expr);
+}

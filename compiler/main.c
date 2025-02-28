@@ -105,9 +105,11 @@
      Type** param_types = malloc(sizeof(Type*));
      param_types[0] = string_type;
      
-     Type* print_type = create_function_type(create_primitive_type(TYPE_VOID), param_types, 1);
-     add_symbol(parser.symbol_table, print_token, print_type);
-     
+     // After creating the print type
+    Type* print_type = create_function_type(create_primitive_type(TYPE_VOID), param_types, 1);
+    mark_type_non_freeable(print_type);  // Mark as non-freeable
+    add_symbol(parser.symbol_table, print_token, print_type);
+
      // Process each function in the module
      for (int i = 0; i < module->count; i++) {
          Stmt* stmt = module->statements[i];
@@ -151,17 +153,23 @@
          DEBUG_ERROR("Type checking failed");
      }
      
-     // Clean up in reverse order of initialization
-     DEBUG_INFO("Cleaning up resources");
-     
-     if (module != NULL) {
-         free_module(module);
-         free(module);
-     }
-     
-     parser_cleanup(&parser);
-     free(source);
-     compiler_options_cleanup(&options);
-     
+    // Clean up in reverse order of initialization
+    DEBUG_INFO("Cleaning up resources");
+
+    if (module != NULL) {
+        free_module(module);
+        free(module);
+        module = NULL;
+    }
+
+    // Clear symbol table without freeing types again
+    SymbolTable* table = parser.symbol_table;
+    parser.symbol_table = NULL;  // Prevent parser_cleanup from freeing it again
+    free_symbol_table(table);
+
+    parser_cleanup(&parser);
+    free(source);
+    compiler_options_cleanup(&options);
+
      return type_check_success ? 0 : 1;
  }

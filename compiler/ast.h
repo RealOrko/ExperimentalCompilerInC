@@ -30,6 +30,7 @@
  
  struct Type {
      TypeKind kind;
+     int should_free;
      
      union {
          // For array types
@@ -242,6 +243,7 @@
  } Module;
  
  // Type functions
+ void mark_type_non_freeable(Type* type);
  Type* create_primitive_type(TypeKind kind);
  Type* create_array_type(Type* element_type);
  Type* create_function_type(Type* return_type, Type** param_types, int param_count);
@@ -279,5 +281,7 @@
  void init_module(Module* module, const char* filename);
  void module_add_statement(Module* module, Stmt* stmt);
  void free_module(Module* module);
+ void free_stmt_preserve_types(Stmt* stmt);
+ void free_expr_preserve_types(Expr* expr);
  
  #endif // AST_H
