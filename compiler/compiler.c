@@ -21,6 +21,7 @@ void init_compiler_options(CompilerOptions *options)
     options->source_file = NULL;
     options->output_file = NULL;
     options->verbose = 0;
+    options->log_level = DEBUG_LEVEL_ERROR; // Default log level is ERROR
 }
 
 void compiler_options_cleanup(CompilerOptions *options)
@@ -50,7 +51,10 @@ int parse_args(int argc, char **argv, CompilerOptions *options)
     DEBUG_VERBOSE("Parsing command line arguments, argc=%d", argc);
     if (argc < 2)
     {
-        fprintf(stderr, "Usage: %s <source_file> [-o <output_file>] [-v]\n", argv[0]);
+        fprintf(stderr, "Usage: %s <source_file> [-o <output_file>] [-v] [-l <level>]\n", argv[0]);
+        fprintf(stderr, "  -o <output_file>   Specify output file (default is source_file.o)\n");
+        fprintf(stderr, "  -v                 Verbose mode\n");
+        fprintf(stderr, "  -l <level>         Set log level (0=none, 1=error, 2=warning, 3=info, 4=verbose)\n");
         return 0;
     }
 
@@ -110,6 +114,23 @@ int parse_args(int argc, char **argv, CompilerOptions *options)
         {
             options->verbose = 1;
             DEBUG_VERBOSE("Verbose mode enabled");
+        }
+        else if (strcmp(argv[i], "-l") == 0 && i + 1 < argc)
+        {
+            // Parse log level
+            i++;
+            int log_level = atoi(argv[i]);
+            
+            // Ensure log level is valid
+            if (log_level < DEBUG_LEVEL_NONE || log_level > DEBUG_LEVEL_VERBOSE)
+            {
+                DEBUG_WARNING("Invalid log level: %d, using default", log_level);
+            }
+            else
+            {
+                options->log_level = log_level;
+                DEBUG_VERBOSE("Log level set to: %d", options->log_level);
+            }
         }
         else
         {

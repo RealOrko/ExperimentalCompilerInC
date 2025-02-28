@@ -38,11 +38,6 @@ int can_assign_to_param(Type *param_type, Expr *arg_expr)
 
 int main(int argc, char **argv)
 {
-    // Initialize debugging
-    init_debug(DEBUG_LEVEL_INFO);
-
-    DEBUG_INFO("Compiler starting up");
-
     // Variables that need cleanup
     CompilerOptions options;
     char *source = NULL;
@@ -58,8 +53,12 @@ int main(int argc, char **argv)
         return 1;
     }
 
+    // Initialize debugging with the specified log level
+    init_debug(options.log_level);
+
     DEBUG_INFO("Source file: %s", options.source_file);
     DEBUG_INFO("Output file: %s", options.output_file);
+    DEBUG_INFO("Log level: %d", options.log_level);
 
     // Read the source file
     source = read_file(options.source_file);
