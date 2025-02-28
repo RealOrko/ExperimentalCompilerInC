@@ -15,8 +15,13 @@ typedef struct
     int label_count;
     SymbolTable *symbol_table;
     FILE *output;
-    char *current_function;
-    Type *current_return_type;
+    char *current_function;      // Current function name
+    Type *current_return_type;   // Current function return type
+    
+    // Function context stack for handling nested expressions
+    int function_stack_capacity;
+    int function_stack_size;
+    char **function_stack;       // Stack of function names
 } CodeGen;
 
 // Initialize and cleanup code generator

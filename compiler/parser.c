@@ -578,6 +578,9 @@ Stmt *parse_var_declaration(Parser *parser)
     return create_var_decl_stmt(name, type, initializer);
 }
 
+// Modify the function declaration parsing function in parser.c
+// Replace the existing parse_function_declaration function with this one
+
 Stmt *parse_function_declaration(Parser *parser)
 {
     Token name;
@@ -663,12 +666,13 @@ Stmt *parse_function_declaration(Parser *parser)
     add_symbol(parser->symbol_table, name, function_type);
 
     // Create a new scope for function body
-    push_scope(parser->symbol_table);
+    // Use the new begin_function_scope instead of push_scope
+    begin_function_scope(parser->symbol_table);
 
-    // Add parameters to symbol table
+    // Add parameters to symbol table with SYMBOL_PARAM kind
     for (int i = 0; i < param_count; i++)
     {
-        add_symbol(parser->symbol_table, params[i].name, params[i].type);
+        add_symbol_with_kind(parser->symbol_table, params[i].name, params[i].type, SYMBOL_PARAM);
     }
 
     // Function body
