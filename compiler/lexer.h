@@ -9,12 +9,19 @@
  #include "token.h"
  
  typedef struct {
-     const char* start;     // Start of the current lexeme
-     const char* current;   // Current character being examined
-     int line;              // Current line number
-     const char* filename;  // Source filename
- } Lexer;
- 
+    const char* start;     // Start of the current lexeme
+    const char* current;   // Current character being examined
+    int line;              // Current line number
+    const char* filename;  // Source filename
+    
+    // Add these fields for indentation tracking
+    int* indent_stack;     // Stack of indentation levels
+    int indent_size;       // Current size of the indent stack
+    int indent_capacity;   // Capacity of the indent stack
+    int at_line_start;     // Whether we're at the start of a line
+} Lexer;
+
+
  // Lexer initialization and scanning
  void init_lexer(Lexer* lexer, const char* source, const char* filename);
  Token scan_token(Lexer* lexer);

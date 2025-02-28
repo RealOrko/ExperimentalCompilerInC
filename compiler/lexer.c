@@ -10,11 +10,18 @@
  #include <ctype.h>
  
  void init_lexer(Lexer* lexer, const char* source, const char* filename) {
-     lexer->start = source;
-     lexer->current = source;
-     lexer->line = 1;
-     lexer->filename = filename;
- }
+    lexer->start = source;
+    lexer->current = source;
+    lexer->line = 1;
+    lexer->filename = filename;
+    
+    // Initialize indentation tracking
+    lexer->indent_capacity = 8;
+    lexer->indent_stack = malloc(sizeof(int) * lexer->indent_capacity);
+    lexer->indent_size = 1;
+    lexer->indent_stack[0] = 0;  // Base level has zero indentation
+    lexer->at_line_start = 1;    // Start at the beginning of a line
+}
  
  int is_at_end(Lexer* lexer) {
      return *lexer->current == '\0';
@@ -53,36 +60,38 @@
      return token;
  }
  
- void skip_whitespace(Lexer* lexer) {
-     for (;;) {
-         char c = peek(lexer);
-         switch (c) {
-             case ' ':
-             case '\r':
-             case '\t':
-                 advance(lexer);
-                 break;
-             case '\n':
-                 lexer->line++;
-                 advance(lexer);
-                 break;
-             case '/':
-                 if (peek_next(lexer) == '/') {
-                     // A comment goes until the end of the line
-                     while (peek(lexer) != '\n' && !is_at_end(lexer)) {
-                         advance(lexer);
-                     }
-                 } else {
-                     return;
-                 }
-                 break;
-             default:
-                 return;
-         }
-     }
- }
  
- TokenType check_keyword(Lexer* lexer, int start, int length, const char* rest, TokenType type) {
+ void skip_whitespace(Lexer* lexer) {
+    for (;;) {
+        char c = peek(lexer);
+        switch (c) {
+            case ' ':
+            case '\r':
+            case '\t':
+                advance(lexer);
+                break;
+            case '\n':
+                // Don't skip newlines - they're significant now
+                return;
+            case '/':
+                if (peek_next(lexer) == '/') {
+                    // A comment goes until the end of the line
+                    while (peek(lexer) != '\n' && !is_at_end(lexer)) {
+                        advance(lexer);
+                    }
+                    // Now at newline, but don't consume it
+                } else {
+                    return;
+                }
+                break;
+            default:
+                return;
+        }
+    }
+}
+
+
+TokenType check_keyword(Lexer* lexer, int start, int length, const char* rest, TokenType type) {
      int lexeme_length = (int)(lexer->current - lexer->start);
      if (lexeme_length == start + length && 
          memcmp(lexer->start + start, rest, length) == 0) {
@@ -413,85 +422,92 @@
  }
  
  Token scan_token(Lexer* lexer) {
-     skip_whitespace(lexer);
-     
-     lexer->start = lexer->current;
-     
-     if (is_at_end(lexer)) {
-         return make_token(lexer, TOKEN_EOF);
-     }
-     
-     char c = advance(lexer);
-     
-     // Identifiers
-     if (isalpha(c) || c == '_') {
-         return scan_identifier(lexer);
-     }
-     
-     // Numbers
-     if (isdigit(c)) {
-         return scan_number(lexer);
-     }
-     
-     switch (c) {
-         // Single-character tokens
-         case '(': return make_token(lexer, TOKEN_LEFT_PAREN);
-         case ')': return make_token(lexer, TOKEN_RIGHT_PAREN);
-         case '{': return make_token(lexer, TOKEN_LEFT_BRACE);
-         case '}': return make_token(lexer, TOKEN_RIGHT_BRACE);
-         case '[': return make_token(lexer, TOKEN_LEFT_BRACKET);
-         case ']': return make_token(lexer, TOKEN_RIGHT_BRACKET);
-         case ';': return make_token(lexer, TOKEN_SEMICOLON);
-         case ':': return make_token(lexer, TOKEN_COLON);
-         case ',': return make_token(lexer, TOKEN_COMMA);
-         case '.': return make_token(lexer, TOKEN_DOT);
-         case '-': 
-             if (match(lexer, '>')) {
-                 return make_token(lexer, TOKEN_ARROW);
-             } else if (match(lexer, '-')) {
-                 return make_token(lexer, TOKEN_MINUS_MINUS);
-             }
-             return make_token(lexer, TOKEN_MINUS);
-         case '+': 
-             if (match(lexer, '+')) {
-                 return make_token(lexer, TOKEN_PLUS_PLUS);
-             }
-             return make_token(lexer, TOKEN_PLUS);
-         case '*': return make_token(lexer, TOKEN_STAR);
-         case '/': return make_token(lexer, TOKEN_SLASH);
-         case '%': return make_token(lexer, TOKEN_MODULO);
-         
-         // One or two character tokens
-         case '!':
-             return make_token(lexer, match(lexer, '=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
-         case '=':
-             if (match(lexer, '=')) {
-                 return make_token(lexer, TOKEN_EQUAL_EQUAL);
-             } else if (match(lexer, '>')) {
-                 return make_token(lexer, TOKEN_ARROW);
-             }
-             return make_token(lexer, TOKEN_EQUAL);
-         case '<':
-             return make_token(lexer, match(lexer, '=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
-         case '>':
-             return make_token(lexer, match(lexer, '=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
-         
-         // Literals
-         case '"': return scan_string(lexer);
-         case '\'': return scan_char(lexer);
-         
-         // Two-character tokens
-         case '&':
-             if (match(lexer, '&')) {
-                 return make_token(lexer, TOKEN_AND);
-             }
-             return error_token(lexer, "Expected '&' after '&'");
-         case '|':
-             if (match(lexer, '|')) {
-                 return make_token(lexer, TOKEN_OR);
-             }
-             return error_token(lexer, "Expected '|' after '|'");
-     }
-     
-     return error_token(lexer, "Unexpected character");
- }
+    // Skip whitespace but not newlines
+    skip_whitespace(lexer);
+    
+    lexer->start = lexer->current;
+    
+    if (is_at_end(lexer)) {
+        return make_token(lexer, TOKEN_EOF);
+    }
+    
+    char c = advance(lexer);
+    
+    // Handle newline as a token
+    if (c == '\n') {
+        lexer->line++;
+        return make_token(lexer, TOKEN_NEWLINE);
+    }
+    
+    // Identifiers
+    if (isalpha(c) || c == '_') {
+        return scan_identifier(lexer);
+    }
+    
+    // Numbers
+    if (isdigit(c)) {
+        return scan_number(lexer);
+    }
+    
+    switch (c) {
+        // Single-character tokens
+        case '(': return make_token(lexer, TOKEN_LEFT_PAREN);
+        case ')': return make_token(lexer, TOKEN_RIGHT_PAREN);
+        case '{': return make_token(lexer, TOKEN_LEFT_BRACE);
+        case '}': return make_token(lexer, TOKEN_RIGHT_BRACE);
+        case '[': return make_token(lexer, TOKEN_LEFT_BRACKET);
+        case ']': return make_token(lexer, TOKEN_RIGHT_BRACKET);
+        case ';': return make_token(lexer, TOKEN_SEMICOLON);
+        case ':': return make_token(lexer, TOKEN_COLON);
+        case ',': return make_token(lexer, TOKEN_COMMA);
+        case '.': return make_token(lexer, TOKEN_DOT);
+        case '-': 
+            if (match(lexer, '>')) {
+                return make_token(lexer, TOKEN_ARROW);
+            } else if (match(lexer, '-')) {
+                return make_token(lexer, TOKEN_MINUS_MINUS);
+            }
+            return make_token(lexer, TOKEN_MINUS);
+        case '+': 
+            if (match(lexer, '+')) {
+                return make_token(lexer, TOKEN_PLUS_PLUS);
+            }
+            return make_token(lexer, TOKEN_PLUS);
+        case '*': return make_token(lexer, TOKEN_STAR);
+        case '/': return make_token(lexer, TOKEN_SLASH);
+        case '%': return make_token(lexer, TOKEN_MODULO);
+        
+        // One or two character tokens
+        case '!':
+            return make_token(lexer, match(lexer, '=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
+        case '=':
+            if (match(lexer, '=')) {
+                return make_token(lexer, TOKEN_EQUAL_EQUAL);
+            } else if (match(lexer, '>')) {
+                return make_token(lexer, TOKEN_ARROW);
+            }
+            return make_token(lexer, TOKEN_EQUAL);
+        case '<':
+            return make_token(lexer, match(lexer, '=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
+        case '>':
+            return make_token(lexer, match(lexer, '=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
+        
+        // Literals
+        case '"': return scan_string(lexer);
+        case '\'': return scan_char(lexer);
+        
+        // Two-character tokens
+        case '&':
+            if (match(lexer, '&')) {
+                return make_token(lexer, TOKEN_AND);
+            }
+            return error_token(lexer, "Expected '&' after '&'");
+        case '|':
+            if (match(lexer, '|')) {
+                return make_token(lexer, TOKEN_OR);
+            }
+            return error_token(lexer, "Expected '|' after '|'");
+    }
+    
+    return error_token(lexer, "Unexpected character");
+}

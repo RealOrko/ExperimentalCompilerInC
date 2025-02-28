@@ -497,29 +497,29 @@
  }
  
  void type_check_function(TypeChecker* checker, FunctionStmt* stmt) {
-     // Save the current function return type
-     Type* old_return_type = checker->current_function_return_type;
-     checker->current_function_return_type = stmt->return_type;
-     
-     // Create a new scope for the function body
-     push_scope(checker->symbol_table);
-     
-     // Add parameters to the symbol table
-     for (int i = 0; i < stmt->param_count; i++) {
-         add_symbol(checker->symbol_table, stmt->params[i].name, stmt->params[i].type);
-     }
-     
-     // Type check the function body
-     for (int i = 0; i < stmt->body_count; i++) {
-         type_check_statement(checker, stmt->body[i]);
-     }
-     
-     // Restore the outer scope
-     pop_scope(checker->symbol_table);
-     
-     // Restore the previous function return type
-     checker->current_function_return_type = old_return_type;
- }
+    // Save the current function return type
+    Type* old_return_type = checker->current_function_return_type;
+    checker->current_function_return_type = stmt->return_type;
+    
+    // Create a new scope for the function body
+    push_scope(checker->symbol_table);
+    
+    // Add parameters to the symbol table
+    for (int i = 0; i < stmt->param_count; i++) {
+        add_symbol(checker->symbol_table, stmt->params[i].name, stmt->params[i].type);
+    }
+    
+    // Type check the function body
+    for (int i = 0; i < stmt->body_count; i++) {
+        type_check_statement(checker, stmt->body[i]);
+    }
+    
+    // Restore the outer scope
+    pop_scope(checker->symbol_table);
+    
+    // Restore the previous function return type
+    checker->current_function_return_type = old_return_type;
+}
  
  void type_check_return_statement(TypeChecker* checker, ReturnStmt* stmt) {
      if (checker->current_function_return_type == NULL) {

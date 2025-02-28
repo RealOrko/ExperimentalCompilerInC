@@ -8,6 +8,26 @@
  #include <stdlib.h>
  #include <string.h>
  
+ // Function to skip over any newlines
+void skip_newlines(Parser* parser) {
+    while (parser_match(parser, TOKEN_NEWLINE)) {
+        // Just consume the newlines
+    }
+}
+
+// Check if we've reached the end of the file
+int parser_is_at_end(Parser* parser) {
+    return parser->current.type == TOKEN_EOF;
+}
+
+// Skip all newlines and check if we're at the end
+int skip_newlines_and_check_end(Parser* parser) {
+    while (parser_match(parser, TOKEN_NEWLINE)) {
+        // Just consume the newlines
+    }
+    return parser_is_at_end(parser);
+}
+
  void init_parser(Parser* parser, Lexer* lexer) {
      parser->lexer = lexer;
      parser->had_error = 0;
@@ -78,31 +98,32 @@
      return 1;
  }
  
- // Synchronize after an error
  static void synchronize(Parser* parser) {
-     parser->panic_mode = 0;
-     
-     while (parser->current.type != TOKEN_EOF) {
-         if (parser->previous.type == TOKEN_SEMICOLON) return;
-         
-         switch (parser->current.type) {
-             case TOKEN_FN:
-             case TOKEN_VAR:
-             case TOKEN_FOR:
-             case TOKEN_IF:
-             case TOKEN_WHILE:
-             case TOKEN_RETURN:
-             case TOKEN_IMPORT:
-                 return;
-                 
-             default:
-                 // Do nothing
-                 ;
-         }
-         
-         parser_advance(parser);
-     }
- }
+    parser->panic_mode = 0;
+    
+    while (!parser_is_at_end(parser)) {
+        if (parser->previous.type == TOKEN_SEMICOLON || 
+            parser->previous.type == TOKEN_NEWLINE) 
+            return;
+        
+        switch (parser->current.type) {
+            case TOKEN_FN:
+            case TOKEN_VAR:
+            case TOKEN_FOR:
+            case TOKEN_IF:
+            case TOKEN_WHILE:
+            case TOKEN_RETURN:
+            case TOKEN_IMPORT:
+                return;
+                
+            default:
+                // Do nothing
+                ;
+        }
+        
+        parser_advance(parser);
+    }
+}
  
  // Parse a type
  Type* parse_type(Parser* parser) {
@@ -351,74 +372,104 @@
  // Parse statements
  
  Stmt* parse_statement(Parser* parser) {
-     if (parser_match(parser, TOKEN_IF)) {
-         return parse_if_statement(parser);
-     }
-     
-     if (parser_match(parser, TOKEN_WHILE)) {
-         return parse_while_statement(parser);
-     }
-     
-     if (parser_match(parser, TOKEN_FOR)) {
-         return parse_for_statement(parser);
-     }
-     
-     if (parser_match(parser, TOKEN_RETURN)) {
-         return parse_return_statement(parser);
-     }
-     
-     if (parser_match(parser, TOKEN_LEFT_BRACE)) {
-         return parse_block_statement(parser);
-     }
-     
-     return parse_expression_statement(parser);
- }
- 
- Stmt* parse_declaration(Parser* parser) {
-     if (parser_match(parser, TOKEN_VAR)) {
-         return parse_var_declaration(parser);
-     }
-     
-     if (parser_match(parser, TOKEN_FN)) {
-         return parse_function_declaration(parser);
-     }
-     
-     if (parser_match(parser, TOKEN_IMPORT)) {
-         return parse_import_statement(parser);
-     }
-     
-     return parse_statement(parser);
- }
- 
+    // Skip any leading newlines
+    while (parser_match(parser, TOKEN_NEWLINE)) {
+        // Just consume newlines
+    }
+    
+    if (parser_is_at_end(parser)) {
+        parser_error(parser, "Unexpected end of file");
+        return NULL;
+    }
+    
+    if (parser_match(parser, TOKEN_VAR)) {
+        return parse_var_declaration(parser);
+    }
+    
+    if (parser_match(parser, TOKEN_IF)) {
+        return parse_if_statement(parser);
+    }
+    
+    if (parser_match(parser, TOKEN_WHILE)) {
+        return parse_while_statement(parser);
+    }
+    
+    if (parser_match(parser, TOKEN_FOR)) {
+        return parse_for_statement(parser);
+    }
+    
+    if (parser_match(parser, TOKEN_RETURN)) {
+        return parse_return_statement(parser);
+    }
+    
+    if (parser_match(parser, TOKEN_LEFT_BRACE)) {
+        return parse_block_statement(parser);
+    }
+    
+    return parse_expression_statement(parser);
+}
+
+
+Stmt* parse_declaration(Parser* parser) {
+    // Skip newlines before declarations
+    while (parser_match(parser, TOKEN_NEWLINE)) {
+        // Just consume newlines
+    }
+    
+    if (parser_is_at_end(parser)) {
+        // Return NULL or some sentinel value to indicate EOF
+        parser_error(parser, "Unexpected end of file");
+        return NULL;
+    }
+    
+    if (parser_match(parser, TOKEN_VAR)) {
+        return parse_var_declaration(parser);
+    }
+    
+    if (parser_match(parser, TOKEN_FN)) {
+        return parse_function_declaration(parser);
+    }
+    
+    if (parser_match(parser, TOKEN_IMPORT)) {
+        return parse_import_statement(parser);
+    }
+    
+    return parse_statement(parser);
+}
+
  Stmt* parse_var_declaration(Parser* parser) {
-     Token name;
-     if (check(parser, TOKEN_IDENTIFIER)) {
-         name = parser->current;
-         parser_advance(parser);
-     } else {
-         parser_error_at_current(parser, "Expected variable name");
-         // Error recovery
-         name = parser->current;
-         parser_advance(parser);
-     }
-     
-     consume(parser, TOKEN_COLON, "Expected ':' after variable name");
-     
-     Type* type = parse_type(parser);
-     
-     Expr* initializer = NULL;
-     if (parser_match(parser, TOKEN_EQUAL)) {
-         initializer = parse_expression(parser);
-     }
-     
-     consume(parser, TOKEN_SEMICOLON, "Expected ';' after variable declaration");
-     
-     // Add to symbol table
-     add_symbol(parser->symbol_table, name, type);
-     
-     return create_var_decl_stmt(name, type, initializer);
- }
- 
+    Token name;
+    if (check(parser, TOKEN_IDENTIFIER)) {
+        name = parser->current;
+        parser_advance(parser);
+    } else {
+        parser_error_at_current(parser, "Expected variable name");
+        // Error recovery
+        name = parser->current;
+        parser_advance(parser);
+    }
+    
+    consume(parser, TOKEN_COLON, "Expected ':' after variable name");
+    
+    Type* type = parse_type(parser);
+    
+    Expr* initializer = NULL;
+    if (parser_match(parser, TOKEN_EQUAL)) {
+        initializer = parse_expression(parser);
+    }
+    
+    // Accept either semicolon or newline
+    if (!parser_match(parser, TOKEN_SEMICOLON) && 
+        !parser_match(parser, TOKEN_NEWLINE)) {
+        consume(parser, TOKEN_SEMICOLON, "Expected ';' or newline after variable declaration");
+    }
+    
+    // Add to symbol table
+    add_symbol(parser->symbol_table, name, type);
+    
+    return create_var_decl_stmt(name, type, initializer);
+}
+
  Stmt* parse_function_declaration(Parser* parser) {
     Token name;
     if (check(parser, TOKEN_IDENTIFIER)) {
@@ -499,6 +550,8 @@
     
     // Function body
     consume(parser, TOKEN_ARROW, "Expected '=>' before function body");
+
+    skip_newlines(parser);
     
     Stmt** body = NULL;
     int body_count = 0;
@@ -533,113 +586,167 @@
     return create_function_stmt(name, params, param_count, return_type, body, body_count);
 }
  
- Stmt* parse_return_statement(Parser* parser) {
-     Token keyword = parser->previous;
-     
-     Expr* value = NULL;
-     if (!check(parser, TOKEN_SEMICOLON)) {
-         value = parse_expression(parser);
-     }
-     
-     consume(parser, TOKEN_SEMICOLON, "Expected ';' after return value");
-     
-     return create_return_stmt(keyword, value);
- }
- 
- Stmt* parse_if_statement(Parser* parser) {
-     consume(parser, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
-     Expr* condition = parse_expression(parser);
-     consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
-     consume(parser, TOKEN_ARROW, "Expected '=>' before 'if' body");
-     
-     Stmt* then_branch = parse_statement(parser);
-     Stmt* else_branch = NULL;
-     
-     if (parser_match(parser, TOKEN_ELSE)) {
-         else_branch = parse_statement(parser);
-     }
-     
-     return create_if_stmt(condition, then_branch, else_branch);
- }
- 
- Stmt* parse_while_statement(Parser* parser) {
-     consume(parser, TOKEN_LEFT_PAREN, "Expected '(' after 'while'");
-     Expr* condition = parse_expression(parser);
-     consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
-     consume(parser, TOKEN_ARROW, "Expected '=>' before 'while' body");
-     
-     Stmt* body = parse_statement(parser);
-     
-     return create_while_stmt(condition, body);
- }
- 
- Stmt* parse_for_statement(Parser* parser) {
-     consume(parser, TOKEN_LEFT_PAREN, "Expected '(' after 'for'");
-     
-     // Initializer
-     Stmt* initializer;
-     if (parser_match(parser, TOKEN_SEMICOLON)) {
-         initializer = NULL;
-     } else if (parser_match(parser, TOKEN_VAR)) {
-         initializer = parse_var_declaration(parser);
-     } else {
-         initializer = parse_expression_statement(parser);
-     }
-     
-     // Condition
-     Expr* condition = NULL;
-     if (!check(parser, TOKEN_SEMICOLON)) {
-         condition = parse_expression(parser);
-     }
-     consume(parser, TOKEN_SEMICOLON, "Expected ';' after loop condition");
-     
-     // Increment
-     Expr* increment = NULL;
-     if (!check(parser, TOKEN_RIGHT_PAREN)) {
-         increment = parse_expression(parser);
-     }
-     consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after for clauses");
-     consume(parser, TOKEN_ARROW, "Expected '=>' before 'for' body");
-     
-     // Body
-     Stmt* body = parse_statement(parser);
-     
-     return create_for_stmt(initializer, condition, increment, body);
- }
- 
- Stmt* parse_block_statement(Parser* parser) {
-     Stmt** statements = NULL;
-     int count = 0;
-     int capacity = 0;
-     
-     // Create a new scope
-     push_scope(parser->symbol_table);
-     
-     while (!check(parser, TOKEN_RIGHT_BRACE) && !check(parser, TOKEN_EOF)) {
-         Stmt* stmt = parse_declaration(parser);
-         
-         if (count >= capacity) {
-             capacity = capacity == 0 ? 8 : capacity * 2;
-             statements = realloc(statements, sizeof(Stmt*) * capacity);
-         }
-         
-         statements[count++] = stmt;
-     }
-     
-     consume(parser, TOKEN_RIGHT_BRACE, "Expected '}' after block");
-     
-     // Restore outer scope
-     pop_scope(parser->symbol_table);
-     
-     return create_block_stmt(statements, count);
- }
- 
- Stmt* parse_expression_statement(Parser* parser) {
-     Expr* expr = parse_expression(parser);
-     consume(parser, TOKEN_SEMICOLON, "Expected ';' after expression");
-     return create_expr_stmt(expr);
- }
- 
+Stmt* parse_return_statement(Parser* parser) {
+    Token keyword = parser->previous;
+    
+    Expr* value = NULL;
+    if (!check(parser, TOKEN_SEMICOLON) && 
+        !check(parser, TOKEN_NEWLINE) && 
+        !parser_is_at_end(parser)) {
+        value = parse_expression(parser);
+    }
+    
+    // Accept either semicolon or newline as statement terminator
+    if (!parser_match(parser, TOKEN_SEMICOLON) && 
+        !check(parser, TOKEN_NEWLINE) && 
+        !parser_is_at_end(parser)) {
+        consume(parser, TOKEN_SEMICOLON, "Expected ';' or newline after return value");
+    } else if (parser_match(parser, TOKEN_SEMICOLON)) {
+        // We already consumed the semicolon
+    }
+    
+    return create_return_stmt(keyword, value);
+}
+
+
+Stmt* parse_if_statement(Parser* parser) {
+    consume(parser, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
+    Expr* condition = parse_expression(parser);
+    consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
+    consume(parser, TOKEN_ARROW, "Expected '=>' before 'if' body");
+    
+    // Skip any newlines after the arrow
+    while (parser_match(parser, TOKEN_NEWLINE)) {
+        // Just consume the newline token
+    }
+    
+    // Don't push a new scope here unless it's a block
+    Stmt* then_branch = parse_statement(parser);
+    Stmt* else_branch = NULL;
+    
+    // Skip newlines before checking for else
+    while (parser_match(parser, TOKEN_NEWLINE)) {
+        // Just consume newlines
+    }
+    
+    if (parser_match(parser, TOKEN_ELSE)) {
+        // Skip any newlines after the else
+        while (parser_match(parser, TOKEN_NEWLINE)) {
+            // Just consume the newline token
+        }
+        
+        // Don't push a new scope here unless it's a block
+        else_branch = parse_statement(parser);
+    }
+    
+    return create_if_stmt(condition, then_branch, else_branch);
+}
+
+Stmt* parse_while_statement(Parser* parser) {
+    consume(parser, TOKEN_LEFT_PAREN, "Expected '(' after 'while'");
+    Expr* condition = parse_expression(parser);
+    consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
+    consume(parser, TOKEN_ARROW, "Expected '=>' before 'while' body");
+    
+    // Skip any newlines after the arrow
+    while (parser_match(parser, TOKEN_NEWLINE)) {
+        // Just consume the newline token
+    }
+    
+    // Don't push a new scope unless it's a block
+    Stmt* body = parse_statement(parser);
+    
+    return create_while_stmt(condition, body);
+}
+
+Stmt* parse_for_statement(Parser* parser) {
+    consume(parser, TOKEN_LEFT_PAREN, "Expected '(' after 'for'");
+    
+    // Initializer
+    Stmt* initializer;
+    if (parser_match(parser, TOKEN_SEMICOLON)) {
+        initializer = NULL;
+    } else if (parser_match(parser, TOKEN_VAR)) {
+        initializer = parse_var_declaration(parser);
+    } else {
+        initializer = parse_expression_statement(parser);
+    }
+    
+    // Condition
+    Expr* condition = NULL;
+    if (!check(parser, TOKEN_SEMICOLON)) {
+        condition = parse_expression(parser);
+    }
+    consume(parser, TOKEN_SEMICOLON, "Expected ';' after loop condition");
+    
+    // Increment
+    Expr* increment = NULL;
+    if (!check(parser, TOKEN_RIGHT_PAREN)) {
+        increment = parse_expression(parser);
+    }
+    consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after for clauses");
+    consume(parser, TOKEN_ARROW, "Expected '=>' before 'for' body");
+    
+    // Skip any newlines after the arrow
+    skip_newlines(parser);
+    
+    // Body
+    Stmt* body = parse_statement(parser);
+    
+    return create_for_stmt(initializer, condition, increment, body);
+}
+
+Stmt* parse_block_statement(Parser* parser) {
+    Stmt** statements = NULL;
+    int count = 0;
+    int capacity = 0;
+    
+    // Create a new scope
+    push_scope(parser->symbol_table);
+    
+    while (!check(parser, TOKEN_RIGHT_BRACE) && !parser_is_at_end(parser)) {
+        // Skip newlines between statements
+        while (parser_match(parser, TOKEN_NEWLINE)) {
+            // Just consume newlines
+        }
+        
+        if (check(parser, TOKEN_RIGHT_BRACE) || parser_is_at_end(parser)) {
+            break;
+        }
+        
+        Stmt* stmt = parse_declaration(parser);
+        
+        if (count >= capacity) {
+            capacity = capacity == 0 ? 8 : capacity * 2;
+            statements = realloc(statements, sizeof(Stmt*) * capacity);
+        }
+        
+        statements[count++] = stmt;
+    }
+    
+    consume(parser, TOKEN_RIGHT_BRACE, "Expected '}' after block");
+    
+    // Restore outer scope
+    pop_scope(parser->symbol_table);
+    
+    return create_block_stmt(statements, count);
+}
+
+Stmt* parse_expression_statement(Parser* parser) {
+    Expr* expr = parse_expression(parser);
+    
+    // Accept either semicolon or newline as statement terminator
+    if (!parser_match(parser, TOKEN_SEMICOLON) && 
+        !check(parser, TOKEN_NEWLINE) && 
+        !parser_is_at_end(parser)) {
+        consume(parser, TOKEN_SEMICOLON, "Expected ';' or newline after expression");
+    } else if (parser_match(parser, TOKEN_SEMICOLON)) {
+        // We already consumed the semicolon
+    }
+    
+    return create_expr_stmt(expr);
+}
+
  Stmt* parse_import_statement(Parser* parser) {
      Token module_name;
      if (check(parser, TOKEN_IDENTIFIER)) {
@@ -659,23 +766,33 @@
  
  // Parse program
  Module* parse(Parser* parser, const char* filename) {
-     Module* module = malloc(sizeof(Module));
-     init_module(module, filename);
-     
-     while (!check(parser, TOKEN_EOF)) {
-         Stmt* stmt = parse_declaration(parser);
-         module_add_statement(module, stmt);
-         
-         if (parser->panic_mode) {
-             synchronize(parser);
-         }
-     }
-     
-     if (parser->had_error) {
-         free_module(module);
-         free(module);
-         return NULL;
-     }
-     
-     return module;
- }
+    Module* module = malloc(sizeof(Module));
+    init_module(module, filename);
+    
+    while (!parser_is_at_end(parser)) {
+        // Skip any leading newlines between declarations
+        while (parser_match(parser, TOKEN_NEWLINE)) {
+            // Just consume newlines
+        }
+        
+        // If we reached EOF after skipping newlines, break the loop
+        if (parser_is_at_end(parser)) {
+            break;
+        }
+        
+        Stmt* stmt = parse_declaration(parser);
+        module_add_statement(module, stmt);
+        
+        if (parser->panic_mode) {
+            synchronize(parser);
+        }
+    }
+    
+    if (parser->had_error) {
+        free_module(module);
+        free(module);
+        return NULL;
+    }
+    
+    return module;
+}

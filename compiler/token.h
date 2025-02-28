@@ -13,6 +13,11 @@
      // End of file
      TOKEN_EOF,
      
+    // Add these to the TokenType enum
+    TOKEN_INDENT,       // Increase in indentation
+    TOKEN_DEDENT,       // Decrease in indentation
+    TOKEN_NEWLINE,      // End of line
+
      // Literals
      TOKEN_INT_LITERAL,     // e.g. 42
      TOKEN_LONG_LITERAL,    // e.g. 42l

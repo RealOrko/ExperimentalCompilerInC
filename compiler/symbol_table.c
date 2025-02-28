@@ -168,18 +168,18 @@ void add_symbol(SymbolTable* table, Token name, Type* type) {
  }
  
  Symbol* lookup_symbol(SymbolTable* table, Token name) {
-     Scope* scope = table->current;
-     while (scope != NULL) {
-         Symbol* symbol = scope->symbols;
-         while (symbol != NULL) {
-             if (tokens_equal(symbol->name, name)) {
-                 return symbol;
-             }
-             symbol = symbol->next;
-         }
-         
-         scope = scope->enclosing;
-     }
-     
-     return NULL;
- }
+    Scope* scope = table->current;
+    while (scope != NULL) {
+        Symbol* symbol = scope->symbols;
+        while (symbol != NULL) {
+            if (tokens_equal(symbol->name, name)) {
+                return symbol;
+            }
+            symbol = symbol->next;
+        }
+        
+        scope = scope->enclosing;
+    }
+    
+    return NULL;
+}
