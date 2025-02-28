@@ -557,68 +557,79 @@
  }
  
  void generate_function(CodeGen* gen, FunctionStmt* stmt) {
-     // Save the current function context
-     char* old_function = gen->current_function;
-     Type* old_return_type = gen->current_return_type;
-     
-     // Set up new function context
-     if (stmt->name.length < 256) {
-         gen->current_function = malloc(stmt->name.length + 1);
-         if (gen->current_function == NULL) {
-             fprintf(stderr, "Error: Out of memory\n");
-             exit(1);
-         }
-         
-         strncpy(gen->current_function, stmt->name.start, stmt->name.length);
-         gen->current_function[stmt->name.length] = '\0';
-     } else {
-         fprintf(stderr, "Error: Function name too long\n");
-         exit(1);
-     }
-     
-     gen->current_return_type = stmt->return_type;
-     
-     // Generate function prologue
-     generate_prologue(gen, gen->current_function);
-     
-     // Save function parameters from registers to stack
-     // In x64 Linux calling convention, parameters are in rdi, rsi, rdx, rcx, r8, r9
-     for (int i = 0; i < stmt->param_count && i < 6; i++) {
-         switch (i) {
-             case 0:
-                 fprintf(gen->output, "    mov [rbp-%d], rdi\n", 8 * (i + 1));
-                 break;
-             case 1:
-                 fprintf(gen->output, "    mov [rbp-%d], rsi\n", 8 * (i + 1));
-                 break;
-             case 2:
-                 fprintf(gen->output, "    mov [rbp-%d], rdx\n", 8 * (i + 1));
-                 break;
-             case 3:
-                 fprintf(gen->output, "    mov [rbp-%d], rcx\n", 8 * (i + 1));
-                 break;
-             case 4:
-                 fprintf(gen->output, "    mov [rbp-%d], r8\n", 8 * (i + 1));
-                 break;
-             case 5:
-                 fprintf(gen->output, "    mov [rbp-%d], r9\n", 8 * (i + 1));
-                 break;
-         }
-     }
-     
-     // Generate function body
-     for (int i = 0; i < stmt->body_count; i++) {
-         generate_statement(gen, stmt->body[i]);
-     }
-     
-     // Generate function epilogue
-     generate_epilogue(gen);
-     
-     // Restore old function context
-     free(gen->current_function);
-     gen->current_function = old_function;
-     gen->current_return_type = old_return_type;
- }
+    // Save the current function context
+    char* old_function = gen->current_function;
+    Type* old_return_type = gen->current_return_type;
+    
+    // Set up new function context
+    if (stmt->name.length < 256) {
+        gen->current_function = malloc(stmt->name.length + 1);
+        if (gen->current_function == NULL) {
+            fprintf(stderr, "Error: Out of memory\n");
+            exit(1);
+        }
+        
+        strncpy(gen->current_function, stmt->name.start, stmt->name.length);
+        gen->current_function[stmt->name.length] = '\0';
+    } else {
+        fprintf(stderr, "Error: Function name too long\n");
+        exit(1);
+    }
+    
+    gen->current_return_type = stmt->return_type;
+    
+    // Generate function prologue
+    generate_prologue(gen, gen->current_function);
+    
+    // Create a new scope for function parameters
+    push_scope(gen->symbol_table);
+    
+    // Add function parameters to symbol table
+    for (int i = 0; i < stmt->param_count; i++) {
+        add_symbol(gen->symbol_table, stmt->params[i].name, stmt->params[i].type);
+    }
+    
+    // Save function parameters from registers to stack
+    // In x64 Linux calling convention, parameters are in rdi, rsi, rdx, rcx, r8, r9
+    for (int i = 0; i < stmt->param_count && i < 6; i++) {
+        switch (i) {
+            case 0:
+                fprintf(gen->output, "    mov [rbp-%d], rdi\n", 8 * (i + 1));
+                break;
+            case 1:
+                fprintf(gen->output, "    mov [rbp-%d], rsi\n", 8 * (i + 1));
+                break;
+            case 2:
+                fprintf(gen->output, "    mov [rbp-%d], rdx\n", 8 * (i + 1));
+                break;
+            case 3:
+                fprintf(gen->output, "    mov [rbp-%d], rcx\n", 8 * (i + 1));
+                break;
+            case 4:
+                fprintf(gen->output, "    mov [rbp-%d], r8\n", 8 * (i + 1));
+                break;
+            case 5:
+                fprintf(gen->output, "    mov [rbp-%d], r9\n", 8 * (i + 1));
+                break;
+        }
+    }
+    
+    // Generate function body
+    for (int i = 0; i < stmt->body_count; i++) {
+        generate_statement(gen, stmt->body[i]);
+    }
+    
+    // Pop the function parameter scope
+    pop_scope(gen->symbol_table);
+    
+    // Generate function epilogue
+    generate_epilogue(gen);
+    
+    // Restore old function context
+    free(gen->current_function);
+    gen->current_function = old_function;
+    gen->current_return_type = old_return_type;
+}
  
  void generate_return_statement(CodeGen* gen, ReturnStmt* stmt) {
      // Evaluate the return value
