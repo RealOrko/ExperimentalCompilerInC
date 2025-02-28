@@ -1,5 +1,4 @@
 #!/bin/bash
-set -x
 rm -rf bin/
 
 pushd compiler/
