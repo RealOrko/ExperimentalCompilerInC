@@ -870,8 +870,10 @@ void free_stmt_preserve_types(Stmt *stmt)
         }
         break;
 
-        // Handle all other statement types similarly...
-        // (same as free_stmt but skip freeing types)
+    default:
+        // Handle all other statement types generically
+        // (or leave empty if no action needed)
+        break;
     }
 
     free(stmt);
