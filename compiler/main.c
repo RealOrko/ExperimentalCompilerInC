@@ -154,13 +154,6 @@ int main(int argc, char **argv)
         code_gen_cleanup(&gen);
 
         DEBUG_INFO("Compilation successful: %s -> %s", options.source_file, options.output_file);
-
-        // Execute the compiled program
-        if (options.verbose)
-        {
-            DEBUG_INFO("Executing compiled program");
-            execute(options.output_file);
-        }
     }
     else
     {

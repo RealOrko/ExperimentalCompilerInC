@@ -70,7 +70,7 @@ void push_function_context(CodeGen *gen)
     gen->function_stack_size++;
 
     DEBUG_VERBOSE("Pushed function context '%s', stack size now %d",
-            gen->current_function ? gen->current_function : "NULL", gen->function_stack_size);
+                  gen->current_function ? gen->current_function : "NULL", gen->function_stack_size);
 }
 
 // Fix the pop_function_context implementation
@@ -95,7 +95,7 @@ void pop_function_context(CodeGen *gen)
     gen->function_stack[gen->function_stack_size] = NULL;
 
     DEBUG_VERBOSE("Popped function context, restored to '%s', stack size now %d",
-            gen->current_function ? gen->current_function : "NULL", gen->function_stack_size);
+                  gen->current_function ? gen->current_function : "NULL", gen->function_stack_size);
 }
 
 // Free the function stack
@@ -276,7 +276,7 @@ void generate_data_section(CodeGen *gen)
 void generate_text_section(CodeGen *gen)
 {
     fprintf(gen->output, "section .text\n");
-    fprintf(gen->output, "    global _start\n");
+    // Only make main global, not _start
     fprintf(gen->output, "    global main\n\n");
 
     // Add external functions
@@ -341,7 +341,7 @@ static int get_var_offset(CodeGen *gen, Token name)
 
     // Debug output to see what variable we're trying to access
     DEBUG_VERBOSE("Looking up variable '%s' in function '%s'",
-            var_name, gen->current_function ? gen->current_function : "global");
+                  var_name, gen->current_function ? gen->current_function : "global");
 
     // Use the symbol table to get the variable's offset
     Symbol *symbol = lookup_symbol(gen->symbol_table, name);
@@ -368,7 +368,7 @@ static int get_var_offset(CodeGen *gen, Token name)
                     if (strcmp(sym_name, var_name) == 0)
                     {
                         DEBUG_VERBOSE("Manual string lookup found '%s' with offset %d\n",
-                                var_name, sym->offset);
+                                      var_name, sym->offset);
                         return sym->offset;
                     }
                     sym = sym->next;
@@ -406,7 +406,7 @@ static int get_var_offset(CodeGen *gen, Token name)
 void generate_binary_expression(CodeGen *gen, BinaryExpr *expr)
 {
     DEBUG_VERBOSE("Generating binary expression in function '%s' with operator %d",
-            gen->current_function ? gen->current_function : "global", expr->operator);
+                  gen->current_function ? gen->current_function : "global", expr->operator);
 
     // Generate the right operand first and push it on the stack
     generate_expression(gen, expr->right);
@@ -593,7 +593,7 @@ void generate_variable_expression(CodeGen *gen, VariableExpr *expr)
     var_name[name_len] = '\0';
 
     DEBUG_VERBOSE("Accessing variable '%s' in function '%s'",
-            var_name, gen->current_function ? gen->current_function : "global");
+                  var_name, gen->current_function ? gen->current_function : "global");
 
     // If we're in the function factorial and the variable is 'n', use the hardcoded offset
     if (gen->current_function && strcmp(gen->current_function, "factorial") == 0 &&
@@ -652,7 +652,7 @@ void generate_variable_expression(CodeGen *gen, VariableExpr *expr)
                 if (strcmp(sym_name, var_name) == 0)
                 {
                     DEBUG_VERBOSE("Manual match found for '%s' with offset %d\n",
-                            var_name, sym->offset);
+                                  var_name, sym->offset);
                     fprintf(gen->output, "    mov rax, [rbp-%d]\n", sym->offset);
                     return;
                 }
@@ -723,7 +723,7 @@ void generate_assign_expression(CodeGen *gen, AssignExpr *expr)
     var_name[name_len] = '\0';
 
     DEBUG_VERBOSE("Assigning to variable '%s' in function '%s'",
-            var_name, gen->current_function ? gen->current_function : "global");
+                  var_name, gen->current_function ? gen->current_function : "global");
 
     // Evaluate the value
     generate_expression(gen, expr->value);
@@ -754,7 +754,7 @@ void generate_assign_expression(CodeGen *gen, AssignExpr *expr)
                 if (strcmp(sym_name, var_name) == 0)
                 {
                     DEBUG_VERBOSE("Manual match found for '%s' with offset %d",
-                            var_name, sym->offset);
+                                  var_name, sym->offset);
 
                     // Store the computed value in the variable
                     fprintf(gen->output, "    mov [rbp-%d], rax\n", sym->offset);
@@ -920,7 +920,7 @@ void generate_expression(CodeGen *gen, Expr *expr)
     push_function_context(gen);
 
     DEBUG_VERBOSE("Generating expression type %d in function context '%s'",
-            expr->type, gen->current_function ? gen->current_function : "global");
+                  expr->type, gen->current_function ? gen->current_function : "global");
 
     switch (expr->type)
     {
@@ -936,7 +936,7 @@ void generate_expression(CodeGen *gen, Expr *expr)
         if (expr->as.literal.type)
         {
             DEBUG_VERBOSE("Literal expression of type %s",
-                    type_to_string(expr->as.literal.type));
+                          type_to_string(expr->as.literal.type));
         }
         generate_literal_expression(gen, &expr->as.literal);
         break;
@@ -947,7 +947,7 @@ void generate_expression(CodeGen *gen, Expr *expr)
         strncpy(var_name, expr->as.variable.name.start, name_len);
         var_name[name_len] = '\0';
         DEBUG_VERBOSE("Variable expression '%s' in function '%s'",
-                var_name, gen->current_function ? gen->current_function : "global");
+                      var_name, gen->current_function ? gen->current_function : "global");
 
         debug_print_symbol_table(gen->symbol_table, "before variable lookup");
     }
@@ -977,7 +977,7 @@ void generate_expression(CodeGen *gen, Expr *expr)
         break;
     case EXPR_ARRAY:
         DEBUG_VERBOSE("Array expression with %d elements",
-                expr->as.array.element_count);
+                      expr->as.array.element_count);
         generate_array_expression(gen, &expr->as.array);
         break;
     case EXPR_ARRAY_ACCESS:
@@ -995,7 +995,7 @@ void generate_expression(CodeGen *gen, Expr *expr)
     }
 
     DEBUG_VERBOSE("Finished generating expression in function '%s'",
-            gen->current_function ? gen->current_function : "global");
+                  gen->current_function ? gen->current_function : "global");
 
     pop_function_context(gen);
 }
@@ -1031,7 +1031,7 @@ void generate_var_declaration(CodeGen *gen, VarDeclStmt *stmt)
 void generate_function(CodeGen *gen, FunctionStmt *stmt)
 {
     DEBUG_VERBOSE("==== GENERATING FUNCTION '%.*s' ====",
-            stmt->name.length, stmt->name.start);
+                  stmt->name.length, stmt->name.start);
 
     debug_print_symbol_table(gen->symbol_table, "at function start");
 
@@ -1121,7 +1121,7 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
         }
 
         DEBUG_VERBOSE("Generating code to save parameter %d to offset %d",
-                i, param->offset);
+                      i, param->offset);
 
         switch (i)
         {
@@ -1150,12 +1150,36 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
     for (int i = 0; i < stmt->body_count; i++)
     {
         DEBUG_VERBOSE("Generating statement %d in function '%s'",
-                i, gen->current_function);
+                      i, gen->current_function);
         generate_statement(gen, stmt->body[i]);
     }
 
     debug_print_symbol_table(gen->symbol_table, "before leaving function");
 
+    // If this is the main function, ensure it returns 0 to indicate success
+    // This is critical for proper program termination
+    if (strcmp(gen->current_function, "main") == 0)
+    {
+        // Check if there's an explicit return
+        int has_explicit_return = 0;
+        if (stmt->body_count > 0)
+        {
+            Stmt *last = stmt->body[stmt->body_count - 1];
+            if (last->type == STMT_RETURN)
+            {
+                has_explicit_return = 1;
+            }
+        }
+
+        // If no explicit return in main, add exit call
+        if (!has_explicit_return)
+        {
+            fprintf(gen->output, "    ; Ensure main exits properly\n");
+            fprintf(gen->output, "    xor rdi, rdi    ; Exit code 0\n");
+            fprintf(gen->output, "    call exit       ; Explicit exit call\n");
+        }
+    }
+    
     // Pop the function parameter scope
     DEBUG_VERBOSE("Popping function scope");
     pop_scope(gen->symbol_table);
@@ -1165,7 +1189,7 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
 
     // Restore old function context
     DEBUG_VERBOSE("Restoring function context from '%s' to '%s'",
-            gen->current_function, old_function ? old_function : "NULL");
+                  gen->current_function, old_function ? old_function : "NULL");
     free(gen->current_function);
     gen->current_function = old_function;
     gen->current_return_type = old_return_type;
@@ -1173,7 +1197,7 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
     pop_function_context(gen);
 
     DEBUG_VERBOSE("==== COMPLETED FUNCTION '%.*s' ====",
-        stmt->name.length, stmt->name.start);
+                  stmt->name.length, stmt->name.start);
 }
 
 void generate_return_statement(CodeGen *gen, ReturnStmt *stmt)
@@ -1228,67 +1252,75 @@ void generate_if_statement(CodeGen *gen, IfStmt *stmt)
     fprintf(gen->output, ".L%d:\n", end_label);
 }
 
+// Simple, elegant fix for the while statement generator
 void generate_while_statement(CodeGen *gen, WhileStmt *stmt)
 {
     int loop_start = new_label(gen);
     int loop_end = new_label(gen);
 
-    // Loop start
-    fprintf(gen->output, ".L%d:\n", loop_start);
-
-    // Generate condition
+    // Loop start - check condition first
+    fprintf(gen->output, ".L%d: ; Loop start\n", loop_start);
+    
+    // Generate condition check
     generate_expression(gen, stmt->condition);
-
-    // Test condition
     fprintf(gen->output, "    test rax, rax\n");
-    fprintf(gen->output, "    jz .L%d\n", loop_end);
-
+    fprintf(gen->output, "    jz .L%d ; Exit if condition is false\n", loop_end);
+    
     // Generate loop body
     generate_statement(gen, stmt->body);
-
-    // Jump back to start
-    fprintf(gen->output, "    jmp .L%d\n", loop_start);
-
+    
+    // Jump back to start (condition check)
+    fprintf(gen->output, "    jmp .L%d ; Return to condition\n", loop_start);
+    
     // Loop end
-    fprintf(gen->output, ".L%d:\n", loop_end);
+    fprintf(gen->output, ".L%d: ; Loop end\n", loop_end);
 }
 
 void generate_for_statement(CodeGen *gen, ForStmt *stmt)
 {
-    int loop_start = new_label(gen);
-    int loop_end = new_label(gen);
+    // Create labels for the loop structure
+    int condition_label = new_label(gen);
+    int body_label = new_label(gen);
+    int increment_label = new_label(gen);
+    int end_label = new_label(gen);
 
     // Generate initializer
     if (stmt->initializer != NULL)
     {
+        fprintf(gen->output, "    ; For loop initializer\n");
         generate_statement(gen, stmt->initializer);
     }
 
-    // Loop start
-    fprintf(gen->output, ".L%d:\n", loop_start);
+    // Jump to condition
+    fprintf(gen->output, "    jmp .L%d ; Jump to condition\n", condition_label);
 
-    // Generate condition
-    if (stmt->condition != NULL)
-    {
-        generate_expression(gen, stmt->condition);
-        fprintf(gen->output, "    test rax, rax\n");
-        fprintf(gen->output, "    jz .L%d\n", loop_end);
-    }
-
-    // Generate loop body
+    // Loop body
+    fprintf(gen->output, ".L%d: ; Loop body\n", body_label);
     generate_statement(gen, stmt->body);
 
-    // Generate increment
+    // Increment
+    fprintf(gen->output, ".L%d: ; Increment\n", increment_label);
     if (stmt->increment != NULL)
     {
         generate_expression(gen, stmt->increment);
     }
 
-    // Jump back to start
-    fprintf(gen->output, "    jmp .L%d\n", loop_start);
+    // Condition check
+    fprintf(gen->output, ".L%d: ; Condition\n", condition_label);
+    if (stmt->condition != NULL)
+    {
+        generate_expression(gen, stmt->condition);
+        fprintf(gen->output, "    test rax, rax\n");
+        fprintf(gen->output, "    jnz .L%d ; Continue loop if condition is true\n", body_label);
+    }
+    else
+    {
+        // If no condition, loop forever (or until break)
+        fprintf(gen->output, "    jmp .L%d ; Unconditional loop\n", body_label);
+    }
 
     // Loop end
-    fprintf(gen->output, ".L%d:\n", loop_end);
+    fprintf(gen->output, ".L%d: ; Loop end\n", end_label);
 }
 
 void generate_statement(CodeGen *gen, Stmt *stmt)
@@ -1330,12 +1362,8 @@ void generate_module(CodeGen *gen, Module *module)
     // Set up the assembly file
     generate_text_section(gen);
 
-    // Generate _start function (entry point)
-    fprintf(gen->output, "_start:\n");
-    fprintf(gen->output, "    ; Program entry point\n");
-    fprintf(gen->output, "    call main\n");
-    fprintf(gen->output, "    mov rdi, rax\n");
-    fprintf(gen->output, "    call exit\n\n");
+    // DON'T generate _start function (entry point) -
+    // GCC's runtime will provide this
 
     // Generate code for each statement in the module
     for (int i = 0; i < module->count; i++)

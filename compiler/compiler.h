@@ -36,7 +36,4 @@
  // Compile source string
  int compile_source(const char *source, const char *filename, const char *output_path, int verbose);
  
- // Execute assembled code
- int execute(const char *output_path);
- 
  #endif // COMPILER_H

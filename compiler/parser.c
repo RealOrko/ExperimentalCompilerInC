@@ -4,6 +4,7 @@
  */
 
 #include "parser.h"
+#include "debug.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -46,6 +47,74 @@ int is_at_function_boundary(Parser *parser)
     }
 
     return 0;
+}
+
+Stmt *parse_indented_block(Parser *parser)
+{
+    DEBUG_VERBOSE("Parsing indented block", 0);
+    
+    // Create arrays to hold statements in the block
+    Stmt **statements = NULL;
+    int count = 0;
+    int capacity = 0;
+    
+    // Create a new scope for this block
+    push_scope(parser->symbol_table);
+    
+    // Check if we're starting with an indent token
+    int expect_indent = check(parser, TOKEN_INDENT);
+    if (expect_indent) {
+        parser_advance(parser); // Consume the INDENT token
+        DEBUG_VERBOSE("Found explicit INDENT token");
+    }
+    
+    // Keep track of the starting indentation level
+    int start_level = parser->lexer->indent_size;
+    
+    // Continue parsing until we hit a dedent or EOF
+    while (!parser_is_at_end(parser)) {
+        // Skip any newlines
+        skip_newlines(parser);
+        
+        // If we've reached EOF, break
+        if (parser_is_at_end(parser)) {
+            break;
+        }
+        
+        // If we've dedented below our starting level, break
+        if (check(parser, TOKEN_DEDENT)) {
+            parser_advance(parser); // Consume the DEDENT
+            if (parser->lexer->indent_size < start_level) {
+                DEBUG_VERBOSE("Found dedent back to level %d, breaking", parser->lexer->indent_size);
+                break;
+            }
+        }
+        
+        // Parse a statement (or declaration)
+        Stmt *stmt = parse_declaration(parser);
+        if (stmt == NULL) {
+            continue; // Skip NULL statements
+        }
+        
+        // Add the statement to our list
+        if (count >= capacity) {
+            capacity = capacity == 0 ? 8 : capacity * 2;
+            statements = realloc(statements, sizeof(Stmt *) * capacity);
+            if (statements == NULL) {
+                DEBUG_ERROR("Out of memory");
+                exit(1);
+            }
+        }
+        
+        statements[count++] = stmt;
+        DEBUG_VERBOSE("Added statement %d to indented block", count);
+    }
+    
+    // Pop the scope we created
+    pop_scope(parser->symbol_table);
+    
+    // Create and return a block statement
+    return create_block_stmt(statements, count);
 }
 
 Expr *parse_multi_line_expression(Parser *parser)
@@ -801,19 +870,55 @@ Stmt *parse_if_statement(Parser *parser)
     skip_newlines(parser);
 
     // Parse the then branch
-    Stmt *then_branch = parse_statement(parser);
+    Stmt *then_branch;
+    
+    if (check(parser, TOKEN_INDENT)) {
+        then_branch = parse_indented_block(parser);
+    } else {
+        then_branch = parse_statement(parser);
+        
+        // Check for follow-up indented block
+        skip_newlines(parser);
+        if (check(parser, TOKEN_INDENT)) {
+            Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
+            if (block_stmts == NULL) {
+                DEBUG_ERROR("Out of memory");
+                exit(1);
+            }
+            block_stmts[0] = then_branch;
+            block_stmts[1] = parse_indented_block(parser);
+            then_branch = create_block_stmt(block_stmts, 2);
+        }
+    }
+    
     Stmt *else_branch = NULL;
 
     // Skip newlines before checking for else
     skip_newlines(parser);
 
-    if (parser_match(parser, TOKEN_ELSE))
-    {
+    if (parser_match(parser, TOKEN_ELSE)) {
         // Skip newlines after else
         skip_newlines(parser);
 
         // Parse the else branch
-        else_branch = parse_statement(parser);
+        if (check(parser, TOKEN_INDENT)) {
+            else_branch = parse_indented_block(parser);
+        } else {
+            else_branch = parse_statement(parser);
+            
+            // Check for follow-up indented block
+            skip_newlines(parser);
+            if (check(parser, TOKEN_INDENT)) {
+                Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
+                if (block_stmts == NULL) {
+                    DEBUG_ERROR("Out of memory");
+                    exit(1);
+                }
+                block_stmts[0] = else_branch;
+                block_stmts[1] = parse_indented_block(parser);
+                else_branch = create_block_stmt(block_stmts, 2);
+            }
+        }
     }
 
     return create_if_stmt(condition, then_branch, else_branch);
@@ -826,11 +931,32 @@ Stmt *parse_while_statement(Parser *parser)
     consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
     consume(parser, TOKEN_ARROW, "Expected '=>' before 'while' body");
 
-    // Skip newlines after arrow
+    // Skip any newlines after the arrow
     skip_newlines(parser);
-
-    // Parse the body
-    Stmt *body = parse_statement(parser);
+    
+    // Parse the body - if we see an indent token, parse an indented block
+    // otherwise parse a single statement
+    Stmt *body;
+    
+    if (check(parser, TOKEN_INDENT)) {
+        body = parse_indented_block(parser);
+    } else {
+        body = parse_statement(parser);
+        
+        // Check if the statement should be followed by another indented statement
+        skip_newlines(parser);
+        if (check(parser, TOKEN_INDENT)) {
+            // We need to create a block with both the first statement and the indented block
+            Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
+            if (block_stmts == NULL) {
+                DEBUG_ERROR("Out of memory");
+                exit(1);
+            }
+            block_stmts[0] = body;
+            block_stmts[1] = parse_indented_block(parser);
+            body = create_block_stmt(block_stmts, 2);
+        }
+    }
 
     return create_while_stmt(condition, body);
 }
@@ -841,31 +967,26 @@ Stmt *parse_for_statement(Parser *parser)
 
     // Initializer
     Stmt *initializer;
-    if (parser_match(parser, TOKEN_SEMICOLON))
-    {
+    if (parser_match(parser, TOKEN_SEMICOLON)) {
         initializer = NULL;
     }
-    else if (parser_match(parser, TOKEN_VAR))
-    {
+    else if (parser_match(parser, TOKEN_VAR)) {
         initializer = parse_var_declaration(parser);
     }
-    else
-    {
+    else {
         initializer = parse_expression_statement(parser);
     }
 
     // Condition
     Expr *condition = NULL;
-    if (!check(parser, TOKEN_SEMICOLON))
-    {
+    if (!check(parser, TOKEN_SEMICOLON)) {
         condition = parse_expression(parser);
     }
     consume(parser, TOKEN_SEMICOLON, "Expected ';' after loop condition");
 
     // Increment
     Expr *increment = NULL;
-    if (!check(parser, TOKEN_RIGHT_PAREN))
-    {
+    if (!check(parser, TOKEN_RIGHT_PAREN)) {
         increment = parse_expression(parser);
     }
     consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after for clauses");
@@ -874,8 +995,27 @@ Stmt *parse_for_statement(Parser *parser)
     // Skip any newlines after the arrow
     skip_newlines(parser);
 
-    // Body
-    Stmt *body = parse_statement(parser);
+    // Body - parse indented block or single statement
+    Stmt *body;
+    
+    if (check(parser, TOKEN_INDENT)) {
+        body = parse_indented_block(parser);
+    } else {
+        body = parse_statement(parser);
+        
+        // Check for follow-up indented block
+        skip_newlines(parser);
+        if (check(parser, TOKEN_INDENT)) {
+            Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
+            if (block_stmts == NULL) {
+                DEBUG_ERROR("Out of memory");
+                exit(1);
+            }
+            block_stmts[0] = body;
+            block_stmts[1] = parse_indented_block(parser);
+            body = create_block_stmt(block_stmts, 2);
+        }
+    }
 
     return create_for_stmt(initializer, condition, increment, body);
 }
