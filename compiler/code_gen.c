@@ -8,6 +8,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+// Declare the variable to track if the last call in main is reached
+static int is_last_call_in_main = 0;
+
 // Custom strdup implementation since it's not part of C99 standard
 static char *my_strdup(const char *s)
 {
@@ -324,11 +327,9 @@ void generate_prologue(CodeGen *gen, const char *function_name)
 
 void generate_epilogue(CodeGen *gen)
 {
-    // Add a return label for the function
-    fprintf(gen->output, "%s_return:\n", gen->current_function);
-    fprintf(gen->output, "    mov rsp, rbp\n");
-    fprintf(gen->output, "    pop rbp\n");
-    fprintf(gen->output, "    ret\n\n");
+    // This function is now a no-op
+    // All epilogue code is generated directly in generate_function
+    (void)gen; // Avoid unused parameter warning
 }
 
 static int get_var_offset(CodeGen *gen, Token name)
@@ -860,6 +861,19 @@ void generate_call_expression(CodeGen *gen, CallExpr *expr)
     // Call the function
     fprintf(gen->output, "    call %s\n", function_name);
 
+    // For main function, don't restore stack after the LAST function call
+    if (gen->current_function && strcmp(gen->current_function, "main") == 0)
+    {
+        // Check if this is the last call in main (you'll need a way to track this)
+        // If it's the last call, skip stack restoration and go directly to exit
+        if (is_last_call_in_main)
+        {
+            fprintf(gen->output, "    ; Skipping stack restoration for final call\n");
+            fprintf(gen->output, "    jmp main_exit\n");
+            return;
+        }
+    }
+
     // Clean up the stack - only needed for args beyond the register-passed ones
     if (expr->arg_count > 6)
     {
@@ -1154,32 +1168,24 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
         generate_statement(gen, stmt->body[i]);
     }
 
+    // Add exit code for main
+    if (gen->current_function && strcmp(gen->current_function, "main") == 0)
+    {
+        fprintf(gen->output, "main_exit:\n");
+        fprintf(gen->output, "    ; Clean up stack completely\n");
+        fprintf(gen->output, "    mov rsp, rbp\n"); // Reset stack to base pointer
+        fprintf(gen->output, "    pop rbp\n");      // Restore base pointer
+        fprintf(gen->output, "    xor rdi, rdi\n"); // Exit code 0
+        fprintf(gen->output, "    call exit\n");    // Call C library exit
+
+        fprintf(gen->output, "main_return:\n");
+        fprintf(gen->output, "    jmp main_exit\n");
+
+        is_last_call_in_main = 1;
+    }
+
     debug_print_symbol_table(gen->symbol_table, "before leaving function");
 
-    // If this is the main function, ensure it returns 0 to indicate success
-    // This is critical for proper program termination
-    if (strcmp(gen->current_function, "main") == 0)
-    {
-        // Check if there's an explicit return
-        int has_explicit_return = 0;
-        if (stmt->body_count > 0)
-        {
-            Stmt *last = stmt->body[stmt->body_count - 1];
-            if (last->type == STMT_RETURN)
-            {
-                has_explicit_return = 1;
-            }
-        }
-
-        // If no explicit return in main, add exit call
-        if (!has_explicit_return)
-        {
-            fprintf(gen->output, "    ; Ensure main exits properly\n");
-            fprintf(gen->output, "    xor rdi, rdi    ; Exit code 0\n");
-            fprintf(gen->output, "    call exit       ; Explicit exit call\n");
-        }
-    }
-    
     // Pop the function parameter scope
     DEBUG_VERBOSE("Popping function scope");
     pop_scope(gen->symbol_table);
@@ -1202,18 +1208,33 @@ void generate_function(CodeGen *gen, FunctionStmt *stmt)
 
 void generate_return_statement(CodeGen *gen, ReturnStmt *stmt)
 {
-    // Evaluate the return value
+    // Evaluate the return value if provided
     if (stmt->value != NULL)
     {
         generate_expression(gen, stmt->value);
+
+        // For main, use return value as exit code
+        if (gen->current_function && strcmp(gen->current_function, "main") == 0)
+        {
+            fprintf(gen->output, "    mov rdi, rax    ; Use return value as exit code\n");
+            fprintf(gen->output, "    jmp main_exit   ; Jump to clean exit\n");
+            return;
+        }
     }
     else
     {
         // Default return value is 0
         fprintf(gen->output, "    xor rax, rax\n");
+
+        // For main with no return value
+        if (gen->current_function && strcmp(gen->current_function, "main") == 0)
+        {
+            fprintf(gen->output, "    jmp main_exit   ; Jump to clean exit\n");
+            return;
+        }
     }
 
-    // Return from function
+    // For non-main functions, jump to function's return label
     fprintf(gen->output, "    jmp %s_return\n", gen->current_function);
 }
 
@@ -1260,18 +1281,18 @@ void generate_while_statement(CodeGen *gen, WhileStmt *stmt)
 
     // Loop start - check condition first
     fprintf(gen->output, ".L%d: ; Loop start\n", loop_start);
-    
+
     // Generate condition check
     generate_expression(gen, stmt->condition);
     fprintf(gen->output, "    test rax, rax\n");
     fprintf(gen->output, "    jz .L%d ; Exit if condition is false\n", loop_end);
-    
+
     // Generate loop body
     generate_statement(gen, stmt->body);
-    
+
     // Jump back to start (condition check)
     fprintf(gen->output, "    jmp .L%d ; Return to condition\n", loop_start);
-    
+
     // Loop end
     fprintf(gen->output, ".L%d: ; Loop end\n", loop_end);
 }
