@@ -8,6 +8,33 @@
 #include <stdlib.h>
 #include <string.h>
 
+static const TypeConversionRule CONVERSION_RULES[] = {
+    // Implicit conversions
+    {TYPE_CHAR,   TYPE_INT,     1, TYPE_INT},
+    {TYPE_BOOL,   TYPE_INT,     1, TYPE_INT},
+    {TYPE_CHAR,   TYPE_LONG,    1, TYPE_LONG},
+    {TYPE_INT,    TYPE_LONG,    1, TYPE_LONG},
+    {TYPE_BOOL,   TYPE_LONG,    1, TYPE_LONG},
+    
+    // Numeric promotions to double
+    {TYPE_INT,    TYPE_DOUBLE,  1, TYPE_DOUBLE},
+    {TYPE_LONG,   TYPE_DOUBLE,  1, TYPE_DOUBLE},
+    {TYPE_CHAR,   TYPE_DOUBLE,  1, TYPE_DOUBLE},
+    {TYPE_BOOL,   TYPE_DOUBLE,  1, TYPE_DOUBLE},
+    
+    // Character conversions
+    {TYPE_INT,    TYPE_CHAR,    1, TYPE_CHAR},
+    {TYPE_BOOL,   TYPE_CHAR,    1, TYPE_CHAR},
+    
+    // String conversions
+    {TYPE_CHAR,   TYPE_STRING,  1, TYPE_STRING},
+    
+    // Boolean conversions from numeric types
+    {TYPE_INT,    TYPE_BOOL,    1, TYPE_BOOL},
+    {TYPE_LONG,   TYPE_BOOL,    1, TYPE_BOOL},
+    {TYPE_CHAR,   TYPE_BOOL,    1, TYPE_BOOL},
+};
+
 void init_type_checker(TypeChecker *checker, SymbolTable *symbol_table)
 {
     checker->symbol_table = symbol_table;
@@ -30,96 +57,29 @@ void error(TypeChecker *checker, const char *message)
 
 int can_convert(Type *from, Type *to)
 {
-    // Handle trivial cases first
+    // Handle trivial cases
     if (from == NULL || to == NULL)
         return 0;
-
+    
     // Exact type match always converts
     if (type_equals(from, to))
         return 1;
-
+    
     // NIL can be converted to any type
     if (from->kind == TYPE_NIL)
         return 1;
-
-    // Main conversion matrix
-    switch (to->kind)
+    
+    // Look through conversion rules
+    for (size_t i = 0; i < sizeof(CONVERSION_RULES)/sizeof(CONVERSION_RULES[0]); i++)
     {
-    case TYPE_INT:
-        switch (from->kind)
+        if (CONVERSION_RULES[i].from == from->kind && 
+            CONVERSION_RULES[i].to == to->kind)
         {
-        case TYPE_CHAR: // char can convert to int
-        case TYPE_BOOL: // bool can convert to int
-            return 1;
-        default:
-            return 0;
+            return CONVERSION_RULES[i].is_convertible;
         }
-
-    case TYPE_LONG:
-        switch (from->kind)
-        {
-        case TYPE_INT:  // int can convert to long
-        case TYPE_CHAR: // char can convert to long
-        case TYPE_BOOL: // bool can convert to long
-            return 1;
-        default:
-            return 0;
-        }
-
-    case TYPE_DOUBLE:
-        switch (from->kind)
-        {
-        case TYPE_INT:  // int can convert to double
-        case TYPE_LONG: // long can convert to double
-        case TYPE_CHAR: // char can convert to double
-        case TYPE_BOOL: // bool can convert to double
-            return 1;
-        default:
-            return 0;
-        }
-
-    case TYPE_CHAR:
-        switch (from->kind)
-        {
-        case TYPE_INT:  // int can convert to char (with potential truncation)
-        case TYPE_BOOL: // bool can convert to char
-            return 1;
-        default:
-            return 0;
-        }
-
-    case TYPE_STRING:
-        switch (from->kind)
-        {
-        case TYPE_CHAR: // char can convert to string
-            return 1;
-        default:
-            return 0;
-        }
-
-    case TYPE_BOOL:
-        switch (from->kind)
-        {
-        case TYPE_INT:  // int can convert to bool
-        case TYPE_LONG: // long can convert to bool
-        case TYPE_CHAR: // char can convert to bool
-            return 1;
-        default:
-            return 0;
-        }
-
-    case TYPE_VOID:
-        // Nothing can convert to void
-        return 0;
-
-    case TYPE_NIL:
-        // Only nil can convert to nil
-        return (from->kind == TYPE_NIL);
-
-    default:
-        // Unknown type
-        return 0;
     }
+    
+    return 0;
 }
 
 Type *common_type(Type *a, Type *to)
@@ -127,97 +87,30 @@ Type *common_type(Type *a, Type *to)
     // Handle trivial cases
     if (a == NULL || to == NULL)
         return NULL;
-
+    
     // Exact type match
     if (type_equals(a, to))
         return a;
-
+    
     // NIL handling
     if (a->kind == TYPE_NIL)
         return to;
     if (to->kind == TYPE_NIL)
         return a;
-
-    // Main type resolution matrix
-    switch (to->kind)
+    
+    // Look through conversion rules for promotion
+    for (size_t i = 0; i < sizeof(CONVERSION_RULES)/sizeof(CONVERSION_RULES[0]); i++)
     {
-    case TYPE_DOUBLE:
-        switch (a->kind)
+        if ((CONVERSION_RULES[i].from == a->kind && 
+             CONVERSION_RULES[i].to == to->kind) ||
+            (CONVERSION_RULES[i].from == to->kind && 
+             CONVERSION_RULES[i].to == a->kind))
         {
-        case TYPE_INT:    // int promotes to double
-        case TYPE_LONG:   // long promotes to double
-        case TYPE_CHAR:   // char promotes to double
-        case TYPE_BOOL:   // bool promotes to double
-        case TYPE_DOUBLE: // double stays double
-            return create_primitive_type(TYPE_DOUBLE);
-        default:
-            return NULL;
+            return create_primitive_type(CONVERSION_RULES[i].promotion_result);
         }
-
-    case TYPE_LONG:
-        switch (a->kind)
-        {
-        case TYPE_INT:  // int promotes to long
-        case TYPE_CHAR: // char promotes to long
-        case TYPE_BOOL: // bool promotes to long
-        case TYPE_LONG: // long stays long
-            return create_primitive_type(TYPE_LONG);
-        default:
-            return NULL;
-        }
-
-    case TYPE_INT:
-        switch (a->kind)
-        {
-        case TYPE_CHAR: // char promotes to int
-        case TYPE_BOOL: // bool promotes to int
-        case TYPE_INT:  // int stays int
-            return create_primitive_type(TYPE_INT);
-        default:
-            return NULL;
-        }
-
-    case TYPE_CHAR:
-        switch (a->kind)
-        {
-        case TYPE_BOOL: // bool can convert to char
-        case TYPE_CHAR: // char stays char
-            return create_primitive_type(TYPE_CHAR);
-        default:
-            return NULL;
-        }
-
-    case TYPE_STRING:
-        switch (a->kind)
-        {
-        case TYPE_CHAR:   // char can be converted to string
-        case TYPE_STRING: // string stays string
-            return create_primitive_type(TYPE_STRING);
-        default:
-            return NULL;
-        }
-
-    case TYPE_BOOL:
-        switch (a->kind)
-        {
-        case TYPE_BOOL: // bool stays bool
-            return create_primitive_type(TYPE_BOOL);
-        default:
-            return NULL;
-        }
-
-    case TYPE_VOID:
-        // Nothing promotes to void
-        return NULL;
-
-    case TYPE_NIL:
-        // Only nil promotes to nil
-        return (a->kind == TYPE_NIL) ? create_primitive_type(TYPE_NIL) : NULL;
-
-    default:
-        // Unknown type
-        return NULL;
     }
+    
+    return NULL;
 }
 
 Type *type_check_expression(TypeChecker *checker, Expr *expr)

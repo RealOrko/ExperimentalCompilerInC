@@ -17,6 +17,13 @@ typedef struct
     int in_loop;
 } TypeChecker;
 
+typedef struct {
+    TypeKind from;
+    TypeKind to;
+    int is_convertible;
+    TypeKind promotion_result;  // What type it converts to
+} TypeConversionRule;
+
 // Initialize and cleanup type checker
 void init_type_checker(TypeChecker *checker, SymbolTable *symbol_table);
 void type_checker_cleanup(TypeChecker *checker);
