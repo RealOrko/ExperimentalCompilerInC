@@ -49,6 +49,17 @@ void print_ast(Stmt *stmt, int indent_level)
     }
 }
 
+Expr *create_comparison_expr(Expr *left, Expr *right, TokenType comparison_type)
+{
+    if (left == NULL || right == NULL)
+    {
+        DEBUG_ERROR("Cannot create comparison with NULL expressions");
+        return NULL;
+    }
+
+    return create_binary_expr(left, comparison_type, right);
+}
+
 void mark_type_non_freeable(Type *type)
 {
     if (type == NULL)

@@ -296,6 +296,7 @@ Expr *create_array_expr(Expr **elements, int element_count);
 Expr *create_array_access_expr(Expr *array, Expr *index);
 Expr *create_increment_expr(Expr *operand);
 Expr *create_decrement_expr(Expr *operand);
+Expr *create_comparison_expr(Expr *left, Expr *right, TokenType comparison_type);
 void free_expr(Expr *expr);
 
 // Statement functions

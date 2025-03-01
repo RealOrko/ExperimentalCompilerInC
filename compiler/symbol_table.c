@@ -14,6 +14,21 @@
 #define LOCAL_BASE_OFFSET 8  // First local is at rbp-8
 #define OFFSET_ALIGNMENT 8   // All variables are 8-byte aligned
 
+// New helper function to determine type size
+int get_type_size(Type *type)
+{
+    switch (type->kind)
+    {
+    case TYPE_INT:
+    case TYPE_LONG:   return 8;
+    case TYPE_DOUBLE: return 8;
+    case TYPE_CHAR:   return 1;
+    case TYPE_BOOL:   return 1;
+    case TYPE_STRING: return 8;  // Pointer size
+    default:          return 8;  // Default to pointer size
+    }
+}
+
 // Helper to represent a token as a string safely
 static char *token_to_string(Token token)
 {
@@ -330,6 +345,14 @@ void add_symbol_with_kind(SymbolTable *table, Token name, Type *type, SymbolKind
     // Add to current scope
     symbol->next = table->current->symbols;
     table->current->symbols = symbol;
+
+    // Smarter offset calculation
+    int base_offset = (kind == SYMBOL_PARAM) ? PARAM_BASE_OFFSET : LOCAL_BASE_OFFSET;
+    symbol->offset = table->current->next_local_offset;
+    
+    // Align offsets based on type size
+    int type_size = get_type_size(type);
+    table->current->next_local_offset += ((type_size + 7) / 8) * 8;
 }
 
 /**
