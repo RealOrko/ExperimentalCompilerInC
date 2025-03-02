@@ -1,171 +1,297 @@
 /**
  * memory.h
- * Enhanced memory management system for compiler with thread safety, hierarchy,
- * pool allocation, and improved debugging
+ * Generic hierarchical memory management system
  */
 
- #ifndef COMPILER_MEMORY_H
- #define COMPILER_MEMORY_H
+ #ifndef MEMORY_H
+ #define MEMORY_H
  
- #include "debug.h"
  #include <stddef.h>
  #include <stdint.h>
- #include <pthread.h>
+ #include <stdbool.h>
  
- // Memory context types
+ /**
+  * @brief Logging levels for memory subsystem messages
+  */
  typedef enum {
-     MEMORY_CONTEXT_GLOBAL,    // Long-lived global allocations
-     MEMORY_CONTEXT_PARSING,   // Temporary memory during parsing
-     MEMORY_CONTEXT_TYPE_CHECK,// Memory used during type checking
-     MEMORY_CONTEXT_CODE_GEN,  // Memory for code generation
-     MEMORY_CONTEXT_SYMBOL_TABLE, // Memory for symbol table
-     MEMORY_CONTEXT_AST,       // Memory for AST nodes
-     MEMORY_CONTEXT_MAX        // Sentinel value
- } MemoryContextType;
+     MEM_LOG_NONE = 0,
+     MEM_LOG_ERROR,
+     MEM_LOG_WARNING,
+     MEM_LOG_INFO,
+     MEM_LOG_VERBOSE
+ } MemoryLogLevel;
  
- // Memory allocation strategies
+ /**
+  * @brief Memory allocation strategies
+  */
  typedef enum {
-     ALLOC_STRATEGY_ARENA,     // Pre-allocated block strategy
-     ALLOC_STRATEGY_STANDARD,  // Standard malloc/free
-     ALLOC_STRATEGY_POOL       // Fixed-size object pool
- } AllocationStrategy;
+     MEM_STRATEGY_STANDARD, // Traditional malloc/free behavior
+     MEM_STRATEGY_ARENA,    // Fast arena allocation for objects with similar lifetimes
+     MEM_STRATEGY_POOL      // Fixed-size object pool for uniform allocations
+ } MemoryStrategy;
  
- // Forward declarations for opaque structures
- typedef struct MemoryBlock MemoryBlock;
- typedef struct PoolBlock PoolBlock;
+ /**
+  * Forward declarations of opaque structures
+  */
  typedef struct MemoryContext MemoryContext;
+ typedef struct MemoryManager MemoryManager;
  
- // Allocation tracking for debugging
- #ifdef DEBUG_MEMORY
- typedef struct AllocationInfo {
-     void *ptr;                 // Allocated memory pointer
-     size_t size;               // Size of allocation
-     const char *file;          // Source file
-     int line;                  // Source line
-     struct AllocationInfo *next;
- } AllocationInfo;
- #endif
- 
- // Memory block structure
- struct MemoryBlock {
-     void *memory;              // The actual memory buffer
-     size_t used;               // How much is currently used
-     size_t capacity;           // Total capacity of this block
-     MemoryBlock *next;         // Next block in the chain
-     int has_free_space;        // Quick flag for blocks with free space
- };
- 
- // Pool block for fixed-size allocations
- struct PoolBlock {
-     void *memory;              // The memory pool
-     size_t element_size;       // Size of each element
-     size_t capacity;           // Number of elements in the pool
-     uint8_t *free_bitmap;      // Bitmap tracking free elements
-     size_t free_count;         // Count of free elements
-     PoolBlock *next;           // Next pool block
- };
- 
- // Memory context configuration
+ /**
+  * @brief Configuration for a memory context
+  */
  typedef struct {
-     MemoryContextType type;    // Type identifier for this context
-     AllocationStrategy strategy; // Allocation strategy to use
-     size_t initial_block_size; // Initial block size (0 = default)
-     size_t max_total_memory;   // Maximum memory allowed (0 = default)
-     size_t pool_element_size;  // For pool allocation, size of each element
-     int thread_safe;           // Whether to use thread safety mechanisms
+     const char* name;           // Human-readable name for debugging
+     MemoryStrategy strategy;    // Allocation strategy to use
+     size_t initial_size;        // Initial arena/pool size (0 = use default)
+     size_t max_size;            // Maximum memory limit (0 = use default)
+     size_t pool_object_size;    // Size of each object in pool (for pool strategy only)
+     bool thread_safe;           // Whether to use thread safety mechanisms
  } MemoryContextConfig;
  
- // Memory context for tracking allocations
- struct MemoryContext {
-     MemoryContextType type;
-     AllocationStrategy strategy;
-     
-     // Hierarchy
-     MemoryContext *parent;     // Parent context, if any
-     MemoryContext *first_child; // First child context
-     MemoryContext *next_sibling; // Next sibling context
+ /**
+  * @brief Statistics for a memory context
+  */
+ typedef struct {
+     const char* name;          // Context name
+     MemoryStrategy strategy;   // Allocation strategy used
+     size_t allocated;          // Total bytes allocated
+     size_t used;               // Current bytes in use
+     size_t peak;               // Peak memory usage
+     size_t max_size;           // Maximum allowed size
+     size_t block_count;        // Number of memory blocks
+     size_t alloc_count;        // Number of allocations
+     size_t free_count;         // Number of frees
+ } MemoryStats;
  
-     // Arena allocation fields
-     MemoryBlock *first_block;
-     MemoryBlock *current_block;
-     
-     // Pool allocation fields
-     PoolBlock *first_pool;
-     
-     // Memory tracking
-     size_t total_allocated;
-     size_t total_used;
-     size_t max_memory_limit;
-     
-     // Thread safety
-     pthread_mutex_t mutex;
-     int thread_safe;
-     
-     // Debugging
- #ifdef DEBUG_MEMORY
-     AllocationInfo *allocations; // Linked list of tracked allocations
- #endif
+ /**
+  * @brief Optional callback used to handle memory allocation failures
+  *
+  * Return true if the allocation should be retried, false to propagate the failure
+  */
+ typedef bool (*MemoryFailureHandler)(MemoryContext* context, size_t requested_size, void* user_data);
  
-     // Optional cleanup function
-     void (*cleanup)(struct MemoryContext *context);
- };
+ /**
+  * Global memory management initialization and cleanup
+  */
  
- // Global memory management functions
- int memory_init(void);
- void memory_shutdown(void);
- int memory_add_leak_detection(void);
- void memory_print_leaks(void);
+ /**
+  * @brief Initialize the memory management system
+  * 
+  * @param log_level Initial logging level
+  * @param detect_leaks Whether to enable leak detection
+  * @return A new memory manager or NULL on failure
+  */
+ MemoryManager* memory_init(MemoryLogLevel log_level, bool detect_leaks);
  
- // Context management
- MemoryContext* create_memory_context(MemoryContextConfig config);
- MemoryContext* create_child_context(MemoryContext *parent, MemoryContextConfig config);
- void destroy_memory_context(MemoryContext *context);
- void destroy_child_contexts(MemoryContext *parent);
+ /**
+  * @brief Shut down the memory management system and free all memory
+  * 
+  * @param manager The memory manager to shut down
+  */
+ void memory_shutdown(MemoryManager* manager);
  
- // Thread safety
- void memory_context_lock(MemoryContext *context);
- void memory_context_unlock(MemoryContext *context);
+ /**
+  * @brief Set the logging level for memory operations
+  * 
+  * @param manager The memory manager
+  * @param level The new logging level
+  */
+ void memory_set_log_level(MemoryManager* manager, MemoryLogLevel level);
  
- // Allocation functions
- void* memory_alloc(MemoryContext *context, size_t size);
- void* memory_calloc(MemoryContext *context, size_t count, size_t size);
- char* memory_strdup(MemoryContext *context, const char *str);
- void* memory_realloc(MemoryContext *context, void *ptr, size_t new_size);
+ /**
+  * @brief Set a callback to handle memory allocation failures
+  * 
+  * @param manager The memory manager
+  * @param handler The failure handler callback
+  * @param user_data User data to pass to the handler
+  */
+ void memory_set_failure_handler(MemoryManager* manager, MemoryFailureHandler handler, void* user_data);
  
- // Pool allocation
- void* memory_pool_alloc(MemoryContext *context);
- void memory_pool_free(MemoryContext *context, void *ptr);
+ /**
+  * Memory context operations
+  */
  
- // Free functions (for standard allocation strategy only)
- void memory_free(MemoryContext *context, void *ptr);
+ /**
+  * @brief Create a root memory context
+  * 
+  * @param manager The memory manager
+  * @param config Configuration for the context
+  * @return A new memory context or NULL on failure
+  */
+ MemoryContext* memory_create_context(MemoryManager* manager, MemoryContextConfig config);
  
- // Block management
- void* memory_alloc_best_fit(MemoryContext *context, size_t size);
- void memory_compact(MemoryContext *context);
+ /**
+  * @brief Create a child memory context
+  * 
+  * @param parent The parent memory context
+  * @param config Configuration for the child context
+  * @return A new memory context or NULL on failure
+  */
+ MemoryContext* memory_create_child_context(MemoryContext* parent, MemoryContextConfig config);
  
- // Utility functions
- void memory_reset_context(MemoryContext *context);
- size_t memory_context_usage(MemoryContext *context);
- size_t memory_context_capacity(MemoryContext *context);
- void memory_print_stats(MemoryContext *context);
- void memory_print_detailed_stats(MemoryContext *context, int verbose);
+ /**
+  * @brief Destroy a memory context and all its children
+  * 
+  * @param context The context to destroy
+  */
+ void memory_destroy_context(MemoryContext* context);
  
- // Debug helpers
- #ifdef DEBUG_MEMORY
- #define memory_alloc(ctx, size) memory_alloc_debug(ctx, size, __FILE__, __LINE__)
- #define memory_calloc(ctx, count, size) memory_calloc_debug(ctx, count, size, __FILE__, __LINE__)
- #define memory_strdup(ctx, str) memory_strdup_debug(ctx, str, __FILE__, __LINE__)
- #define memory_realloc(ctx, ptr, size) memory_realloc_debug(ctx, ptr, size, __FILE__, __LINE__)
- #define memory_pool_alloc(ctx) memory_pool_alloc_debug(ctx, __FILE__, __LINE__)
+ /**
+  * @brief Reset a memory context (free all allocations but keep the context)
+  * 
+  * @param context The context to reset
+  */
+ void memory_reset_context(MemoryContext* context);
  
- void* memory_alloc_debug(MemoryContext *context, size_t size, const char *file, int line);
- void* memory_calloc_debug(MemoryContext *context, size_t count, size_t size, const char *file, int line);
- char* memory_strdup_debug(MemoryContext *context, const char *str, const char *file, int line);
- void* memory_realloc_debug(MemoryContext *context, void *ptr, size_t new_size, const char *file, int line);
- void* memory_pool_alloc_debug(MemoryContext *context, const char *file, int line);
- #endif
+ /**
+  * @brief Get statistics for a memory context
+  * 
+  * @param context The context to query
+  * @param stats The statistics structure to fill
+  */
+ void memory_get_stats(MemoryContext* context, MemoryStats* stats);
  
- // AST node helpers
- #define AST_ALLOC(ctx, type) ((type*)memory_calloc(ctx, 1, sizeof(type)))
+ /**
+  * @brief Print detailed statistics for a memory context and its children
+  * 
+  * @param context The context to print statistics for
+  * @param verbose Whether to include detailed information
+  */
+ void memory_print_stats(MemoryContext* context, bool verbose);
  
- #endif // COMPILER_MEMORY_H
+ /**
+  * @brief Get the parent of a memory context
+  * 
+  * @param context The context to query
+  * @return The parent context or NULL if this is a root context
+  */
+ MemoryContext* memory_get_parent(MemoryContext* context);
+ 
+ /**
+  * @brief Get the memory manager that owns a context
+  * 
+  * @param context The context to query
+  * @return The memory manager
+  */
+ MemoryManager* memory_get_manager(MemoryContext* context);
+ 
+ /**
+  * @brief Find a memory context by name
+  * 
+  * @param manager The memory manager
+  * @param name The name to search for
+  * @return The found context or NULL if not found
+  */
+ MemoryContext* memory_find_context(MemoryManager* manager, const char* name);
+ 
+ /**
+  * Memory allocation functions
+  */
+ 
+ /**
+  * @brief Allocate memory from a context
+  * 
+  * @param context The memory context
+  * @param size The number of bytes to allocate
+  * @return A pointer to the allocated memory or NULL on failure
+  */
+ void* memory_alloc(MemoryContext* context, size_t size);
+ 
+ /**
+  * @brief Allocate memory and initialize it to zero
+  * 
+  * @param context The memory context
+  * @param count The number of elements to allocate
+  * @param size The size of each element
+  * @return A pointer to the allocated memory or NULL on failure
+  */
+ void* memory_calloc(MemoryContext* context, size_t count, size_t size);
+ 
+ /**
+  * @brief Reallocate a memory block to a new size
+  * 
+  * @param context The memory context
+  * @param ptr The existing memory block (or NULL to allocate a new block)
+  * @param size The new size in bytes
+  * @return A pointer to the reallocated memory or NULL on failure
+  */
+ void* memory_realloc(MemoryContext* context, void* ptr, size_t size);
+ 
+ /**
+  * @brief Duplicate a string using memory from the context
+  * 
+  * @param context The memory context
+  * @param str The string to duplicate
+  * @return A new copy of the string or NULL on failure
+  */
+ char* memory_strdup(MemoryContext* context, const char* str);
+ 
+ /**
+  * @brief Free memory allocated from a context
+  * 
+  * @param context The memory context
+  * @param ptr The memory to free
+  * @note Only needed for MEM_STRATEGY_STANDARD
+  */
+ void memory_free(MemoryContext* context, void* ptr);
+ 
+ /**
+  * Pool allocation functions (for MEM_STRATEGY_POOL)
+  */
+ 
+ /**
+  * @brief Allocate an object from a memory pool
+  * 
+  * @param context The memory context (must use MEM_STRATEGY_POOL)
+  * @return A pointer to a pool object or NULL on failure
+  */
+ void* memory_pool_alloc(MemoryContext* context);
+ 
+ /**
+  * @brief Return an object to a memory pool
+  * 
+  * @param context The memory context
+  * @param ptr The object to return to the pool
+  */
+ void memory_pool_free(MemoryContext* context, void* ptr);
+ 
+ /**
+  * Memory leak detection
+  */
+ 
+ /**
+  * @brief Enable memory leak detection
+  * 
+  * @param manager The memory manager
+  */
+ void memory_enable_leak_detection(MemoryManager* manager);
+ 
+ /**
+  * @brief Disable memory leak detection
+  * 
+  * @param manager The memory manager
+  */
+ void memory_disable_leak_detection(MemoryManager* manager);
+ 
+ /**
+  * @brief Print memory leak report
+  * 
+  * @param manager The memory manager
+  */
+ void memory_print_leaks(MemoryManager* manager);
+ 
+ /**
+  * Convenience macros for allocating structures
+  */
+ 
+ /**
+  * @brief Allocate a structure of the specified type
+  */
+ #define MEM_NEW(ctx, type) ((type*)memory_calloc((ctx), 1, sizeof(type)))
+ 
+ /**
+  * @brief Allocate an array of structures
+  */
+ #define MEM_NEW_ARRAY(ctx, type, count) ((type*)memory_calloc((ctx), (count), sizeof(type)))
+ 
+ #endif /* MEMORY_H */
