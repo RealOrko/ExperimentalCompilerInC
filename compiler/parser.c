@@ -112,6 +112,11 @@ Stmt *parse_indented_block(Parser *parser)
         {
             capacity = capacity == 0 ? 8 : capacity * 2;
             statements = realloc(statements, sizeof(Stmt *) * capacity);
+            if (statements == NULL)
+            {
+                DEBUG_ERROR("Out of memory");
+                exit(1);
+            }
         }
         statements[count++] = stmt;
         DEBUG_VERBOSE("Added statement %d to block, type = %d", count - 1, stmt->type);
@@ -539,6 +544,11 @@ Expr *parse_call(Parser *parser, Expr *callee)
             {
                 capacity = capacity == 0 ? 8 : capacity * 2;
                 arguments = realloc(arguments, sizeof(Expr *) * capacity);
+                if (arguments == NULL)
+                {
+                    DEBUG_ERROR("Out of memory");
+                    exit(1);
+                }
             }
             arguments[arg_count++] = arg;
         } while (parser_match(parser, TOKEN_COMMA));
@@ -724,6 +734,11 @@ Stmt *parse_function_declaration(Parser *parser)
                 {
                     param_capacity = param_capacity == 0 ? 8 : param_capacity * 2;
                     params = realloc(params, sizeof(Parameter) * param_capacity);
+                    if (params == NULL)
+                    {
+                        DEBUG_ERROR("Out of memory");
+                        exit(1);
+                    }
                 }
                 params[param_count].name = param_name;
                 params[param_count].type = param_type;
@@ -979,6 +994,11 @@ Stmt *parse_block_statement(Parser *parser)
         {
             capacity = capacity == 0 ? 8 : capacity * 2;
             statements = realloc(statements, sizeof(Stmt *) * capacity);
+            if (statements == NULL)
+            {
+                DEBUG_ERROR("Out of memory");
+                exit(1);
+            }
         }
         statements[count++] = stmt;
     }

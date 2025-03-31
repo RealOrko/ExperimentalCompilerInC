@@ -1050,6 +1050,10 @@
      
      // Perform the reallocation
      void* new_ptr = realloc(ptr, aligned_size);
+     if (!new_ptr) {
+         MEM_ERROR(context->manager, "Failed to reallocate %p to %zu bytes in context '%s'", 
+                 ptr, aligned_size, context->name);
+     }
      
      if (new_ptr) {
          // Update memory tracking
