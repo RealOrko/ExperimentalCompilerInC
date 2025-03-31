@@ -26,7 +26,8 @@ void init_lexer(Lexer *lexer, const char *source, const char *filename)
 
 void cleanup_lexer(Lexer *lexer)
 {
-    if (lexer->indent_stack != NULL) {
+    if (lexer->indent_stack != NULL)
+    {
         free(lexer->indent_stack);
         lexer->indent_stack = NULL;
     }
@@ -35,7 +36,7 @@ void cleanup_lexer(Lexer *lexer)
 void report_indentation_error(Lexer *lexer, int expected, int actual)
 {
     char message[100];
-    sprintf(message, "Indentation error: expected %d spaces, got %d spaces", 
+    sprintf(message, "Indentation error: expected %d spaces, got %d spaces",
             expected, actual);
     error_token(lexer, message);
 }
@@ -535,7 +536,8 @@ Token scan_token(Lexer *lexer)
     if (is_at_end(lexer))
     {
         // Generate any remaining DEDENTs before EOF
-        if (lexer->indent_size > 1) {
+        if (lexer->indent_size > 1)
+        {
             lexer->indent_size--;
             return make_token(lexer, TOKEN_DEDENT);
         }
@@ -543,55 +545,65 @@ Token scan_token(Lexer *lexer)
     }
 
     // Handle indentation at the beginning of lines
-    if (lexer->at_line_start) {
+    if (lexer->at_line_start)
+    {
         // Count spaces/tabs at the start of the line
         int current_indent = 0;
-        const char* indent_start = lexer->current;
-        
-        while (peek(lexer) == ' ' || peek(lexer) == '\t') {
-            if (peek(lexer) == ' ') current_indent++;
-            else current_indent += 4; // Count tab as 4 spaces
+        const char *indent_start = lexer->current;
+
+        while (peek(lexer) == ' ' || peek(lexer) == '\t')
+        {
+            if (peek(lexer) == ' ')
+                current_indent++;
+            else
+                current_indent += 4; // Count tab as 4 spaces
             advance(lexer);
         }
-        
+
         // Update the start to after the whitespace
         lexer->start = lexer->current;
-        
+
         // If this line is just whitespace or a comment, it doesn't affect indentation
-        if (is_at_end(lexer) || peek(lexer) == '\n' || 
-            (peek(lexer) == '/' && peek_next(lexer) == '/')) {
+        if (is_at_end(lexer) || peek(lexer) == '\n' ||
+            (peek(lexer) == '/' && peek_next(lexer) == '/'))
+        {
             // Reset the current position to before the whitespace
             lexer->current = indent_start;
             lexer->start = indent_start;
         }
         // Process real indentation changes
-        else {
+        else
+        {
             int previous_indent = lexer->indent_stack[lexer->indent_size - 1];
-            
-            if (current_indent > previous_indent) {
+
+            if (current_indent > previous_indent)
+            {
                 // Add new indentation level
-                if (lexer->indent_size >= lexer->indent_capacity) {
+                if (lexer->indent_size >= lexer->indent_capacity)
+                {
                     lexer->indent_capacity *= 2;
-                    lexer->indent_stack = realloc(lexer->indent_stack, 
-                                                lexer->indent_capacity * sizeof(int));
+                    lexer->indent_stack = realloc(lexer->indent_stack,
+                                                  lexer->indent_capacity * sizeof(int));
                 }
                 lexer->indent_stack[lexer->indent_size++] = current_indent;
                 return make_token(lexer, TOKEN_INDENT);
             }
-            else if (current_indent < previous_indent) {
+            else if (current_indent < previous_indent)
+            {
                 // Remove an indentation level
                 lexer->indent_size--;
-                if (current_indent != lexer->indent_stack[lexer->indent_size - 1]) {
+                if (current_indent != lexer->indent_stack[lexer->indent_size - 1])
+                {
                     // Put the level back, we'll remove it next time
                     lexer->indent_size++;
                     return error_token(lexer, "Inconsistent indentation");
                 }
                 return make_token(lexer, TOKEN_DEDENT);
             }
-            
+
             // Not at start of line anymore
             lexer->at_line_start = 0;
-            
+
             // Reset to scan the actual token
             lexer->current = indent_start;
             lexer->start = indent_start;
@@ -608,7 +620,8 @@ Token scan_token(Lexer *lexer)
     char c = advance(lexer);
 
     // Handle newline - after a newline we'll be at the start of a line
-    if (c == '\n') {
+    if (c == '\n')
+    {
         lexer->line++;
         lexer->at_line_start = 1;
         return make_token(lexer, TOKEN_NEWLINE);
@@ -707,5 +720,7 @@ Token scan_token(Lexer *lexer)
         return error_token(lexer, "Expected '|' after '|'");
     }
 
-    return error_token(lexer, "Unexpected character");
+    char msg[32];
+    snprintf(msg, sizeof(msg), "Unexpected character '%c'", c);
+    return error_token(lexer, msg);
 }
