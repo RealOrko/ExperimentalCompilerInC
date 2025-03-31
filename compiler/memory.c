@@ -295,6 +295,11 @@
          size_t new_capacity = manager->context_capacity * 2;
          MemoryContext** new_contexts = realloc(manager->contexts, 
                                               new_capacity * sizeof(MemoryContext*));
+         
+         if (new_contexts == NULL) {
+            DEBUG_ERROR("Out of memory");
+            exit(1);
+         }
          if (!new_contexts) {
              pthread_mutex_unlock(&manager->mutex);
              return;

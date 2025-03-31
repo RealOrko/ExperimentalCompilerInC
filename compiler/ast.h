@@ -274,7 +274,8 @@ typedef struct
 } Module;
 
 // Debug
-void print_ast(Stmt *stmt, int indent_level);
+void pretty_print_ast(Stmt *stmt, int indent_level);
+void pretty_print_expr(Expr *expr, int indent_level);
 
 // Type functions
 void mark_type_non_freeable(Type *type);

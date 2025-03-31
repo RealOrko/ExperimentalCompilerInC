@@ -30,10 +30,4 @@
  // Read source file
  char *read_file(const char *path);
  
- // Compile source file
- int compile_file(const char *source_path, const char *output_path, int verbose);
- 
- // Compile source string
- int compile_source(const char *source, const char *filename, const char *output_path, int verbose);
- 
  #endif // COMPILER_H

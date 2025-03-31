@@ -47,6 +47,22 @@ void init_debug(int level);
         fprintf(stderr, "[VERBOSE] %s:%d: " fmt "\n", __FILE__, __LINE__, ##__VA_ARGS__); \
     }
 
+#define DEBUG_VERBOSE_INDENT(level, fmt, ...)                     \
+    if (debug_level >= DEBUG_LEVEL_VERBOSE)                       \
+    {                                                             \
+        fprintf(stderr, "[VERBOSE] %s:%d: ", __FILE__, __LINE__); \
+        if (fmt == NULL)                                          \
+        {                                                         \
+            fprintf(stderr, "Null format\n");                     \
+            abort();                                              \
+        }                                                         \
+        for (int i = 0; i < level; i++)                           \
+        {                                                         \
+            fprintf(stderr, " ");                                 \
+        }                                                         \
+        fprintf(stderr, fmt "\n", ##__VA_ARGS__);                 \
+    }
+
 // Assert macro
 #define ASSERT(condition, fmt, ...)                                                      \
     if (!(condition))                                                                    \

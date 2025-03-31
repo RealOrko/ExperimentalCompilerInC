@@ -1056,10 +1056,12 @@ void generate_var_declaration(CodeGen *gen, VarDeclStmt *stmt)
 void generate_block(CodeGen *gen, BlockStmt *stmt)
 {
     // Generate code for each statement in the block
+    push_scope(gen->symbol_table);
     for (int i = 0; i < stmt->count; i++)
     {
         generate_statement(gen, stmt->statements[i]);
     }
+    pop_scope(gen->symbol_table);
 }
 
 void generate_function(CodeGen *gen, FunctionStmt *stmt)
@@ -1217,8 +1219,15 @@ void generate_while_statement(CodeGen *gen, WhileStmt *stmt)
     fprintf(gen->output, "    test rax, rax\n");
     fprintf(gen->output, "    jz .L%d ; Exit if condition is false\n", loop_end);
 
-    // Generate loop body
-    generate_statement(gen, stmt->body);
+    // Generate the entire loop body
+    if (stmt->body->type == STMT_BLOCK)
+    {
+        generate_block(gen, &stmt->body->as.block); // Handle block statements
+    }
+    else
+    {
+        generate_statement(gen, stmt->body);        // Handle single statements
+    }
 
     // Jump back to start of loop
     fprintf(gen->output, "    jmp .L%d ; Return to condition\n", loop_start);

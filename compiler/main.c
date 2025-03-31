@@ -9,33 +9,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-// Special handling for string literals in type checking
-int allow_string_literals = 1;
-
-// Override the type checking function for call expressions
-int can_assign_to_param(Type *param_type, Expr *arg_expr)
-{
-    if (param_type == NULL || arg_expr == NULL)
-        return 0;
-
-    // Special case for string literals to string parameters
-    if (param_type->kind == TYPE_STRING &&
-        arg_expr->type == EXPR_LITERAL &&
-        arg_expr->as.literal.type != NULL &&
-        arg_expr->as.literal.type->kind == TYPE_STRING)
-    {
-        return 1;
-    }
-
-    // Normal type checking
-    if (arg_expr->expr_type != NULL)
-    {
-        return can_convert(arg_expr->expr_type, param_type);
-    }
-
-    return 0;
-}
-
 int main(int argc, char **argv)
 {
     // Variables that need cleanup

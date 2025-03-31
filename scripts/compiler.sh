@@ -20,13 +20,13 @@ make
 popd
 
 # Compile SN source to assembly
-bin/sn samples/hello-world/main.sn -o bin/hello-world.asm -l 3
+bin/sn samples/hello-world/simple.sn -o bin/hello-world.asm -l 4
 
 # Assemble with NASM (specify elf64 format)
 nasm -f elf64 bin/hello-world.asm -o bin/hello-world.o
 
 # Link with GCC (which handles C runtime properly)
-gcc -no-pie bin/hello-world.o -o bin/hello-world
+gcc -no-pie -fsanitize=address bin/hello-world.o -o bin/hello-world
 
 # Run the executable
 #bin/hello-world

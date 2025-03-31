@@ -9,43 +9,215 @@
 #include <string.h>
 #include <stdio.h>
 
-void print_ast(Stmt *stmt, int indent_level)
+void pretty_print_ast(Stmt *stmt, int indent_level)
 {
-    if (stmt == NULL) return;
-    
-    // Print indentation
-    for (int i = 0; i < indent_level; i++) {
-        printf("  ");
+    if (stmt == NULL)
+    {
+        return;
     }
-    
-    // Print statement type
-    switch (stmt->type) {
-        case STMT_EXPR:
-            printf("Expression\n");
-            break;
-        case STMT_VAR_DECL:
-            printf("Variable Declaration: %.*s\n", 
-                   stmt->as.var_decl.name.length, 
-                   stmt->as.var_decl.name.start);
-            break;
-        case STMT_FUNCTION:
-            printf("Function: %.*s\n", 
-                   stmt->as.function.name.length, 
-                   stmt->as.function.name.start);
-            for (int i = 0; i < stmt->as.function.body_count; i++) {
-                print_ast(stmt->as.function.body[i], indent_level + 1);
+
+    switch (stmt->type)
+    {
+    case STMT_EXPR:
+        DEBUG_VERBOSE_INDENT(indent_level, "ExpressionStmt:");
+        pretty_print_expr(stmt->as.expression.expression, indent_level + 1);
+        break;
+
+    case STMT_VAR_DECL:
+        DEBUG_VERBOSE_INDENT(indent_level, "VarDecl: %.*s (type: %s)",
+                          stmt->as.var_decl.name.length,
+                          stmt->as.var_decl.name.start,
+                          type_to_string(stmt->as.var_decl.type));
+        if (stmt->as.var_decl.initializer)
+        {
+            DEBUG_VERBOSE_INDENT(indent_level + 1, "Initializer:");
+            pretty_print_expr(stmt->as.var_decl.initializer, indent_level + 2);
+        }
+        break;
+
+    case STMT_FUNCTION:
+        DEBUG_VERBOSE_INDENT(indent_level, "Function: %.*s (return: %s)",
+                          stmt->as.function.name.length,
+                          stmt->as.function.name.start,
+                          type_to_string(stmt->as.function.return_type));
+        if (stmt->as.function.param_count > 0)
+        {
+            DEBUG_VERBOSE_INDENT(indent_level + 1, "Parameters:");
+            for (int i = 0; i < stmt->as.function.param_count; i++)
+            {
+                DEBUG_VERBOSE_INDENT(indent_level + 1, "%.*s: %s",
+                                  stmt->as.function.params[i].name.length,
+                                  stmt->as.function.params[i].name.start,
+                                  type_to_string(stmt->as.function.params[i].type));
             }
+        }
+        DEBUG_VERBOSE_INDENT(indent_level + 1, "Body:");
+        for (int i = 0; i < stmt->as.function.body_count; i++)
+        {
+            pretty_print_ast(stmt->as.function.body[i], indent_level + 2);
+        }
+        break;
+
+    case STMT_RETURN:
+        DEBUG_VERBOSE_INDENT(indent_level + 1, "Return:");
+        if (stmt->as.return_stmt.value)
+        {
+            pretty_print_expr(stmt->as.return_stmt.value, indent_level + 1);
+        }
+        break;
+
+    case STMT_BLOCK:
+        DEBUG_VERBOSE_INDENT(indent_level, "Block:");
+        for (int i = 0; i < stmt->as.block.count; i++)
+        {
+            pretty_print_ast(stmt->as.block.statements[i], indent_level + 1);
+        }
+        break;
+
+    case STMT_IF:
+        DEBUG_VERBOSE_INDENT(indent_level, "If:");
+        DEBUG_VERBOSE_INDENT(indent_level + 1, "Condition:");
+        pretty_print_expr(stmt->as.if_stmt.condition, indent_level + 2);
+        DEBUG_VERBOSE_INDENT(indent_level + 1, "Then:");
+        pretty_print_ast(stmt->as.if_stmt.then_branch, indent_level + 2);
+        if (stmt->as.if_stmt.else_branch)
+        {
+            DEBUG_VERBOSE_INDENT(indent_level + 1, "Else:");
+            pretty_print_ast(stmt->as.if_stmt.else_branch, indent_level + 2);
+        }
+        break;
+
+    case STMT_WHILE:
+        DEBUG_VERBOSE_INDENT(indent_level, "While:");
+        DEBUG_VERBOSE_INDENT(indent_level + 1, "Condition:");
+        pretty_print_expr(stmt->as.while_stmt.condition, indent_level + 2);
+        DEBUG_VERBOSE_INDENT(indent_level + 1, "Body:");
+        pretty_print_ast(stmt->as.while_stmt.body, indent_level + 2);
+        break;
+
+    case STMT_FOR:
+        DEBUG_VERBOSE_INDENT(indent_level, "For:");
+        if (stmt->as.for_stmt.initializer)
+        {
+            DEBUG_VERBOSE_INDENT(indent_level + 1, "Initializer:");
+            pretty_print_ast(stmt->as.for_stmt.initializer, indent_level + 2);
+        }
+        if (stmt->as.for_stmt.condition)
+        {
+            DEBUG_VERBOSE_INDENT(indent_level + 1, "Condition:");
+            pretty_print_expr(stmt->as.for_stmt.condition, indent_level + 2);
+        }
+        if (stmt->as.for_stmt.increment)
+        {
+            DEBUG_VERBOSE_INDENT(indent_level + 1, "Increment:");
+            pretty_print_expr(stmt->as.for_stmt.increment, indent_level + 2);
+        }
+        DEBUG_VERBOSE_INDENT(indent_level + 1, "Body:");
+        pretty_print_ast(stmt->as.for_stmt.body, indent_level + 2);
+        break;
+
+    case STMT_IMPORT:
+        DEBUG_VERBOSE_INDENT(indent_level, "Import: %.*s",
+                          stmt->as.import.module_name.length,
+                          stmt->as.import.module_name.start);
+        break;
+    }
+}
+
+void pretty_print_expr(Expr *expr, int indent_level)
+{
+    if (expr == NULL)
+    {
+        return;
+    }
+
+    switch (expr->type)
+    {
+    case EXPR_BINARY:
+        DEBUG_VERBOSE_INDENT(indent_level, "Binary: %d", expr->as.binary.operator);
+        pretty_print_expr(expr->as.binary.left, indent_level + 1);
+        pretty_print_expr(expr->as.binary.right, indent_level + 1);
+        break;
+
+    case EXPR_UNARY:
+        DEBUG_VERBOSE_INDENT(indent_level, "Unary: %d", expr->as.unary.operator);
+        pretty_print_expr(expr->as.unary.operand, indent_level + 1);
+        break;
+
+    case EXPR_LITERAL:
+        DEBUG_VERBOSE_INDENT(indent_level, "Literal: ");
+        switch (expr->as.literal.type->kind)
+        {
+        case TYPE_INT:
+            DEBUG_VERBOSE_INDENT(indent_level, "%ld", expr->as.literal.value.int_value);
             break;
-        case STMT_IF:
-            printf("If Statement\n");
-            print_ast(stmt->as.if_stmt.then_branch, indent_level + 1);
-            if (stmt->as.if_stmt.else_branch) {
-                for (int i = 0; i < indent_level; i++) printf("  ");
-                printf("Else\n");
-                print_ast(stmt->as.if_stmt.else_branch, indent_level + 1);
+        case TYPE_DOUBLE:
+            DEBUG_VERBOSE_INDENT(indent_level, "%f", expr->as.literal.value.double_value);
+            break;
+        case TYPE_CHAR:
+            DEBUG_VERBOSE_INDENT(indent_level, "'%c'", expr->as.literal.value.char_value);
+            break;
+        case TYPE_STRING:
+            DEBUG_VERBOSE_INDENT(indent_level, "\"%s\"", expr->as.literal.value.string_value);
+            break;
+        case TYPE_BOOL:
+            DEBUG_VERBOSE_INDENT(indent_level, "%s", expr->as.literal.value.bool_value ? "true" : "false");
+            break;
+        default:
+            DEBUG_VERBOSE_INDENT(indent_level, "unknown");
+        }
+        DEBUG_VERBOSE_INDENT(indent_level, " (%s)", type_to_string(expr->as.literal.type));
+        break;
+
+    case EXPR_VARIABLE:
+        DEBUG_VERBOSE_INDENT(indent_level, "Variable: %.*s",
+                          expr->as.variable.name.length,
+                          expr->as.variable.name.start);
+        break;
+
+    case EXPR_ASSIGN:
+        DEBUG_VERBOSE_INDENT(indent_level, "Assign: %.*s",
+                          expr->as.assign.name.length,
+                          expr->as.assign.name.start);
+        pretty_print_expr(expr->as.assign.value, indent_level + 1);
+        break;
+
+    case EXPR_CALL:
+        DEBUG_VERBOSE_INDENT(indent_level, "Call:");
+        pretty_print_expr(expr->as.call.callee, indent_level + 1);
+        if (expr->as.call.arg_count > 0)
+        {
+            DEBUG_VERBOSE_INDENT(indent_level + 1, "Arguments:");
+            for (int i = 0; i < expr->as.call.arg_count; i++)
+            {
+                pretty_print_expr(expr->as.call.arguments[i], indent_level + 2);
             }
-            break;
-        // Handle other statement types
+        }
+        break;
+
+    case EXPR_ARRAY:
+        DEBUG_VERBOSE_INDENT(indent_level, "Array:");
+        for (int i = 0; i < expr->as.array.element_count; i++)
+        {
+            pretty_print_expr(expr->as.array.elements[i], indent_level + 1);
+        }
+        break;
+
+    case EXPR_ARRAY_ACCESS:
+        DEBUG_VERBOSE_INDENT(indent_level, "ArrayAccess:");
+        pretty_print_expr(expr->as.array_access.array, indent_level + 1);
+        pretty_print_expr(expr->as.array_access.index, indent_level + 1);
+        break;
+
+    case EXPR_INCREMENT:
+        DEBUG_VERBOSE_INDENT(indent_level, "Increment:");
+        pretty_print_expr(expr->as.operand, indent_level + 1);
+        break;
+
+    case EXPR_DECREMENT:
+        DEBUG_VERBOSE_INDENT(indent_level, "Decrement:");
+        pretty_print_expr(expr->as.operand, indent_level + 1);
+        break;
     }
 }
 

@@ -4,6 +4,7 @@
  */
 
 #include "lexer.h"
+#include "debug.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -96,12 +97,11 @@ void skip_whitespace(Lexer *lexer)
         switch (c)
         {
         case ' ':
-        case '\r':
         case '\t':
+        case '\r':
             advance(lexer);
             break;
         case '\n':
-            // Don't skip newlines - they're significant now
             return;
         case '/':
             if (peek_next(lexer) == '/')
@@ -528,199 +528,209 @@ Token scan_char(Lexer *lexer)
 
 Token scan_token(Lexer *lexer)
 {
-    // Skip whitespace but not newlines
-    skip_whitespace(lexer);
+    // Log the start of token scanning
+    DEBUG_VERBOSE("Line %d: Starting scan_token, at_line_start = %d", lexer->line, lexer->at_line_start);
 
-    lexer->start = lexer->current;
-
-    if (is_at_end(lexer))
-    {
-        // Generate any remaining DEDENTs before EOF
-        if (lexer->indent_size > 1)
-        {
-            lexer->indent_size--;
-            return make_token(lexer, TOKEN_DEDENT);
-        }
-        return make_token(lexer, TOKEN_EOF);
-    }
-
-    // Handle indentation at the beginning of lines
+    // Handle indentation at the start of a line
     if (lexer->at_line_start)
     {
-        // Count spaces/tabs at the start of the line
+        // Calculate indentation level
         int current_indent = 0;
         const char *indent_start = lexer->current;
-
         while (peek(lexer) == ' ' || peek(lexer) == '\t')
         {
-            if (peek(lexer) == ' ')
-                current_indent++;
-            else
-                current_indent += 4; // Count tab as 4 spaces
+            current_indent++;
             advance(lexer);
         }
+        DEBUG_VERBOSE("Line %d: Calculated indent = %d", lexer->line, current_indent);
 
-        // Update the start to after the whitespace
-        lexer->start = lexer->current;
-
-        // If this line is just whitespace or a comment, it doesn't affect indentation
+        // Check if the line is just whitespace or a comment
+        const char *temp = lexer->current;
+        while (peek(lexer) == ' ' || peek(lexer) == '\t')
+        {
+            advance(lexer);
+        }
         if (is_at_end(lexer) || peek(lexer) == '\n' ||
             (peek(lexer) == '/' && peek_next(lexer) == '/'))
         {
-            // Reset the current position to before the whitespace
+            DEBUG_VERBOSE("Line %d: Ignoring line (whitespace or comment only)", lexer->line);
             lexer->current = indent_start;
             lexer->start = indent_start;
         }
-        // Process real indentation changes
         else
         {
-            int previous_indent = lexer->indent_stack[lexer->indent_size - 1];
+            lexer->current = temp;
+            lexer->start = lexer->current;
+            int top = lexer->indent_stack[lexer->indent_size - 1];
+            DEBUG_VERBOSE("Line %d: Top of indent_stack = %d, indent_size = %d",
+                          lexer->line, top, lexer->indent_size);
 
-            if (current_indent > previous_indent)
+            if (current_indent > top)
             {
-                // Add new indentation level
+                // Push new indentation level and emit INDENT
                 if (lexer->indent_size >= lexer->indent_capacity)
                 {
                     lexer->indent_capacity *= 2;
                     lexer->indent_stack = realloc(lexer->indent_stack,
                                                   lexer->indent_capacity * sizeof(int));
+                    if (lexer->indent_stack == NULL)
+                    {
+                        DEBUG_ERROR("Out of memory");
+                        exit(1);
+                    }
+                    DEBUG_VERBOSE("Line %d: Resized indent_stack, new capacity = %d",
+                                  lexer->line, lexer->indent_capacity);
                 }
                 lexer->indent_stack[lexer->indent_size++] = current_indent;
+                lexer->at_line_start = 0;
+                DEBUG_VERBOSE("Line %d: Pushing indent level %d, emitting INDENT",
+                              lexer->line, current_indent);
                 return make_token(lexer, TOKEN_INDENT);
             }
-            else if (current_indent < previous_indent)
+            else if (current_indent < top)
             {
-                // Remove an indentation level
+                // Pop indentation level and emit DEDENT
                 lexer->indent_size--;
-                if (current_indent != lexer->indent_stack[lexer->indent_size - 1])
+                int new_top = lexer->indent_stack[lexer->indent_size - 1];
+                DEBUG_VERBOSE("Line %d: Popped indent level, new top = %d, indent_size = %d",
+                              lexer->line, new_top, lexer->indent_size);
+
+                if (current_indent == new_top)
                 {
-                    // Put the level back, we'll remove it next time
-                    lexer->indent_size++;
+                    lexer->at_line_start = 0;
+                    DEBUG_VERBOSE("Line %d: Emitting DEDENT, indentation matches stack",
+                                  lexer->line);
+                }
+                else if (current_indent > new_top)
+                {
+                    DEBUG_VERBOSE("Line %d: Error - Inconsistent indentation (current %d > new_top %d)",
+                                  lexer->line, current_indent, new_top);
                     return error_token(lexer, "Inconsistent indentation");
+                }
+                else
+                {
+                    DEBUG_VERBOSE("Line %d: Emitting DEDENT, more dedents pending",
+                                  lexer->line);
                 }
                 return make_token(lexer, TOKEN_DEDENT);
             }
-
-            // Not at start of line anymore
-            lexer->at_line_start = 0;
-
-            // Reset to scan the actual token
-            lexer->current = indent_start;
-            lexer->start = indent_start;
+            else
+            {
+                lexer->at_line_start = 0;
+                DEBUG_VERBOSE("Line %d: Indentation unchanged, proceeding to scan token",
+                              lexer->line);
+            }
         }
     }
 
-    // Skip whitespace again to handle the normal case
+    // Skip whitespace within the line
+    DEBUG_VERBOSE("Line %d: Skipping whitespace within the line", lexer->line);
     skip_whitespace(lexer);
     lexer->start = lexer->current;
 
+    // Check for end of file
     if (is_at_end(lexer))
+    {
+        DEBUG_VERBOSE("Line %d: End of file reached", lexer->line);
         return make_token(lexer, TOKEN_EOF);
+    }
 
+    // Scan the next character
     char c = advance(lexer);
+    DEBUG_VERBOSE("Line %d: Scanning character '%c'", lexer->line, c);
 
-    // Handle newline - after a newline we'll be at the start of a line
+    // Handle newline
     if (c == '\n')
     {
         lexer->line++;
         lexer->at_line_start = 1;
+        DEBUG_VERBOSE("Line %d: Emitting NEWLINE", lexer->line - 1);
         return make_token(lexer, TOKEN_NEWLINE);
     }
 
-    // Identifiers
+    // Handle identifiers and keywords
     if (isalpha(c) || c == '_')
-        return scan_identifier(lexer);
+    {
+        Token token = scan_identifier(lexer);
+        DEBUG_VERBOSE("Line %d: Emitting identifier token type %d", lexer->line, token.type);
+        return token;
+    }
 
-    // Numbers
+    // Handle numbers
     if (isdigit(c))
-        return scan_number(lexer);
+    {
+        Token token = scan_number(lexer);
+        DEBUG_VERBOSE("Line %d: Emitting number token type %d", lexer->line, token.type);
+        return token;
+    }
 
+    // Handle operators and punctuation
     switch (c)
     {
-    // Single-character tokens
+    case '%':
+        DEBUG_VERBOSE("Line %d: Emitting MODULO", lexer->line);
+        return make_token(lexer, TOKEN_MODULO);
+    case '/':
+        DEBUG_VERBOSE("Line %d: Emitting SLASH", lexer->line);
+        return make_token(lexer, TOKEN_SLASH);
+    case '*':
+        DEBUG_VERBOSE("Line %d: Emitting STAR", lexer->line);
+        return make_token(lexer, TOKEN_STAR);
+    case '+':
+        DEBUG_VERBOSE("Line %d: Emitting PLUS", lexer->line);
+        return make_token(lexer, TOKEN_PLUS);
     case '(':
+        DEBUG_VERBOSE("Line %d: Emitting LEFT_PAREN", lexer->line);
         return make_token(lexer, TOKEN_LEFT_PAREN);
     case ')':
+        DEBUG_VERBOSE("Line %d: Emitting RIGHT_PAREN", lexer->line);
         return make_token(lexer, TOKEN_RIGHT_PAREN);
-    case '{':
-        return make_token(lexer, TOKEN_LEFT_BRACE);
-    case '}':
-        return make_token(lexer, TOKEN_RIGHT_BRACE);
-    case '[':
-        return make_token(lexer, TOKEN_LEFT_BRACKET);
-    case ']':
-        return make_token(lexer, TOKEN_RIGHT_BRACKET);
-    case ';':
-        return make_token(lexer, TOKEN_SEMICOLON);
     case ':':
+        DEBUG_VERBOSE("Line %d: Emitting COLON", lexer->line);
         return make_token(lexer, TOKEN_COLON);
-    case ',':
-        return make_token(lexer, TOKEN_COMMA);
-    case '.':
-        return make_token(lexer, TOKEN_DOT);
     case '-':
         if (match(lexer, '>'))
         {
+            DEBUG_VERBOSE("Line %d: Emitting ARROW (for '->')", lexer->line);
             return make_token(lexer, TOKEN_ARROW);
         }
-        else if (match(lexer, '-'))
-        {
-            return make_token(lexer, TOKEN_MINUS_MINUS);
-        }
+        DEBUG_VERBOSE("Line %d: Emitting MINUS", lexer->line);
         return make_token(lexer, TOKEN_MINUS);
-    case '+':
-        if (match(lexer, '+'))
-        {
-            return make_token(lexer, TOKEN_PLUS_PLUS);
-        }
-        return make_token(lexer, TOKEN_PLUS);
-    case '*':
-        return make_token(lexer, TOKEN_STAR);
-    case '/':
-        return make_token(lexer, TOKEN_SLASH);
-    case '%':
-        return make_token(lexer, TOKEN_MODULO);
-
-    // One or two character tokens
-    case '!':
-        return make_token(lexer, match(lexer, '=') ? TOKEN_BANG_EQUAL : TOKEN_BANG);
     case '=':
         if (match(lexer, '='))
         {
+            DEBUG_VERBOSE("Line %d: Emitting EQUAL_EQUAL", lexer->line);
             return make_token(lexer, TOKEN_EQUAL_EQUAL);
         }
-        else if (match(lexer, '>'))
+        if (match(lexer, '>'))
         {
+            DEBUG_VERBOSE("Line %d: Emitting ARROW (for '=>')", lexer->line);
             return make_token(lexer, TOKEN_ARROW);
         }
+        DEBUG_VERBOSE("Line %d: Emitting EQUAL", lexer->line);
         return make_token(lexer, TOKEN_EQUAL);
     case '<':
-        return make_token(lexer, match(lexer, '=') ? TOKEN_LESS_EQUAL : TOKEN_LESS);
-    case '>':
-        return make_token(lexer, match(lexer, '=') ? TOKEN_GREATER_EQUAL : TOKEN_GREATER);
-
-    // Literals
+        if (match(lexer, '='))
+        {
+            DEBUG_VERBOSE("Line %d: Emitting LESS_EQUAL", lexer->line);
+            return make_token(lexer, TOKEN_LESS_EQUAL);
+        }
+        DEBUG_VERBOSE("Line %d: Emitting LESS", lexer->line);
+        return make_token(lexer, TOKEN_LESS);
+    case ',':
+        DEBUG_VERBOSE("Line %d: Emitting COMMA", lexer->line);
+        return make_token(lexer, TOKEN_COMMA);
+    case ';':
+        DEBUG_VERBOSE("Line %d: Emitting SEMICOLON", lexer->line);
+        return make_token(lexer, TOKEN_SEMICOLON);
     case '"':
-        return scan_string(lexer);
-    case '\'':
-        return scan_char(lexer);
-
-    // Two-character tokens
-    case '&':
-        if (match(lexer, '&'))
-        {
-            return make_token(lexer, TOKEN_AND);
-        }
-        return error_token(lexer, "Expected '&' after '&'");
-    case '|':
-        if (match(lexer, '|'))
-        {
-            return make_token(lexer, TOKEN_OR);
-        }
-        return error_token(lexer, "Expected '|' after '|'");
+        Token string_token = scan_string(lexer);
+        DEBUG_VERBOSE("Line %d: Emitting STRING_LITERAL", lexer->line);
+        return string_token;
+    default:
+        char msg[32];
+        snprintf(msg, sizeof(msg), "Unexpected character '%c'", c);
+        DEBUG_VERBOSE("Line %d: Error - %s", lexer->line, msg);
+        return error_token(lexer, msg);
     }
-
-    char msg[32];
-    snprintf(msg, sizeof(msg), "Unexpected character '%c'", c);
-    return error_token(lexer, msg);
 }
