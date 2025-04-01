@@ -78,14 +78,14 @@
  Token lexer_make_token(Lexer *lexer, TokenType type)
  {
      Token token;
-     init_token(&token, type, lexer->start, (int)(lexer->current - lexer->start), lexer->line);
+     token_init(&token, type, lexer->start, (int)(lexer->current - lexer->start), lexer->line);
      return token;
  }
  
  Token lexer_error_token(Lexer *lexer, const char *message)
  {
      Token token;
-     init_token(&token, TOKEN_ERROR, message, (int)strlen(message), lexer->line);
+     token_init(&token, TOKEN_ERROR, message, (int)strlen(message), lexer->line);
      return token;
  }
  
