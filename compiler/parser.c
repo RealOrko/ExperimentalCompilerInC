@@ -180,7 +180,7 @@
  {
      DEBUG_VERBOSE("Cleaning up parser");
      free_symbol_table(parser->symbol_table);
-     cleanup_lexer(parser->lexer);
+     lexer_cleanup(parser->lexer);
  }
  
  void parser_error(Parser *parser, const char *message)
@@ -226,7 +226,7 @@
  
      for (;;)
      {
-         parser->current = scan_token(parser->lexer);
+         parser->current = lexer_scan_token(parser->lexer);
          if (parser->current.type != TOKEN_ERROR)
              break;
          parser_error_at_current(parser, parser->current.start);

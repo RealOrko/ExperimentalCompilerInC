@@ -46,7 +46,7 @@
  
      // Create lexer and parser
      Lexer lexer;
-     init_lexer(&lexer, source, options.source_file);
+     lexer_init(&lexer, source, options.source_file);
      DEBUG_INFO("Lexer initialized");
  
      Parser parser;
