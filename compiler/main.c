@@ -50,12 +50,12 @@
      DEBUG_INFO("Lexer initialized");
  
      Parser parser;
-     init_parser(&parser, &lexer);
+     parser_init(&parser, &lexer);
      DEBUG_INFO("Parser initialized");
  
      // Parse the source into AST
      DEBUG_INFO("Starting to parse file");
-     module = parse(&parser, options.source_file);
+     module = parser_execute(&parser, options.source_file);
      if (module == NULL)
      {
          DEBUG_ERROR("Parsing failed");
