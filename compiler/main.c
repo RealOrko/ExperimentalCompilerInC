@@ -17,9 +17,9 @@
      Module *module = NULL;
  
      // Initialize compiler options
-     init_compiler_options(&options);
+     compiler_init_options(&options);
  
-     if (!parse_args(argc, argv, &options))
+     if (!compiler_parse_args(argc, argv, &options))
      {
          DEBUG_ERROR("Failed to parse command line arguments");
          compiler_options_cleanup(&options);
@@ -34,7 +34,7 @@
      DEBUG_INFO("Log level: %d", options.log_level);
  
      // Read the source file
-     source = read_file(options.source_file);
+     source = compiler_read_file(options.source_file);
      if (source == NULL)
      {
          DEBUG_ERROR("Failed to read source file: %s", options.source_file);

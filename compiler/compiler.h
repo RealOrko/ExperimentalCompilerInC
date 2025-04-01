@@ -21,13 +21,13 @@
  } CompilerOptions;
  
  // Compiler initialization and cleanup
- void init_compiler_options(CompilerOptions *options);
+ void compiler_init_options(CompilerOptions *options);
  void compiler_options_cleanup(CompilerOptions *options);
  
  // Parse command line arguments
- int parse_args(int argc, char **argv, CompilerOptions *options);
+ int compiler_parse_args(int argc, char **argv, CompilerOptions *options);
  
  // Read source file
- char *read_file(const char *path);
+ char *compiler_read_file(const char *path);
  
  #endif // COMPILER_H
