@@ -8,7 +8,6 @@
  
  #include "lexer.h"
  #include "parser.h"
- #include "type_checker.h"
  #include "code_gen.h"
  #include <stdio.h>
  

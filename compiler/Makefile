@@ -2,7 +2,7 @@ CC = gcc
 CFLAGS = -Wall -Wextra -std=c99 -g -D_POSIX_C_SOURCE=200809L
 LDFLAGS = 
 
-SRCS = token.c lexer.c ast.c parser.c symbol_table.c type_checker.c code_gen.c compiler.c debug.c main.c
+SRCS = token.c lexer.c ast.c parser.c symbol_table.c code_gen.c compiler.c debug.c main.c
 OBJS = $(SRCS:.c=.o)
 HEADERS = $(SRCS:.c=.h)
 TARGET = ../bin/sn
