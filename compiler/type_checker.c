@@ -297,7 +297,7 @@
  
  Type *type_check_variable_expression(TypeChecker *checker, VariableExpr *expr)
  {
-     Symbol *symbol = lookup_symbol(checker->symbol_table, expr->name);
+     Symbol *symbol = symbol_table_lookup_symbol(checker->symbol_table, expr->name);
  
      if (symbol == NULL)
      {
@@ -317,7 +317,7 @@
  Type *type_check_assign_expression(TypeChecker *checker, AssignExpr *expr)
  {
      Type *var_type = NULL;
-     Symbol *symbol = lookup_symbol(checker->symbol_table, expr->name);
+     Symbol *symbol = symbol_table_lookup_symbol(checker->symbol_table, expr->name);
  
      if (symbol == NULL)
      {
@@ -608,12 +608,12 @@
      checker->current_function_return_type = stmt->return_type;
  
      // Create a new scope for the function body
-     push_scope(checker->symbol_table);
+     symbol_table_push_scope(checker->symbol_table);
  
      // Add parameters to the symbol table
      for (int i = 0; i < stmt->param_count; i++)
      {
-         add_symbol(checker->symbol_table, stmt->params[i].name, stmt->params[i].type);
+         symbol_table_add_symbol(checker->symbol_table, stmt->params[i].name, stmt->params[i].type);
      }
  
      // Type check the function body
@@ -623,7 +623,7 @@
      }
  
      // Restore the outer scope
-     pop_scope(checker->symbol_table);
+     symbol_table_pop_scope(checker->symbol_table);
  
      // Restore the previous function return type
      checker->current_function_return_type = old_return_type;
@@ -663,7 +663,7 @@
  void type_check_block(TypeChecker *checker, BlockStmt *stmt)
  {
      // Create a new scope
-     push_scope(checker->symbol_table);
+     symbol_table_push_scope(checker->symbol_table);
  
      // Type check each statement in the block
      for (int i = 0; i < stmt->count; i++)
@@ -672,7 +672,7 @@
      }
  
      // Restore the outer scope
-     pop_scope(checker->symbol_table);
+     symbol_table_pop_scope(checker->symbol_table);
  }
  
  void type_check_if_statement(TypeChecker *checker, IfStmt *stmt)
@@ -722,7 +722,7 @@
  void type_check_for_statement(TypeChecker *checker, ForStmt *stmt)
  {
      // Create a new scope for the for loop
-     push_scope(checker->symbol_table);
+     symbol_table_push_scope(checker->symbol_table);
  
      // Type check initializer
      if (stmt->initializer != NULL)
@@ -762,7 +762,7 @@
      checker->in_loop = old_in_loop;
  
      // Restore the outer scope
-     pop_scope(checker->symbol_table);
+     symbol_table_pop_scope(checker->symbol_table);
  }
  
  void type_check_import_statement(TypeChecker *checker, ImportStmt *stmt)
@@ -793,7 +793,7 @@
      param_types[0] = ast_create_primitive_type(TYPE_STRING);
  
      Type *print_type = ast_create_function_type(ast_create_primitive_type(TYPE_VOID), param_types, 1);
-     add_symbol(checker->symbol_table, print_token, print_type);
+     symbol_table_add_symbol(checker->symbol_table, print_token, print_type);
  
      // Type check all statements in the module
      for (int i = 0; i < module->count; i++)

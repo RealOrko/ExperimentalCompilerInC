@@ -88,7 +88,7 @@
      // After creating the print type
      Type *print_type = ast_create_function_type(ast_create_primitive_type(TYPE_VOID), param_types, 1);
      ast_mark_type_non_freeable(print_type); // Mark as non-freeable
-     add_symbol(parser.symbol_table, print_token, print_type);
+     symbol_table_add_symbol(parser.symbol_table, print_token, print_type);
  
      // Process each function in the module
      for (int i = 0; i < module->count; i++)
@@ -107,7 +107,7 @@
              }
  
              Type *func_type = ast_create_function_type(func->return_type, func_param_types, func->param_count);
-             add_symbol(parser.symbol_table, func->name, func_type);
+             symbol_table_add_symbol(parser.symbol_table, func->name, func_type);
          }
      }
  
@@ -146,7 +146,7 @@
      // Clear symbol table without freeing types again
      SymbolTable *table = parser.symbol_table;
      parser.symbol_table = NULL; // Prevent parser_cleanup from freeing it again
-     free_symbol_table(table);
+     symbol_table_cleanup(table);
  
      parser_cleanup(&parser);
      free(source);

@@ -40,7 +40,7 @@
  }
  
  // Print the entire symbol table state for debugging
- void debug_print_symbol_table(SymbolTable *table, const char *where)
+ void symbol_table_print(SymbolTable *table, const char *where)
  {
      DEBUG_VERBOSE("==== SYMBOL TABLE DUMP (%s) ====", where);
  
@@ -82,7 +82,7 @@
      DEBUG_VERBOSE("====================================");
  }
  
- SymbolTable *create_symbol_table()
+ SymbolTable *symbol_table_init()
  {
      SymbolTable *table = malloc(sizeof(SymbolTable));
      if (table == NULL)
@@ -93,7 +93,7 @@
      table->current = NULL;
  
      // Start with a global scope
-     push_scope(table);
+     symbol_table_push_scope(table);
  
      return table;
  }
@@ -115,7 +115,7 @@
      free(scope);
  }
  
- void free_symbol_table(SymbolTable *table)
+ void symbol_table_cleanup(SymbolTable *table)
  {
      if (table == NULL)
          return;
@@ -131,7 +131,7 @@
      free(table);
  }
  
- void push_scope(SymbolTable *table)
+ void symbol_table_push_scope(SymbolTable *table)
  {
      Scope *scope = malloc(sizeof(Scope));
      if (scope == NULL)
@@ -149,15 +149,15 @@
  }
  
  // Initialize a function scope with proper offset tracking
- void begin_function_scope(SymbolTable *table)
+ void symbol_table_begin_function_scope(SymbolTable *table)
  {
-     push_scope(table);
+     symbol_table_push_scope(table);
      // Reset the offsets for a new function
      table->current->next_local_offset = LOCAL_BASE_OFFSET;
      table->current->next_param_offset = PARAM_BASE_OFFSET;
  }
  
- void pop_scope(SymbolTable *table)
+ void symbol_table_pop_scope(SymbolTable *table)
  {
      if (table->current == NULL)
          return;
@@ -216,7 +216,7 @@
   * Create a deep clone of a Type structure
   * This ensures each component has its own copy to avoid double free issues
   */
- Type *clone_type(Type *type)
+ Type *symbol_table_clone_type(Type *type)
  {
      if (type == NULL)
          return NULL;
@@ -248,12 +248,12 @@
  
      case TYPE_ARRAY:
          // For arrays, recursively clone the element type
-         clone->as.array.element_type = clone_type(type->as.array.element_type);
+         clone->as.array.element_type = symbol_table_clone_type(type->as.array.element_type);
          break;
  
      case TYPE_FUNCTION:
          // For functions, clone the return type and all parameter types
-         clone->as.function.return_type = clone_type(type->as.function.return_type);
+         clone->as.function.return_type = symbol_table_clone_type(type->as.function.return_type);
          clone->as.function.param_count = type->as.function.param_count;
  
          if (type->as.function.param_count > 0)
@@ -268,7 +268,7 @@
  
              for (int i = 0; i < type->as.function.param_count; i++)
              {
-                 clone->as.function.param_types[i] = clone_type(type->as.function.param_types[i]);
+                 clone->as.function.param_types[i] = symbol_table_clone_type(type->as.function.param_types[i]);
              }
          }
          else
@@ -284,7 +284,7 @@
  /**
   * Add a symbol to the symbol table with a specific kind
   */
- void add_symbol_with_kind(SymbolTable *table, Token name, Type *type, SymbolKind kind)
+ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *type, SymbolKind kind)
  {
      if (table->current == NULL)
      {
@@ -293,12 +293,12 @@
      }
  
      // Check if symbol already exists in current scope
-     Symbol *existing = lookup_symbol_current(table, name);
+     Symbol *existing = symbol_table_lookup_symbol_current(table, name);
      if (existing != NULL)
      {
          // Symbol already exists, just update its type
          ast_free_type(existing->type);
-         existing->type = clone_type(type); // Use clone instead of original
+         existing->type = symbol_table_clone_type(type); // Use clone instead of original
          // Don't change the offset or kind of an existing symbol
          return;
      }
@@ -312,7 +312,7 @@
      }
  
      symbol->name = name;
-     symbol->type = clone_type(type); // Use clone instead of original
+     symbol->type = symbol_table_clone_type(type); // Use clone instead of original
      symbol->kind = kind;
  
      // Determine offset based on symbol kind
@@ -358,12 +358,12 @@
  /**
   * Add a symbol with default kind (local)
   */
- void add_symbol(SymbolTable *table, Token name, Type *type)
+ void symbol_table_add_symbol(SymbolTable *table, Token name, Type *type)
  {
-     add_symbol_with_kind(table, name, type, SYMBOL_LOCAL);
+     symbol_table_add_symbol_with_kind(table, name, type, SYMBOL_LOCAL);
  }
  
- Symbol *lookup_symbol_current(SymbolTable *table, Token name)
+ Symbol *symbol_table_lookup_symbol_current(SymbolTable *table, Token name)
  {
      if (table->current == NULL)
          return NULL;
@@ -381,7 +381,7 @@
      return NULL;
  }
  
- Symbol *lookup_symbol(SymbolTable *table, Token name)
+ Symbol *symbol_table_lookup_symbol(SymbolTable *table, Token name)
  {
      if (!table || !table->current) {
          DEBUG_VERBOSE("Null table or current scope in lookup_symbol");
@@ -453,9 +453,9 @@
   * Get the stack offset for a symbol
   * Returns -1 if the symbol is not found
   */
- int get_symbol_offset(SymbolTable *table, Token name)
+ int symbol_table_get_symbol_offset(SymbolTable *table, Token name)
  {
-     Symbol *symbol = lookup_symbol(table, name);
+     Symbol *symbol = symbol_table_lookup_symbol(table, name);
      if (symbol == NULL)
      {
          // For debugging, print the variable we're looking for

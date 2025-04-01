@@ -335,7 +335,7 @@
                    var_name, gen->current_function ? gen->current_function : "global");
  
      // Use the symbol table to get the variable's offset
-     Symbol *symbol = lookup_symbol(gen->symbol_table, name);
+     Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, name);
  
      if (symbol == NULL)
      {
@@ -620,7 +620,7 @@
      }
  
      // Try normal lookup first
-     Symbol *symbol = lookup_symbol(gen->symbol_table, expr->name);
+     Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, expr->name);
  
      if (symbol == NULL)
      {
@@ -718,7 +718,7 @@
      code_gen_expression(gen, expr->value);
  
      // Attempt direct lookup
-     Symbol *symbol = lookup_symbol(gen->symbol_table, expr->name);
+     Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, expr->name);
  
      if (symbol == NULL)
      {
@@ -1054,12 +1054,12 @@
  void code_gen_block(CodeGen *gen, BlockStmt *stmt)
  {
      // Generate code for each statement in the block
-     push_scope(gen->symbol_table);
+     symbol_table_push_scope(gen->symbol_table);
      for (int i = 0; i < stmt->count; i++)
      {
          code_gen_statement(gen, stmt->statements[i]);
      }
-     pop_scope(gen->symbol_table);
+     symbol_table_pop_scope(gen->symbol_table);
  }
  
  void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
@@ -1096,17 +1096,16 @@
      code_gen_prologue(gen, gen->current_function);
  
      // Create a new scope for function parameters
-     push_scope(gen->symbol_table);
+     symbol_table_push_scope(gen->symbol_table);
  
      // Add all parameters to this scope
      for (int i = 0; i < stmt->param_count; i++)
      {
-         add_symbol_with_kind(gen->symbol_table, stmt->params[i].name, 
-                              stmt->params[i].type, SYMBOL_PARAM);
+         symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->params[i].name, 
+                                           stmt->params[i].type, SYMBOL_PARAM);
      }
  
      // Generate function body
-     int label_counter = 0;
      for (int i = 0; i < stmt->body_count; i++)
      {
          code_gen_statement(gen, stmt->body[i]);
@@ -1131,7 +1130,7 @@
      }
  
      // Clean up
-     pop_scope(gen->symbol_table);
+     symbol_table_pop_scope(gen->symbol_table);
  
      // Restore old function context
      free(gen->current_function);
@@ -1240,7 +1239,7 @@
      int loop_end = code_gen_new_label(gen);
  
      // Initializer (create a new scope)
-     push_scope(gen->symbol_table);
+     symbol_table_push_scope(gen->symbol_table);
      if (stmt->initializer != NULL)
      {
          code_gen_statement(gen, stmt->initializer);
@@ -1273,7 +1272,7 @@
      fprintf(gen->output, ".L%d: ; Loop end\n", loop_end);
  
      // Pop the scope
-     pop_scope(gen->symbol_table);
+     symbol_table_pop_scope(gen->symbol_table);
  }
  
  void code_gen_statement(CodeGen *gen, Stmt *stmt)

@@ -78,7 +78,7 @@
      int capacity = 0;
  
      DEBUG_VERBOSE("Pushing new scope for block");
-     push_scope(parser->symbol_table);
+     symbol_table_push_scope(parser->symbol_table);
  
      while (!parser_is_at_end(parser) &&
             parser->lexer->indent_stack[parser->lexer->indent_size - 1] >= current_indent)
@@ -134,7 +134,7 @@
      }
  
      DEBUG_VERBOSE("Popping scope for block");
-     pop_scope(parser->symbol_table);
+     symbol_table_pop_scope(parser->symbol_table);
  
      DEBUG_VERBOSE("Exiting parse_indented_block with %d statements", count);
      return ast_create_block_stmt(statements, count);
@@ -172,14 +172,14 @@
      parser->lexer = lexer;
      parser->had_error = 0;
      parser->panic_mode = 0;
-     parser->symbol_table = create_symbol_table();
+     parser->symbol_table = symbol_table_init();
      parser_advance(parser);
  }
  
  void parser_cleanup(Parser *parser)
  {
      DEBUG_VERBOSE("Cleaning up parser");
-     free_symbol_table(parser->symbol_table);
+     symbol_table_cleanup(parser->symbol_table);
      lexer_cleanup(parser->lexer);
  }
  
@@ -347,7 +347,7 @@
      Expr *expr = parser_logical_and(parser);
      while (parser_match(parser, TOKEN_OR))
      {
-         TokenType operator= parser->previous.type;
+         TokenType operator = parser->previous.type;
          Expr *right = parser_logical_and(parser);
          expr = ast_create_binary_expr(expr, operator, right);
      }
@@ -359,7 +359,7 @@
      Expr *expr = parser_equality(parser);
      while (parser_match(parser, TOKEN_AND))
      {
-         TokenType operator= parser->previous.type;
+         TokenType operator = parser->previous.type;
          Expr *right = parser_equality(parser);
          expr = ast_create_binary_expr(expr, operator, right);
      }
@@ -371,7 +371,7 @@
      Expr *expr = parser_comparison(parser);
      while (parser_match(parser, TOKEN_BANG_EQUAL) || parser_match(parser, TOKEN_EQUAL_EQUAL))
      {
-         TokenType operator= parser->previous.type;
+         TokenType operator = parser->previous.type;
          Expr *right = parser_comparison(parser);
          expr = ast_create_binary_expr(expr, operator, right);
      }
@@ -384,7 +384,7 @@
      while (parser_match(parser, TOKEN_LESS) || parser_match(parser, TOKEN_LESS_EQUAL) ||
             parser_match(parser, TOKEN_GREATER) || parser_match(parser, TOKEN_GREATER_EQUAL))
      {
-         TokenType operator= parser->previous.type;
+         TokenType operator = parser->previous.type;
          Expr *right = parser_term(parser);
          expr = ast_create_binary_expr(expr, operator, right);
      }
@@ -396,7 +396,7 @@
      Expr *expr = parser_factor(parser);
      while (parser_match(parser, TOKEN_PLUS) || parser_match(parser, TOKEN_MINUS))
      {
-         TokenType operator= parser->previous.type;
+         TokenType operator = parser->previous.type;
          Expr *right = parser_factor(parser);
          expr = ast_create_binary_expr(expr, operator, right);
      }
@@ -408,7 +408,7 @@
      Expr *expr = parser_unary(parser);
      while (parser_match(parser, TOKEN_STAR) || parser_match(parser, TOKEN_SLASH) || parser_match(parser, TOKEN_MODULO))
      {
-         TokenType operator= parser->previous.type;
+         TokenType operator = parser->previous.type;
          Expr *right = parser_unary(parser);
          expr = ast_create_binary_expr(expr, operator, right);
      }
@@ -419,7 +419,7 @@
  {
      if (parser_match(parser, TOKEN_BANG) || parser_match(parser, TOKEN_MINUS))
      {
-         TokenType operator= parser->previous.type;
+         TokenType operator = parser->previous.type;
          Expr *right = parser_unary(parser);
          return ast_create_unary_expr(operator, right);
      }
@@ -679,7 +679,7 @@
          parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' or newline after variable declaration");
      }
  
-     add_symbol(parser->symbol_table, name, type);
+     symbol_table_add_symbol(parser->symbol_table, name, type);
      DEBUG_VERBOSE("Declared variable %.*s", name.length, name.start);
      return ast_create_var_decl_stmt(name, type, initializer);
  }
@@ -763,14 +763,14 @@
      }
      Type *function_type = ast_create_function_type(return_type, param_types, param_count);
  
-     add_symbol(parser->symbol_table, name, function_type);
+     symbol_table_add_symbol(parser->symbol_table, name, function_type);
  
      DEBUG_VERBOSE("Beginning function scope for %.*s", name.length, name.start);
-     begin_function_scope(parser->symbol_table);
+     symbol_table_begin_function_scope(parser->symbol_table);
  
      for (int i = 0; i < param_count; i++)
      {
-         add_symbol_with_kind(parser->symbol_table, params[i].name, params[i].type, SYMBOL_PARAM);
+         symbol_table_add_symbol_with_kind(parser->symbol_table, params[i].name, params[i].type, SYMBOL_PARAM);
      }
  
      parser_consume(parser, TOKEN_ARROW, "Expected '=>' before function body");
@@ -786,7 +786,7 @@
      DEBUG_VERBOSE("Finished parsing function body");
  
      Stmt *func_stmt = ast_create_function_stmt(name, params, param_count, return_type,
-                                            body->as.block.statements, body->as.block.count);
+                                                body->as.block.statements, body->as.block.count);
  
      return func_stmt;
  }
@@ -975,7 +975,7 @@
      int capacity = 0;
  
      DEBUG_VERBOSE("Pushing new scope for block statement");
-     push_scope(parser->symbol_table);
+     symbol_table_push_scope(parser->symbol_table);
  
      while (!parser_is_at_end(parser))
      {
@@ -1004,7 +1004,7 @@
      }
  
      DEBUG_VERBOSE("Popping scope for block statement");
-     pop_scope(parser->symbol_table);
+     symbol_table_pop_scope(parser->symbol_table);
  
      return ast_create_block_stmt(statements, count);
  }
