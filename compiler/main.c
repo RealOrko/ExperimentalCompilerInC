@@ -118,9 +118,9 @@
          // Generate code
          DEBUG_INFO("Starting code generation");
          CodeGen gen;
-         init_code_gen(&gen, parser.symbol_table, options.output_file);
+         code_gen_init(&gen, parser.symbol_table, options.output_file);
  
-         generate_module(&gen, module);
+         code_gen_module(&gen, module);
          DEBUG_INFO("Code generation completed successfully");
  
          // Clean up code generator
