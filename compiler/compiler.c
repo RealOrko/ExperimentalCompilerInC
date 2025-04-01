@@ -10,7 +10,7 @@
  #include <unistd.h>
  #include <sys/wait.h>
  
- void compiler_init_options(CompilerOptions *options)
+ void compiler_init(CompilerOptions *options)
  {
      DEBUG_VERBOSE("Initializing compiler options");
      if (options == NULL)
@@ -24,7 +24,7 @@
      options->log_level = DEBUG_LEVEL_ERROR; // Default log level is ERROR
  }
  
- void compiler_options_cleanup(CompilerOptions *options)
+ void compiler_cleanup(CompilerOptions *options)
  {
      DEBUG_VERBOSE("Cleaning up compiler options");
      if (options == NULL)

@@ -20,8 +20,8 @@
  } CompilerOptions;
  
  // Compiler initialization and cleanup
- void compiler_init_options(CompilerOptions *options);
- void compiler_options_cleanup(CompilerOptions *options);
+ void compiler_init(CompilerOptions *options);
+ void compiler_cleanup(CompilerOptions *options);
  
  // Parse command line arguments
  int compiler_parse_args(int argc, char **argv, CompilerOptions *options);

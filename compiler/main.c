@@ -17,12 +17,12 @@
      Module *module = NULL;
  
      // Initialize compiler options
-     compiler_init_options(&options);
+     compiler_init(&options);
  
      if (!compiler_parse_args(argc, argv, &options))
      {
          DEBUG_ERROR("Failed to parse command line arguments");
-         compiler_options_cleanup(&options);
+         compiler_cleanup(&options);
          return 1;
      }
  
@@ -38,7 +38,7 @@
      if (source == NULL)
      {
          DEBUG_ERROR("Failed to read source file: %s", options.source_file);
-         compiler_options_cleanup(&options);
+         compiler_cleanup(&options);
          return 1;
      }
  
@@ -61,7 +61,7 @@
          DEBUG_ERROR("Parsing failed");
          free(source);
          parser_cleanup(&parser);
-         compiler_options_cleanup(&options);
+         compiler_cleanup(&options);
          return 1;
      }
  
@@ -150,7 +150,7 @@
  
      parser_cleanup(&parser);
      free(source);
-     compiler_options_cleanup(&options);
+     compiler_cleanup(&options);
  
      return type_check_success ? 0 : 1;
  }
