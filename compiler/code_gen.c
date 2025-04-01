@@ -987,7 +987,7 @@ void generate_expression(CodeGen *gen, Expr *expr)
         if (expr->as.literal.type)
         {
             DEBUG_VERBOSE("Literal expression of type %s",
-                          type_to_string(expr->as.literal.type));
+                          ast_type_to_string(expr->as.literal.type));
         }
         generate_literal_expression(gen, &expr->as.literal);
         break;
