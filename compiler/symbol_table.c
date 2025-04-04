@@ -94,6 +94,7 @@
  
      // Start with a global scope
      symbol_table_push_scope(table);
+     table->global_scope = table->current;
  
      return table;
  }
@@ -115,21 +116,14 @@
      free(scope);
  }
  
- void symbol_table_cleanup(SymbolTable *table)
- {
-     if (table == NULL)
-         return;
- 
-     Scope *scope = table->current;
-     while (scope != NULL)
-     {
-         Scope *enclosing = scope->enclosing;
-         free_scope(scope);
-         scope = enclosing;
-     }
- 
-     free(table);
- }
+ void symbol_table_cleanup(SymbolTable* table) {
+    if (table == NULL) return;
+    if (table->global_scope != NULL) {
+        free_scope(table->global_scope);  // Only free the global scope
+        table->global_scope = NULL;
+    }
+    free(table);
+}
  
  void symbol_table_push_scope(SymbolTable *table)
  {
@@ -152,7 +146,6 @@
  void symbol_table_begin_function_scope(SymbolTable *table)
  {
      symbol_table_push_scope(table);
-     // Reset the offsets for a new function
      table->current->next_local_offset = LOCAL_BASE_OFFSET;
      table->current->next_param_offset = PARAM_BASE_OFFSET;
  }
@@ -161,11 +154,8 @@
  {
      if (table->current == NULL)
          return;
- 
      Scope *scope = table->current;
      table->current = scope->enclosing;
- 
-     free_scope(scope);
  }
  
  static int tokens_equal(Token a, Token b)

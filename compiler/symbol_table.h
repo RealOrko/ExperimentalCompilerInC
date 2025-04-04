@@ -43,6 +43,7 @@
  typedef struct
  {
      Scope *current;
+     Scope* global_scope;
  } SymbolTable;
  
  // debug
