@@ -87,29 +87,8 @@
  
      // After creating the print type
      Type *print_type = ast_create_function_type(ast_create_primitive_type(TYPE_VOID), param_types, 1);
-     ast_mark_type_non_freeable(print_type); // Mark as non-freeable
      symbol_table_add_symbol(parser.symbol_table, print_token, print_type);
- 
-     // Process each function in the module
-     for (int i = 0; i < module->count; i++)
-     {
-         Stmt *stmt = module->statements[i];
-         if (stmt->type == STMT_FUNCTION)
-         {
-             // Add function to symbol table
-             FunctionStmt *func = &stmt->as.function;
- 
-             // Create function type
-             Type **func_param_types = malloc(sizeof(Type *) * func->param_count);
-             for (int j = 0; j < func->param_count; j++)
-             {
-                 func_param_types[j] = func->params[j].type;
-             }
- 
-             Type *func_type = ast_create_function_type(func->return_type, func_param_types, func->param_count);
-             symbol_table_add_symbol(parser.symbol_table, func->name, func_type);
-         }
-     }
+     ast_free_type(print_type);
  
      if (type_check_success)
      {

@@ -79,7 +79,7 @@
              return 0;
          }
          strncpy(options->output_file, options->source_file, base_len);
-         strcpy(options->output_file + base_len, ".o");
+         strcpy(options->output_file + base_len, ".s");
      }
      else
      {

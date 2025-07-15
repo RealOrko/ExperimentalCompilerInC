@@ -679,7 +679,6 @@
          parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' or newline after variable declaration");
      }
  
-     symbol_table_add_symbol(parser->symbol_table, name, type);
      DEBUG_VERBOSE("Declared variable %.*s", name.length, name.start);
      return ast_create_var_decl_stmt(name, type, initializer);
  }
@@ -778,6 +777,7 @@
  
      DEBUG_VERBOSE("Parsing function body for %.*s", name.length, name.start);
      Stmt *body = parser_indented_block(parser);
+     symbol_table_pop_scope(parser->symbol_table);
      if (body == NULL)
      {
          body = ast_create_block_stmt(NULL, 0); // Empty block as fallback

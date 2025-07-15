@@ -126,10 +126,11 @@ void symbol_table_cleanup(SymbolTable *table)
 {
     if (table == NULL)
         return;
-    if (table->global_scope != NULL)
-    {
-        free_scope(table->global_scope); // Only free the global scope
-        table->global_scope = NULL;
+    Scope *scope = table->current;
+    while (scope != NULL) {
+        Scope *next = scope->enclosing;
+        free_scope(scope);
+        scope = next;
     }
     free(table);
 }
@@ -163,8 +164,10 @@ void symbol_table_pop_scope(SymbolTable *table)
 {
     if (table->current == NULL)
         return;
-    Scope *scope = table->current;
-    table->current = scope->enclosing;
+    Scope *to_free = table->current;
+    table->current = to_free->enclosing;
+    free_scope(to_free);
+    DEBUG_VERBOSE("After pop, current scope symbols: %p", table->current->symbols);
 }
 
 static int tokens_equal(Token a, Token b)
