@@ -170,53 +170,11 @@ void symbol_table_pop_scope(SymbolTable *table)
     DEBUG_VERBOSE("After pop, current scope symbols: %p", table->current->symbols);
 }
 
-static int tokens_equal(Token a, Token b)
-{
-    if (a.length != b.length)
-    {
-        char a_str[256], b_str[256];
-        int a_len = a.length < 255 ? a.length : 255;
-        int b_len = b.length < 255 ? b.length : 255;
-
-        strncpy(a_str, a.start, a_len);
-        a_str[a_len] = '\0';
-        strncpy(b_str, b.start, b_len);
-        b_str[b_len] = '\0';
-
-        DEBUG_VERBOSE("Token length mismatch: '%s'(%d) vs '%s'(%d)",
-                      a_str, a.length, b_str, b.length);
-        return 0;
-    }
-
-    // Check if the tokens have the same memory address
-    if (a.start == b.start)
-    {
-        DEBUG_VERBOSE("Token address match at %p", (void *)a.start);
-        return 1;
-    }
-
-    // Memory compare
-    int result = memcmp(a.start, b.start, a.length);
-
-    char a_str[256], b_str[256];
-    int a_len = a.length < 255 ? a.length : 255;
-    int b_len = b.length < 255 ? b.length : 255;
-
-    strncpy(a_str, a.start, a_len);
-    a_str[a_len] = '\0';
-    strncpy(b_str, b.start, b_len);
-    b_str[b_len] = '\0';
-
-    if (result == 0)
-    {
-        DEBUG_VERBOSE("Token content match: '%s' == '%s'", a_str, b_str);
-        return 1;
-    }
-    else
-    {
-        DEBUG_VERBOSE("Token content mismatch: '%s' != '%s'", a_str, b_str);
-        return 0;
-    }
+static int tokens_equal(Token a, Token b) {
+    if (a.length != b.length) return 0;
+    if (a.start == NULL || b.start == NULL) return 0;
+    // Always use memcmp for content, ignore pointer equality (it's rarely true across def/use)
+    return memcmp(a.start, b.start, a.length) == 0;
 }
 
 /**

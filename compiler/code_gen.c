@@ -282,17 +282,15 @@ void code_gen_text_section(CodeGen *gen)
     fprintf(gen->output, "section .text\n");
 
     // Define the print function
-    fprintf(gen->output, "; Implementation of print function\n");
     fprintf(gen->output, "print:\n");
     fprintf(gen->output, "    push rbp\n");
     fprintf(gen->output, "    mov rbp, rsp\n");
-
-    // The string to print is in rdi
-    fprintf(gen->output, "    mov rsi, rdi       ; string to print\n");
-    fprintf(gen->output, "    lea rdi, [rel fmt_string] ; format string\n");
-    fprintf(gen->output, "    xor rax, rax       ; no floating point args\n");
+    fprintf(gen->output, "    mov rsi, rdi       ; int to print\n");
+    // HACK
+    // fprintf(gen->output, "    lea rdi, [rel fmt_string] ; format\n");  // Change to fmt_int
+    fprintf(gen->output, "    lea rdi, [rel fmt_int] ; format\n"); // Change to fmt_int
+    fprintf(gen->output, "    xor rax, rax\n");
     fprintf(gen->output, "    call printf\n");
-
     fprintf(gen->output, "    mov rsp, rbp\n");
     fprintf(gen->output, "    pop rbp\n");
     fprintf(gen->output, "    ret\n\n");
@@ -307,8 +305,7 @@ void code_gen_prologue(CodeGen *gen, const char *function_name)
     // Dynamically calculate stack space needed
     int stack_space = 64; // Base allocation
     if (strcmp(function_name, "main") == 0)
-        stack_space = 128; // More space for main function
-
+        stack_space = 128;
     fprintf(gen->output, "    sub rsp, %d\n", stack_space);
 }
 
@@ -319,69 +316,21 @@ void code_gen_epilogue(CodeGen *gen)
     (void)gen; // Avoid unused parameter warning
 }
 
-static int code_gen_get_var_offset(CodeGen *gen, Token name)
-{
+static int code_gen_get_var_offset(CodeGen *gen, Token name) {
     // Extract variable name for comparison
     char var_name[256];
     int name_len = name.length < 255 ? name.length : 255;
     strncpy(var_name, name.start, name_len);
     var_name[name_len] = '\0';
 
-    // Debug output to see what variable we're trying to access
     DEBUG_VERBOSE("Looking up variable '%s' in function '%s'",
                   var_name, gen->current_function ? gen->current_function : "global");
 
-    // Use the symbol table to get the variable's offset
     Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, name);
 
-    if (symbol == NULL)
-    {
-        DEBUG_WARNING("Symbol not found in symbol table: '%s'", var_name);
-
-        // Manual string-based lookup for common variables
-        if (gen->current_function)
-        {
-            // Check all symbols in all scopes
-            Scope *scope = gen->symbol_table->current;
-            while (scope != NULL)
-            {
-                Symbol *sym = scope->symbols;
-                while (sym != NULL)
-                {
-                    char sym_name[256];
-                    int sym_len = sym->name.length < 255 ? sym->name.length : 255;
-                    strncpy(sym_name, sym->name.start, sym_len);
-                    sym_name[sym_len] = '\0';
-
-                    if (strcmp(sym_name, var_name) == 0)
-                    {
-                        DEBUG_VERBOSE("Manual string lookup found '%s' with offset %d\n",
-                                      var_name, sym->offset);
-                        return sym->offset;
-                    }
-                    sym = sym->next;
-                }
-                scope = scope->enclosing;
-            }
-        }
-
-        // For backward compatibility, fall back to hardcoded offsets
-        DEBUG_WARNING("Falling back to hardcoded offsets for '%s'", var_name);
-
-        // Hardcoded offsets for all variables in the factorial function
-        if (gen->current_function && strcmp(gen->current_function, "factorial") == 0)
-        {
-            if (strcmp(var_name, "n") == 0)
-                return 16;
-            if (strcmp(var_name, "result") == 0)
-                return 24;
-            if (strcmp(var_name, "i") == 0)
-                return 32;
-        }
-
-        // If we get here, the variable is not in our hardcoded list
+    if (symbol == NULL) {
         DEBUG_ERROR("Undefined variable '%s'\n", var_name);
-        exit(1);
+        exit(1);  // Fail hard to force fixing the lookup
     }
 
     DEBUG_VERBOSE("Found symbol '%s' with offset %d", var_name, symbol->offset);
@@ -717,19 +666,16 @@ void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
 
 void code_gen_call_expression(CodeGen *gen, CallExpr *expr)
 {
-    // Validate the number of arguments
     if (expr->arg_count > 6)
     {
         DEBUG_ERROR("Too many arguments (max 6 supported)");
         return;
     }
 
-    // Push arguments in reverse order (x86-64 ABI)
+    // Push arguments in reverse order (ABI: rdi, rsi, rdx, rcx, r8, r9, then stack)
     for (int i = expr->arg_count - 1; i >= 0; i--)
     {
         code_gen_expression(gen, expr->arguments[i]);
-
-        // Use appropriate registers for the first 6 arguments
         switch (i)
         {
         case 0:
@@ -752,25 +698,21 @@ void code_gen_call_expression(CodeGen *gen, CallExpr *expr)
             break;
         default:
             fprintf(gen->output, "    push rax\n");
-            break;
+            break; // For >6, but we limit to 6
         }
     }
 
-    // Calculate function name
+    // Get function name (unchanged)
     const char *function_name = NULL;
-
-    // Handle variable functions
     if (expr->callee->type == EXPR_VARIABLE)
     {
         VariableExpr *var = &expr->callee->as.variable;
-        // Copy function name
         char *name = malloc(var->name.length + 1);
         if (name == NULL)
         {
             DEBUG_ERROR("Out of memory");
             exit(1);
         }
-
         strncpy(name, var->name.start, var->name.length);
         name[var->name.length] = '\0';
         function_name = name;
@@ -781,64 +723,29 @@ void code_gen_call_expression(CodeGen *gen, CallExpr *expr)
         exit(1);
     }
 
-    // Reserve space for arguments and align the stack
     fprintf(gen->output, "    ; Call to %s with %d arguments\n", function_name, expr->arg_count);
 
-    // Evaluate arguments and push them on the stack in reverse order
-    for (int i = expr->arg_count - 1; i >= 0; i--)
-    {
-        fprintf(gen->output, "    ; Evaluating argument %d\n", i);
-        code_gen_expression(gen, expr->arguments[i]);
-
-        if (i == 0)
-        { // First argument goes in RDI
-            fprintf(gen->output, "    mov rdi, rax\n");
-        }
-        else if (i == 1)
-        { // Second argument goes in RSI
-            fprintf(gen->output, "    mov rsi, rax\n");
-        }
-        else
-        { // Remaining arguments pushed on stack
-            fprintf(gen->output, "    push rax\n");
-        }
-    }
-
-    // Ensure stack is 16-byte aligned before call (ABI requirement)
-    fprintf(gen->output, "    ; Aligning stack for function call\n");
+    // Align (new code from Step 2)
+    int align_label = code_gen_new_label(gen);
+    fprintf(gen->output, "    ; Align stack to 16 bytes if needed (x86-64 ABI)\n");
     fprintf(gen->output, "    mov rax, rsp\n");
     fprintf(gen->output, "    and rax, 15\n");
-    fprintf(gen->output, "    jz .aligned_%d\n", code_gen_new_label(gen));
+    fprintf(gen->output, "    push rax\n");
+    fprintf(gen->output, "    test rax, rax\n");
+    fprintf(gen->output, "    jz .aligned_%d\n", align_label);
     fprintf(gen->output, "    sub rsp, 8\n");
-    fprintf(gen->output, ".aligned_%d:\n", gen->label_count - 1);
+    fprintf(gen->output, ".aligned_%d:\n", align_label);
 
-    // Call the function
+    // Call
     fprintf(gen->output, "    call %s\n", function_name);
 
-    // For main function, don't restore stack after the LAST function call
-    if (gen->current_function && strcmp(gen->current_function, "main") == 0)
-    {
-        // if (is_last_call_in_main) { jmp main_exit; } else { ... clean stack }
-        // Always clean:
-        if (expr->arg_count > 6)
-        {
-            fprintf(gen->output, "    add rsp, %d\n", 8 * (expr->arg_count - 6));
-        }
-        fprintf(gen->output, "    ; Restoring stack alignment\n");
-        fprintf(gen->output, "    mov rsp, rbp\n");
-        fprintf(gen->output, "    sub rsp, 64\n");
-    }
-
-    // Clean up the stack - only needed for args beyond the register-passed ones
+    // Cleanup (new code from Step 3)
     if (expr->arg_count > 6)
     {
         fprintf(gen->output, "    add rsp, %d\n", 8 * (expr->arg_count - 6));
     }
-
-    // Re-align stack if necessary
-    fprintf(gen->output, "    ; Restoring stack alignment\n");
-    fprintf(gen->output, "    mov rsp, rbp\n");
-    fprintf(gen->output, "    sub rsp, 64\n"); // Restore local variable space
+    fprintf(gen->output, "    pop rax\n");
+    fprintf(gen->output, "    add rsp, rax\n");
 
     free((void *)function_name);
 }
@@ -1261,4 +1168,6 @@ void code_gen_module(CodeGen *gen, Module *module)
 
     // Generate data section (string literals, etc.)
     code_gen_data_section(gen);
+
+    fprintf(gen->output, "section .note.GNU-stack noalloc noexec nowrite progbits\n\n");
 }

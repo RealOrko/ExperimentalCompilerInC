@@ -81,9 +81,14 @@
      print_token.type = TOKEN_IDENTIFIER;
  
      // Create parameter list for print
-     Type *string_type = ast_create_primitive_type(TYPE_STRING);
+     //Type *string_type = ast_create_primitive_type(TYPE_STRING);
+     //Type **param_types = malloc(sizeof(Type *));
+     //param_types[0] = string_type;
+ 
+     // Hack: Just testing with int for now 
+     Type *int_type = ast_create_primitive_type(TYPE_INT);
      Type **param_types = malloc(sizeof(Type *));
-     param_types[0] = string_type;
+     param_types[0] = int_type;
  
      // After creating the print type
      Type *print_type = ast_create_function_type(ast_create_primitive_type(TYPE_VOID), param_types, 1);

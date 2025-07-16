@@ -20,7 +20,7 @@ make
 popd
 
 # Compile SN source to assembly
-bin/sn samples/hello-world/simple.sn -o bin/hello-world.asm -l 4
+bin/sn samples/hello-world/simple.sn -o bin/hello-world.asm -l 4 &> bin/output.txt
 
 # Assemble with NASM (specify elf64 format)
 nasm -f elf64 bin/hello-world.asm -o bin/hello-world.o
