@@ -2,6 +2,8 @@
 
 set -ex  # Exit on any error
 
+export LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/13/libasan.so
+
 # Clean up specific files instead of rm -rf bin/
 rm -f bin/*
 rm -f log/*
