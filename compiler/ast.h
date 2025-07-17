@@ -317,7 +317,5 @@ void ast_free_stmt(Stmt *stmt);
 void ast_init_module(Module *module, const char *filename);
 void ast_module_add_statement(Module *module, Stmt *stmt);
 void ast_free_module(Module *module);
-void ast_free_stmt_preserve_types(Stmt *stmt);
-void ast_free_expr_preserve_types(Expr *expr);
 
 #endif // AST_H

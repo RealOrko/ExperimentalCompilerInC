@@ -259,7 +259,7 @@ void ast_mark_type_non_freeable(Type *type)
 
 Type *ast_create_primitive_type(TypeKind kind)
 {
-    Type *type = malloc(sizeof(Type));
+    Type *type = calloc(1, sizeof(Type));  // Zero-init
     if (type == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -360,6 +360,12 @@ const char *ast_type_to_string(Type *type)
     if (type == NULL)
     {
         return "NULL";
+    }
+
+    if (type->kind < TYPE_INT || type->kind > TYPE_FUNCTION)
+    {
+        DEBUG_ERROR("Invalid TypeKind: %d", type->kind);
+        return "INVALID";
     }
 
     switch (type->kind)
@@ -1071,146 +1077,6 @@ void ast_module_add_statement(Module *module, Stmt *stmt)
     module->statements[module->count++] = stmt;
 }
 
-void ast_free_stmt_preserve_types(Stmt *stmt)
-{
-    if (stmt == NULL)
-        return;
-
-    switch (stmt->type)
-    {
-    case STMT_EXPR:
-        if (stmt->as.expression.expression != NULL)
-        {
-            ast_free_expr_preserve_types(stmt->as.expression.expression);
-            stmt->as.expression.expression = NULL;
-        }
-        break;
-
-    case STMT_VAR_DECL:
-        // Don't free the type here - the symbol table owns it
-        // stmt->as.var_decl.type = NULL; // Just nullify
-        if (stmt->as.var_decl.initializer != NULL)
-        {
-            ast_free_expr_preserve_types(stmt->as.var_decl.initializer);
-            stmt->as.var_decl.initializer = NULL;
-        }
-        break;
-
-    case STMT_FUNCTION:
-        // Don't free the return_type here - the symbol table owns it
-        // stmt->as.function.return_type = NULL; // Just nullify
-        if (stmt->as.function.params != NULL)
-        {
-            for (int i = 0; i < stmt->as.function.param_count; i++)
-            {
-                // Don't free params[i].type - the symbol table owns it
-                // stmt->as.function.params[i].type = NULL; // Just nullify
-            }
-            free(stmt->as.function.params);
-            stmt->as.function.params = NULL;
-        }
-
-        if (stmt->as.function.body != NULL)
-        {
-            for (int i = 0; i < stmt->as.function.body_count; i++)
-            {
-                if (stmt->as.function.body[i] != NULL)
-                {
-                    ast_free_stmt_preserve_types(stmt->as.function.body[i]);
-                    stmt->as.function.body[i] = NULL;
-                }
-            }
-            free(stmt->as.function.body);
-            stmt->as.function.body = NULL;
-        }
-        break;
-
-    case STMT_RETURN:
-        if (stmt->as.return_stmt.value != NULL)
-        {
-            ast_free_expr_preserve_types(stmt->as.return_stmt.value);
-            stmt->as.return_stmt.value = NULL;
-        }
-        break;
-
-    case STMT_BLOCK:
-        if (stmt->as.block.statements != NULL)
-        {
-            for (int i = 0; i < stmt->as.block.count; i++)
-            {
-                if (stmt->as.block.statements[i] != NULL)
-                {
-                    ast_free_stmt_preserve_types(stmt->as.block.statements[i]);
-                    stmt->as.block.statements[i] = NULL;
-                }
-            }
-            free(stmt->as.block.statements);
-            stmt->as.block.statements = NULL;
-        }
-        break;
-
-    case STMT_IF:
-        if (stmt->as.if_stmt.condition != NULL)
-        {
-            ast_free_expr_preserve_types(stmt->as.if_stmt.condition);
-            stmt->as.if_stmt.condition = NULL;
-        }
-        if (stmt->as.if_stmt.then_branch != NULL)
-        {
-            ast_free_stmt_preserve_types(stmt->as.if_stmt.then_branch);
-            stmt->as.if_stmt.then_branch = NULL;
-        }
-        if (stmt->as.if_stmt.else_branch != NULL)
-        {
-            ast_free_stmt_preserve_types(stmt->as.if_stmt.else_branch);
-            stmt->as.if_stmt.else_branch = NULL;
-        }
-        break;
-
-    case STMT_WHILE:
-        if (stmt->as.while_stmt.condition != NULL)
-        {
-            ast_free_expr_preserve_types(stmt->as.while_stmt.condition);
-            stmt->as.while_stmt.condition = NULL;
-        }
-        if (stmt->as.while_stmt.body != NULL)
-        {
-            ast_free_stmt_preserve_types(stmt->as.while_stmt.body);
-            stmt->as.while_stmt.body = NULL;
-        }
-        break;
-
-    case STMT_FOR:
-        if (stmt->as.for_stmt.initializer != NULL)
-        {
-            ast_free_stmt_preserve_types(stmt->as.for_stmt.initializer);
-            stmt->as.for_stmt.initializer = NULL;
-        }
-        if (stmt->as.for_stmt.condition != NULL)
-        {
-            ast_free_expr_preserve_types(stmt->as.for_stmt.condition);
-            stmt->as.for_stmt.condition = NULL;
-        }
-        if (stmt->as.for_stmt.increment != NULL)
-        {
-            ast_free_expr_preserve_types(stmt->as.for_stmt.increment);
-            stmt->as.for_stmt.increment = NULL;
-        }
-        if (stmt->as.for_stmt.body != NULL)
-        {
-            ast_free_stmt_preserve_types(stmt->as.for_stmt.body);
-            stmt->as.for_stmt.body = NULL;
-        }
-        break;
-
-    case STMT_IMPORT:
-        // Nothing to free
-        break;
-    }
-
-    free(stmt);
-}
-
 void ast_free_module(Module *module)
 {
     if (module == NULL)
@@ -1222,8 +1088,7 @@ void ast_free_module(Module *module)
         {
             if (module->statements[i] != NULL)
             {
-                // Use a special flag to indicate we're in cleanup mode
-                ast_free_stmt_preserve_types(module->statements[i]);
+                ast_free_stmt(module->statements[i]);  // Use normal free (frees types)
                 module->statements[i] = NULL;
             }
         }
@@ -1234,122 +1099,4 @@ void ast_free_module(Module *module)
 
     module->count = 0;
     module->capacity = 0;
-}
-
-void ast_free_expr_preserve_types(Expr *expr)
-{
-    if (expr == NULL)
-        return;
-
-    switch (expr->type)
-    {
-    case EXPR_BINARY:
-        if (expr->as.binary.left != NULL)
-        {
-            ast_free_expr_preserve_types(expr->as.binary.left);
-            expr->as.binary.left = NULL;
-        }
-        if (expr->as.binary.right != NULL)
-        {
-            ast_free_expr_preserve_types(expr->as.binary.right);
-            expr->as.binary.right = NULL;
-        }
-        break;
-
-    case EXPR_UNARY:
-        if (expr->as.unary.operand != NULL)
-        {
-            ast_free_expr_preserve_types(expr->as.unary.operand);
-            expr->as.unary.operand = NULL;
-        }
-        break;
-
-    case EXPR_LITERAL:
-        // Free string literal memory if applicable (fixes memory leak)
-        if (expr->as.literal.type != NULL && expr->as.literal.type->kind == TYPE_STRING)
-        {
-            free((char *)expr->as.literal.value.string_value);
-            expr->as.literal.value.string_value = NULL;
-        }
-        // Do not free type (preserved for symbol table)
-        expr->as.literal.type = NULL; // Just nullify
-        break;
-
-    case EXPR_VARIABLE:
-        // Nothing to free
-        break;
-
-    case EXPR_ASSIGN:
-        if (expr->as.assign.value != NULL)
-        {
-            ast_free_expr_preserve_types(expr->as.assign.value);
-            expr->as.assign.value = NULL;
-        }
-        break;
-
-    case EXPR_CALL:
-        if (expr->as.call.callee != NULL)
-        {
-            ast_free_expr_preserve_types(expr->as.call.callee);
-            expr->as.call.callee = NULL;
-        }
-
-        if (expr->as.call.arguments != NULL)
-        {
-            for (int i = 0; i < expr->as.call.arg_count; i++)
-            {
-                if (expr->as.call.arguments[i] != NULL)
-                {
-                    ast_free_expr_preserve_types(expr->as.call.arguments[i]);
-                    expr->as.call.arguments[i] = NULL;
-                }
-            }
-            free(expr->as.call.arguments);
-            expr->as.call.arguments = NULL;
-        }
-        break;
-
-    case EXPR_ARRAY:
-        if (expr->as.array.elements != NULL)
-        {
-            for (int i = 0; i < expr->as.array.element_count; i++)
-            {
-                if (expr->as.array.elements[i] != NULL)
-                {
-                    ast_free_expr_preserve_types(expr->as.array.elements[i]);
-                    expr->as.array.elements[i] = NULL;
-                }
-            }
-            free(expr->as.array.elements);
-            expr->as.array.elements = NULL;
-        }
-        break;
-
-    case EXPR_ARRAY_ACCESS:
-        if (expr->as.array_access.array != NULL)
-        {
-            ast_free_expr_preserve_types(expr->as.array_access.array);
-            expr->as.array_access.array = NULL;
-        }
-        if (expr->as.array_access.index != NULL)
-        {
-            ast_free_expr_preserve_types(expr->as.array_access.index);
-            expr->as.array_access.index = NULL;
-        }
-        break;
-
-    case EXPR_INCREMENT:
-    case EXPR_DECREMENT:
-        if (expr->as.operand != NULL)
-        {
-            ast_free_expr_preserve_types(expr->as.operand);
-            expr->as.operand = NULL;
-        }
-        break;
-    }
-
-    // Do not free the type here - the symbol table owns it
-    expr->expr_type = NULL; // Just nullify
-
-    free(expr);
 }
