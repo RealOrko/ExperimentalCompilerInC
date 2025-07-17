@@ -61,7 +61,11 @@ void code_gen_push_function_context(CodeGen *gen)
     // Store current function (even if NULL)
     if (gen->current_function != NULL)
     {
-        gen->function_stack[gen->function_stack_size] = strdup(gen->current_function);
+        gen->function_stack[gen->function_stack_size] = my_strdup(gen->current_function);
+        if (gen->function_stack[gen->function_stack_size] == NULL) {
+            DEBUG_ERROR("Failed to duplicate function name");
+            exit(1);
+        }
     }
     else
     {

@@ -284,13 +284,13 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     symbol->next = table->current->symbols;
     table->current->symbols = symbol;
 
-    // Smarter offset calculation
-    int base_offset = (kind == SYMBOL_PARAM) ? PARAM_BASE_OFFSET : LOCAL_BASE_OFFSET;
-    symbol->offset = table->current->next_local_offset;
-
-    // Align offsets based on type size
+    // Smarter offset calculation (apply alignment based on type size)
     int type_size = get_type_size(type);
-    table->current->next_local_offset += ((type_size + 7) / 8) * 8;
+    if (kind == SYMBOL_PARAM) {
+        table->current->next_param_offset += ((type_size + 7) / 8) * 8 - OFFSET_ALIGNMENT;  // Adjust for alignment
+    } else if (kind == SYMBOL_LOCAL) {
+        table->current->next_local_offset += ((type_size + 7) / 8) * 8 - OFFSET_ALIGNMENT;  // Adjust for alignment
+    }
 }
 
 /**
