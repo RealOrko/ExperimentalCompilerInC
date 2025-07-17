@@ -220,75 +220,6 @@ static int tokens_equal(Token a, Token b)
 }
 
 /**
- * Create a deep clone of a Type structure
- * This ensures each component has its own copy to avoid double free issues
- */
-Type *symbol_table_clone_type(Type *type)
-{
-    if (type == NULL)
-        return NULL;
-
-    Type *clone = malloc(sizeof(Type));
-    if (clone == NULL)
-    {
-        DEBUG_ERROR("Out of memory when cloning type");
-        exit(1);
-    }
-
-    // Copy the kind
-    clone->kind = type->kind;
-    clone->should_free = type->should_free;
-
-    // Handle the specific type data based on kind
-    switch (type->kind)
-    {
-    case TYPE_INT:
-    case TYPE_LONG:
-    case TYPE_DOUBLE:
-    case TYPE_CHAR:
-    case TYPE_STRING:
-    case TYPE_BOOL:
-    case TYPE_VOID:
-    case TYPE_NIL:
-        // For primitive types, no additional data to copy
-        break;
-
-    case TYPE_ARRAY:
-        // For arrays, recursively clone the element type
-        clone->as.array.element_type = symbol_table_clone_type(type->as.array.element_type);
-        break;
-
-    case TYPE_FUNCTION:
-        // For functions, clone the return type and all parameter types
-        clone->as.function.return_type = symbol_table_clone_type(type->as.function.return_type);
-        clone->as.function.param_count = type->as.function.param_count;
-
-        if (type->as.function.param_count > 0)
-        {
-            // Allocate and clone each parameter type
-            clone->as.function.param_types = malloc(sizeof(Type *) * type->as.function.param_count);
-            if (clone->as.function.param_types == NULL)
-            {
-                DEBUG_ERROR("Out of memory when cloning function param types");
-                exit(1);
-            }
-
-            for (int i = 0; i < type->as.function.param_count; i++)
-            {
-                clone->as.function.param_types[i] = symbol_table_clone_type(type->as.function.param_types[i]);
-            }
-        }
-        else
-        {
-            clone->as.function.param_types = NULL;
-        }
-        break;
-    }
-
-    return clone;
-}
-
-/**
  * Add a symbol to the symbol table with a specific kind
  */
 void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *type, SymbolKind kind)
@@ -305,7 +236,7 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     {
         // Symbol already exists, just update its type
         ast_free_type(existing->type);
-        existing->type = symbol_table_clone_type(type); // Use clone instead of original
+        existing->type = ast_clone_type(type); // Use clone instead of original
         // Don't change the offset or kind of an existing symbol
         return;
     }
@@ -319,7 +250,7 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     }
 
     symbol->name = name;
-    symbol->type = symbol_table_clone_type(type); // Use clone instead of original
+    symbol->type = ast_clone_type(type); // Use clone instead of original
     symbol->kind = kind;
 
     // Determine offset based on symbol kind

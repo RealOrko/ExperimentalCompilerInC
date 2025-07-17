@@ -1,5 +1,5 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -g -D_POSIX_C_SOURCE=200809L
+CFLAGS = -Wall -Wextra -std=c99 -g -fsanitize=address -fsanitize=leak
 LDFLAGS = 
 
 SRCS = token.c lexer.c ast.c parser.c symbol_table.c code_gen.c compiler.c debug.c main.c

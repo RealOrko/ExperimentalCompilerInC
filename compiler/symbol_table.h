@@ -59,7 +59,6 @@ void symbol_table_pop_scope(SymbolTable *table);
 void symbol_table_begin_function_scope(SymbolTable *table); // New function for initializing function scope offsets
 
 // Symbol management
-Type *symbol_table_clone_type(Type *type);
 void symbol_table_add_symbol(SymbolTable *table, Token name, Type *type);
 void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *type, SymbolKind kind); // New function
 Symbol *symbol_table_lookup_symbol(SymbolTable *table, Token name);

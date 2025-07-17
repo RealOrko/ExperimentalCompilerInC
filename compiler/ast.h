@@ -278,6 +278,7 @@ void ast_print_stmt(Stmt *stmt, int indent_level);
 void ast_print_expr(Expr *expr, int indent_level);
 
 // Type functions
+Type *ast_clone_type(Type *type);
 void ast_mark_type_non_freeable(Type *type);
 Type *ast_create_primitive_type(TypeKind kind);
 Type *ast_create_array_type(Type *element_type);

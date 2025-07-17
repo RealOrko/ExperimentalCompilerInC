@@ -158,6 +158,12 @@ const char *token_type_to_string(TokenType type)
         return "DOT";
     case TOKEN_ARROW:
         return "ARROW";
+    case TOKEN_INDENT:
+        return "INDENT";
+    case TOKEN_DEDENT:
+        return "DEDENT";
+    case TOKEN_NEWLINE:
+        return "NEWLINE";
     case TOKEN_ERROR:
         return "ERROR";
     default:
