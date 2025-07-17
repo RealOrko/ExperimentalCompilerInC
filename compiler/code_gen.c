@@ -271,17 +271,16 @@ void code_gen_text_section(CodeGen *gen)
     // Only make main global, not _start
     fprintf(gen->output, "    global main\n\n");
 
-    // Add external functions
-    fprintf(gen->output, "    extern printf\n");
-    fprintf(gen->output, "    extern exit\n\n");
+    // Add external functions (remove extern exit)
+    fprintf(gen->output, "    extern printf\n\n");
 
-    // Format strings for printf
+    // Format strings for printf (add \n for flush)
     fprintf(gen->output, "section .data\n");
-    fprintf(gen->output, "    fmt_int db \"%%d\", 0\n");
-    fprintf(gen->output, "    fmt_long db \"%%ld\", 0\n");
-    fprintf(gen->output, "    fmt_double db \"%%f\", 0\n");
-    fprintf(gen->output, "    fmt_char db \"%%c\", 0\n");
-    fprintf(gen->output, "    fmt_string db \"%%s\", 0\n");
+    fprintf(gen->output, "    fmt_int db \"%%d\\n\", 0\n");
+    fprintf(gen->output, "    fmt_long db \"%%ld\\n\", 0\n");
+    fprintf(gen->output, "    fmt_double db \"%%f\\n\", 0\n");
+    fprintf(gen->output, "    fmt_char db \"%%c\\n\", 0\n");
+    fprintf(gen->output, "    fmt_string db \"%%s\\n\", 0\n");
     fprintf(gen->output, "    fmt_newline db 10, 0\n\n");
 
     fprintf(gen->output, "section .text\n");
@@ -1008,22 +1007,21 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
         code_gen_statement(gen, stmt->body[i]);
     }
 
-    // Ensure a return path for functions that don't explicitly return
-    if (strcmp(gen->current_function, "main") != 0)
+    // Generate epilogue (special handling for main)
+    if (strcmp(gen->current_function, "main") == 0)
     {
-        fprintf(gen->output, "%s_return:\n", gen->current_function);
+        fprintf(gen->output, "main_return:\n");
+        fprintf(gen->output, "    mov rax, 0\n"); // Return 0 for main
         fprintf(gen->output, "    mov rsp, rbp\n");
         fprintf(gen->output, "    pop rbp\n");
         fprintf(gen->output, "    ret\n");
     }
     else
     {
-        // Special handling for main function
-        fprintf(gen->output, "main_exit:\n");
+        fprintf(gen->output, "%s_return:\n", gen->current_function);
         fprintf(gen->output, "    mov rsp, rbp\n");
         fprintf(gen->output, "    pop rbp\n");
-        fprintf(gen->output, "    xor rdi, rdi\n"); // Exit code 0
-        fprintf(gen->output, "    call exit wrt ..plt\n");
+        fprintf(gen->output, "    ret\n");
     }
 
     // Clean up
@@ -1051,10 +1049,10 @@ void code_gen_return_statement(CodeGen *gen, ReturnStmt *stmt)
         fprintf(gen->output, "    xor rax, rax\n");
     }
 
-    // For main function, directly exit
+    // Jump to the function's return label (special for main)
     if (gen->current_function && strcmp(gen->current_function, "main") == 0)
     {
-        fprintf(gen->output, "    jmp main_exit\n");
+        fprintf(gen->output, "    jmp main_return\n");
     }
     else
     {
