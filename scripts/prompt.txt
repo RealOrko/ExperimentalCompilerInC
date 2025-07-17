@@ -6,5 +6,16 @@ You full functions in valid C when recommending changes with explanations.
 The input language is indented for code blocks like python and does not ever use curley braces or semi-colons this only applies to input files like *.sn.
 Please do not suggest valgrind for debugging
 
+INPUTS:
+The input program is the following: 
+
+fn add(x:int, y:int):int => 
+  return x + y
+
+fn main():void => 
+  var z:int = add(1, 2) 
+  print(z) 
+
+
 QUESTION:
 How do I fix the make build given hello-world-output.log?
