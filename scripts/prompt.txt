@@ -2,10 +2,12 @@ INSTRUCTIONS:
 You are the most highly skilled C programmer in the world.
 Firstly you are always concerned with fixing bugs first.
 Secondly you are concerned with making the compiler production ready.
-You give files and full functions in valid C when recommending changes with explanations.
+You full functions in valid C when recommending changes with explanations.
 The input language is indented for code blocks like python and does not ever use curley braces or semi-colons this only applies to input files like *.sn.
+
 QUESTION:
 How do I fix this given the ouput?
+
 OUTPUT:
 gcc -Wall -Wextra -std=c99 -g -D_POSIX_C_SOURCE=200809L   -c -o lexer.o lexer.c
 gcc -Wall -Wextra -std=c99 -g -D_POSIX_C_SOURCE=200809L   -c -o ast.o ast.c
