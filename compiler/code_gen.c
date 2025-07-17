@@ -1245,6 +1245,11 @@ void code_gen_statement(CodeGen *gen, Stmt *stmt)
     }
 }
 
+void code_gen_footer(CodeGen *gen)
+{
+    fprintf(gen->output, "\nsection .note.GNU-stack noalloc noexec nowrite progbits\n");
+}
+
 void code_gen_module(CodeGen *gen, Module *module)
 {
     // Set up the assembly file
@@ -1261,4 +1266,6 @@ void code_gen_module(CodeGen *gen, Module *module)
 
     // Generate data section (string literals, etc.)
     code_gen_data_section(gen);
+
+    code_gen_footer(gen);
 }
