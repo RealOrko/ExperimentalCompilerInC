@@ -292,9 +292,9 @@ void code_gen_text_section(CodeGen *gen)
     fprintf(gen->output, "    push rbp\n");
     fprintf(gen->output, "    mov rbp, rsp\n");
 
-    // The string to print is in rdi
-    fprintf(gen->output, "    mov rsi, rdi       ; string to print\n");
-    fprintf(gen->output, "    lea rdi, [rel fmt_string] ; format string\n");
+    // The integer to print is in rdi
+    fprintf(gen->output, "    mov rsi, rdi       ; integer to print\n");
+    fprintf(gen->output, "    lea rdi, [rel fmt_long] ; format string for long/int\n");
     fprintf(gen->output, "    xor rax, rax       ; no floating point args\n");
     fprintf(gen->output, "    call printf wrt ..plt\n");
 
@@ -729,38 +729,6 @@ void code_gen_call_expression(CodeGen *gen, CallExpr *expr)
         return;
     }
 
-    // Push arguments in reverse order (x86-64 ABI)
-    for (int i = expr->arg_count - 1; i >= 0; i--)
-    {
-        code_gen_expression(gen, expr->arguments[i]);
-
-        // Use appropriate registers for the first 6 arguments
-        switch (i)
-        {
-        case 0:
-            fprintf(gen->output, "    mov rdi, rax\n");
-            break;
-        case 1:
-            fprintf(gen->output, "    mov rsi, rax\n");
-            break;
-        case 2:
-            fprintf(gen->output, "    mov rdx, rax\n");
-            break;
-        case 3:
-            fprintf(gen->output, "    mov rcx, rax\n");
-            break;
-        case 4:
-            fprintf(gen->output, "    mov r8, rax\n");
-            break;
-        case 5:
-            fprintf(gen->output, "    mov r9, rax\n");
-            break;
-        default:
-            fprintf(gen->output, "    push rax\n");
-            break;
-        }
-    }
-
     // Calculate function name
     const char *function_name = NULL;
 
@@ -786,64 +754,52 @@ void code_gen_call_expression(CodeGen *gen, CallExpr *expr)
         exit(1);
     }
 
-    // Reserve space for arguments and align the stack
     fprintf(gen->output, "    ; Call to %s with %d arguments\n", function_name, expr->arg_count);
 
-    // Evaluate arguments and push them on the stack in reverse order
+    // Evaluate arguments and move to registers in reverse order (x86-64 ABI)
     for (int i = expr->arg_count - 1; i >= 0; i--)
     {
         fprintf(gen->output, "    ; Evaluating argument %d\n", i);
         code_gen_expression(gen, expr->arguments[i]);
 
-        if (i == 0)
-        { // First argument goes in RDI
+        // Use appropriate registers for the first 6 arguments
+        switch (i)
+        {
+        case 0:
             fprintf(gen->output, "    mov rdi, rax\n");
-        }
-        else if (i == 1)
-        { // Second argument goes in RSI
+            break;
+        case 1:
             fprintf(gen->output, "    mov rsi, rax\n");
-        }
-        else
-        { // Remaining arguments pushed on stack
-            fprintf(gen->output, "    push rax\n");
+            break;
+        case 2:
+            fprintf(gen->output, "    mov rdx, rax\n");
+            break;
+        case 3:
+            fprintf(gen->output, "    mov rcx, rax\n");
+            break;
+        case 4:
+            fprintf(gen->output, "    mov r8, rax\n");
+            break;
+        case 5:
+            fprintf(gen->output, "    mov r9, rax\n");
+            break;
+        default:
+            // For >6 args (not supported yet), would push here
+            break;
         }
     }
 
     // Ensure stack is 16-byte aligned before call (ABI requirement)
     fprintf(gen->output, "    ; Aligning stack for function call\n");
-    fprintf(gen->output, "    mov rax, rsp\n");
-    fprintf(gen->output, "    and rax, 15\n");
-    fprintf(gen->output, "    jz .aligned_%d\n", code_gen_new_label(gen));
-    fprintf(gen->output, "    sub rsp, 8\n");
-    fprintf(gen->output, ".aligned_%d:\n", gen->label_count - 1);
+    fprintf(gen->output, "    mov r10, rsp\n");
+    fprintf(gen->output, "    and r10, 15\n");
+    fprintf(gen->output, "    sub rsp, r10\n");
 
     // Call the function
     fprintf(gen->output, "    call %s\n", function_name);
 
-    // For main function, don't restore stack after the LAST function call
-    if (gen->current_function && strcmp(gen->current_function, "main") == 0)
-    {
-        // if (is_last_call_in_main) { jmp main_exit; } else { ... clean stack }
-        // Always clean:
-        if (expr->arg_count > 6)
-        {
-            fprintf(gen->output, "    add rsp, %d\n", 8 * (expr->arg_count - 6));
-        }
-        fprintf(gen->output, "    ; Restoring stack alignment\n");
-        fprintf(gen->output, "    mov rsp, rbp\n");
-        fprintf(gen->output, "    sub rsp, 64\n");
-    }
-
-    // Clean up the stack - only needed for args beyond the register-passed ones
-    if (expr->arg_count > 6)
-    {
-        fprintf(gen->output, "    add rsp, %d\n", 8 * (expr->arg_count - 6));
-    }
-
-    // Re-align stack if necessary
-    fprintf(gen->output, "    ; Restoring stack alignment\n");
-    fprintf(gen->output, "    mov rsp, rbp\n");
-    fprintf(gen->output, "    sub rsp, 64\n"); // Restore local variable space
+    // Restore stack alignment
+    fprintf(gen->output, "    add rsp, r10\n");
 
     free((void *)function_name);
 }

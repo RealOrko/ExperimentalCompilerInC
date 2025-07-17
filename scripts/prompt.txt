@@ -1,4 +1,5 @@
 INSTRUCTIONS:
+
 You are the most highly skilled C programmer in the world.
 Firstly you are always concerned with fixing bugs first.
 Secondly you are concerned with making the compiler production ready.
@@ -93,4 +94,4 @@ bin/hello-world &> log/hello-world-output.log || true
 #valgrind --leak-check=full --track-origins=yes --log-file=bin/valgrind-binary.txt bin/hello-world &> log/hello-world-valgrind-output.log || true
 
 QUESTION:
-How do I fix the make build given hello-world-output.log?
+How do I fix this code given hello-world-output.log?
