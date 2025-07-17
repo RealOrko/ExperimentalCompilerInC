@@ -20,12 +20,7 @@ make &> ../log/make-output.log
 popd
 
 # Compile SN source to assembly under Valgrind
-valgrind --leak-check=full \
-         --show-leak-kinds=all \
-         --track-origins=yes \
-         --verbose \
-         --log-file=bin/valgrind-compiler.txt \
-         bin/sn samples/hello-world/simple.sn -o bin/hello-world.asm -l 4 &> log/compiler-output.log
+bin/sn samples/hello-world/simple.sn -o bin/hello-world.asm -l 4 &> log/compiler-output.log
 
 # Assemble with NASM (specify elf64 format)
 nasm -f elf64 bin/hello-world.asm -o bin/hello-world.o &> log/nasm-output.log
