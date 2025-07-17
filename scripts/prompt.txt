@@ -4,6 +4,7 @@ Firstly you are always concerned with fixing bugs first.
 Secondly you are concerned with making the compiler production ready.
 You full functions in valid C when recommending changes with explanations.
 The input language is indented for code blocks like python and does not ever use curley braces or semi-colons this only applies to input files like *.sn.
+Please do not suggest valgrind for debugging
 
 QUESTION:
-How do I fix the make build given make-output.log?
+How do I fix the make build given compiler-output.log?

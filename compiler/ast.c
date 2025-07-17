@@ -237,7 +237,7 @@ Type *ast_clone_type(Type *type)
     if (type == NULL)
         return NULL;
 
-    Type *clone = calloc(1, sizeof(Type));  // Zero-init
+    Type *clone = calloc(1, sizeof(Type)); // Zero-init
     if (clone == NULL)
     {
         DEBUG_ERROR("Out of memory when cloning type");
@@ -245,7 +245,7 @@ Type *ast_clone_type(Type *type)
     }
 
     clone->kind = type->kind;
-    clone->should_free = 1;  // Always freeable since newly allocated
+    clone->should_free = 1; // Always freeable since newly allocated
 
     switch (type->kind)
     {
@@ -318,7 +318,7 @@ void ast_mark_type_non_freeable(Type *type)
 
 Type *ast_create_primitive_type(TypeKind kind)
 {
-    Type *type = calloc(1, sizeof(Type));  // Zero-init
+    Type *type = calloc(1, sizeof(Type)); // Zero-init
     if (type == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -331,7 +331,7 @@ Type *ast_create_primitive_type(TypeKind kind)
 
 Type *ast_create_array_type(Type *element_type)
 {
-    Type *type = calloc(1, sizeof(Type));  // Zero-init
+    Type *type = calloc(1, sizeof(Type)); // Zero-init
     if (type == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -345,7 +345,7 @@ Type *ast_create_array_type(Type *element_type)
 
 Type *ast_create_function_type(Type *return_type, Type **param_types, int param_count)
 {
-    Type *type = calloc(1, sizeof(Type));  // Zero-init
+    Type *type = calloc(1, sizeof(Type)); // Zero-init
     if (type == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -353,9 +353,30 @@ Type *ast_create_function_type(Type *return_type, Type **param_types, int param_
     }
     type->kind = TYPE_FUNCTION;
     type->should_free = 1;
-    type->as.function.return_type = return_type;
-    type->as.function.param_types = param_types;
+
+    // Clone the return type
+    type->as.function.return_type = ast_clone_type(return_type);
+
+    // Clone the parameter types
     type->as.function.param_count = param_count;
+    if (param_count > 0)
+    {
+        type->as.function.param_types = malloc(sizeof(Type *) * param_count);
+        if (type->as.function.param_types == NULL)
+        {
+            DEBUG_ERROR("Out of memory");
+            exit(1);
+        }
+        for (int i = 0; i < param_count; i++)
+        {
+            type->as.function.param_types[i] = ast_clone_type(param_types[i]);
+        }
+    }
+    else
+    {
+        type->as.function.param_types = NULL;
+    }
+
     return type;
 }
 
@@ -582,7 +603,7 @@ Expr *ast_create_literal_expr(LiteralValue value, Type *type)
     expr->type = EXPR_LITERAL;
     expr->as.literal.value = value;
     expr->as.literal.type = type;
-    expr->expr_type = ast_clone_type(type);  // Clone to avoid double free
+    expr->expr_type = ast_clone_type(type); // Clone to avoid double free
     return expr;
 }
 
@@ -1149,7 +1170,7 @@ void ast_free_module(Module *module)
         {
             if (module->statements[i] != NULL)
             {
-                ast_free_stmt(module->statements[i]);  // Use normal free (frees types)
+                ast_free_stmt(module->statements[i]); // Use normal free (frees types)
                 module->statements[i] = NULL;
             }
         }

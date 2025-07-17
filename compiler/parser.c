@@ -772,6 +772,7 @@ Stmt *parser_function_declaration(Parser *parser)
 
     symbol_table_add_symbol(parser->symbol_table, name, function_type);
     ast_free_type(function_type);
+    free(param_types);
 
     DEBUG_VERBOSE("Beginning function scope for %.*s", name.length, name.start);
     symbol_table_begin_function_scope(parser->symbol_table);
