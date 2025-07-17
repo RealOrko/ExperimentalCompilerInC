@@ -7,7 +7,8 @@ The input language is indented for code blocks like python and does not ever use
 Please do not suggest valgrind for debugging
 
 INPUTS:
-The input program is the following: 
+
+The input program is the following (./samples/hello-world/simple.sn): 
 
 fn add(x:int, y:int):int => 
   return x + y
@@ -16,6 +17,80 @@ fn main():void =>
   var z:int = add(1, 2) 
   print(z) 
 
+The makefile is the following (./compiler/Makefile):
+
+CC = gcc
+CFLAGS = -Wall -Wextra -std=c99 -g -fsanitize=address -fno-omit-frame-pointer -MMD -MP
+LDFLAGS = -fsanitize=address
+
+SRCDIR = .
+SRCS = token.c lexer.c ast.c parser.c symbol_table.c code_gen.c compiler.c debug.c main.c
+HEADERS = token.h lexer.h ast.h parser.h symbol_table.h code_gen.h compiler.h debug.h
+BIN_DIR = ../bin
+OBJS = $(addprefix $(BIN_DIR)/, $(notdir $(SRCS:.c=.o)))
+DEPS = $(OBJS:.o=.d)
+TARGET = $(BIN_DIR)/sn
+
+VPATH = $(SRCDIR)
+
+.PHONY: all clean
+
+all: create-bin-dir $(TARGET)
+
+create-bin-dir:
+	@mkdir -p $(BIN_DIR)
+
+$(TARGET): $(OBJS)
+	$(CC) $(LDFLAGS) -o $@ $^
+	@chmod +x $@
+
+$(BIN_DIR)/%.o: %.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c $< -o $@
+
+-include $(DEPS)
+
+clean:
+	rm -f $(BIN_DIR)/*.o $(BIN_DIR)/*.d *.asm
+	rm -f $(TARGET)
+
+The main build shell script is the following (./scripts/compiler.sh):
+
+#!/bin/bash
+
+set -ex  # Exit on any error
+
+# For debugging leaks.
+#export LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/13/libasan.so
+
+# Clean up specific files instead of rm -rf bin/
+rm -f bin/*
+rm -f log/*
+
+# Create bin directory if it doesn't exist
+mkdir -p bin/
+mkdir -p log/
+
+# Build the compiler
+pushd compiler/
+make clean
+make &> ../log/make-output.log
+popd
+
+# Compile SN source to assembly under Valgrind
+bin/sn samples/hello-world/simple.sn -o bin/hello-world.asm -l 4 &> log/compiler-output.log
+
+# Assemble with NASM (specify elf64 format)
+nasm -f elf64 bin/hello-world.asm -o bin/hello-world.o &> log/nasm-output.log
+
+# Link with GCC (which handles C runtime properly, add frame pointer for better traces)
+gcc -pie -fsanitize=address -fno-omit-frame-pointer -g bin/hello-world.o -o bin/hello-world &> log/gcc-output.log
+
+# Run the executable (with ASan enabled)
+bin/hello-world &> log/hello-world-output.log || true
+
+# Optional: Run Valgrind on the final binary for extra checks (comment out if not needed)
+#valgrind --leak-check=full --track-origins=yes --log-file=bin/valgrind-binary.txt bin/hello-world &> log/hello-world-valgrind-output.log || true
 
 QUESTION:
 How do I fix the make build given hello-world-output.log?
