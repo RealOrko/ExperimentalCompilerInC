@@ -760,19 +760,26 @@ Stmt *parser_function_declaration(Parser *parser)
     Type *return_type = ast_create_primitive_type(TYPE_VOID);
     if (parser_match(parser, TOKEN_COLON))
     {
+        ast_free_type(return_type); // Free default if overridden
         return_type = parser_type(parser);
     }
 
     Type **param_types = malloc(sizeof(Type *) * param_count);
+    if (param_types == NULL && param_count > 0)
+    {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
     for (int i = 0; i < param_count; i++)
     {
         param_types[i] = params[i].type;
     }
     Type *function_type = ast_create_function_type(return_type, param_types, param_count);
+    free(param_types);          // Free temp array after cloning in function_type
+    ast_free_type(return_type); // Free original after cloning
 
     symbol_table_add_symbol(parser->symbol_table, name, function_type);
-    ast_free_type(function_type);
-    free(param_types);
+    ast_free_type(function_type); // Free after adding (cloned in symbol table)
 
     DEBUG_VERBOSE("Beginning function scope for %.*s", name.length, name.start);
     symbol_table_begin_function_scope(parser->symbol_table);
@@ -793,10 +800,16 @@ Stmt *parser_function_declaration(Parser *parser)
         body = ast_create_block_stmt(NULL, 0); // Empty block as fallback
     }
 
+    // Extract statements from block and free the block struct (without freeing array)
+    Stmt **stmts = body->as.block.statements;
+    int stmt_count = body->as.block.count;
+    body->as.block.statements = NULL; // Prevent array free in ast_free_stmt
+    ast_free_stmt(body);
+
     DEBUG_VERBOSE("Finished parsing function body");
 
     Stmt *func_stmt = ast_create_function_stmt(name, params, param_count, return_type,
-                                               body->as.block.statements, body->as.block.count);
+                                               stmts, stmt_count);
 
     return func_stmt;
 }
