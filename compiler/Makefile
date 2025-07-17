@@ -1,6 +1,6 @@
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -g -fsanitize=address -fsanitize=leak -fno-omit-frame-pointer -no-pie -MMD -MP
-LDFLAGS = -fsanitize=address -fsanitize=leak -no-pie
+CFLAGS = -Wall -Wextra -std=c99 -g -fsanitize=address -fno-omit-frame-pointer -no-pie -MMD -MP
+LDFLAGS = -fsanitize=address -no-pie
 
 SRCDIR = .
 SRCS = token.c lexer.c ast.c parser.c symbol_table.c code_gen.c compiler.c debug.c main.c

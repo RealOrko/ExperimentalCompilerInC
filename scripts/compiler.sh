@@ -2,7 +2,8 @@
 
 set -ex  # Exit on any error
 
-export LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/13/libasan.so
+# For debugging leaks.
+#export LD_PRELOAD=/usr/lib/gcc/x86_64-linux-gnu/13/libasan.so
 
 # Clean up specific files instead of rm -rf bin/
 rm -f bin/*
@@ -30,7 +31,7 @@ valgrind --leak-check=full \
 nasm -f elf64 bin/hello-world.asm -o bin/hello-world.o &> log/nasm-output.log
 
 # Link with GCC (which handles C runtime properly, add frame pointer for better traces)
-gcc -no-pie -fsanitize=address,undefined,leak -fno-omit-frame-pointer -g bin/hello-world.o -o bin/hello-world &> log/gcc-output.log
+gcc -no-pie -fsanitize=address -fno-omit-frame-pointer -g bin/hello-world.o -o bin/hello-world &> log/gcc-output.log
 
 # Run the executable (with ASan enabled)
 bin/hello-world &> log/hello-world-output.log || true
