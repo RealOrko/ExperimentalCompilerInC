@@ -775,8 +775,7 @@ Stmt *parser_function_declaration(Parser *parser)
         param_types[i] = params[i].type;
     }
     Type *function_type = ast_create_function_type(return_type, param_types, param_count);
-    free(param_types);          // Free temp array after cloning in function_type
-    ast_free_type(return_type); // Free original after cloning
+    free(param_types); // Free temp array after cloning in function_type
 
     symbol_table_add_symbol(parser->symbol_table, name, function_type);
     ast_free_type(function_type); // Free after adding (cloned in symbol table)
