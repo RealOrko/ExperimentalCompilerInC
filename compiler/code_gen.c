@@ -62,7 +62,8 @@ void code_gen_push_function_context(CodeGen *gen)
     if (gen->current_function != NULL)
     {
         gen->function_stack[gen->function_stack_size] = my_strdup(gen->current_function);
-        if (gen->function_stack[gen->function_stack_size] == NULL) {
+        if (gen->function_stack[gen->function_stack_size] == NULL)
+        {
             DEBUG_ERROR("Failed to duplicate function name");
             exit(1);
         }
@@ -295,7 +296,7 @@ void code_gen_text_section(CodeGen *gen)
     fprintf(gen->output, "    mov rsi, rdi       ; string to print\n");
     fprintf(gen->output, "    lea rdi, [rel fmt_string] ; format string\n");
     fprintf(gen->output, "    xor rax, rax       ; no floating point args\n");
-    fprintf(gen->output, "    call printf\n");
+    fprintf(gen->output, "    call printf wrt ..plt\n");
 
     fprintf(gen->output, "    mov rsp, rbp\n");
     fprintf(gen->output, "    pop rbp\n");
@@ -1066,7 +1067,7 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
         fprintf(gen->output, "    mov rsp, rbp\n");
         fprintf(gen->output, "    pop rbp\n");
         fprintf(gen->output, "    xor rdi, rdi\n"); // Exit code 0
-        fprintf(gen->output, "    call exit\n");
+        fprintf(gen->output, "    call exit wrt ..plt\n");
     }
 
     // Clean up
