@@ -4,3 +4,5 @@ fn add(x:int, y:int):int =>
 fn main():void => 
   var z:int = add(1, 2) 
   print(z) 
+
+  print("Good to go!")
