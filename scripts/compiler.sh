@@ -26,10 +26,10 @@ bin/sn samples/hello-world/simple.sn -o bin/hello-world.asm -l 4 &> log/compiler
 nasm -f elf64 bin/hello-world.asm -o bin/hello-world.o &> log/nasm-output.log
 
 # Link with GCC (which handles C runtime properly, add frame pointer for better traces)
-gcc -no-pie -fsanitize=address -fno-omit-frame-pointer -g bin/hello-world.o -o bin/hello-world &> log/gcc-output.log
+gcc -pie -fsanitize=address -fno-omit-frame-pointer -g bin/hello-world.o -o bin/hello-world &> log/gcc-output.log
 
 # Run the executable (with ASan enabled)
 bin/hello-world &> log/hello-world-output.log || true
 
 # Optional: Run Valgrind on the final binary for extra checks (comment out if not needed)
-valgrind --leak-check=full --track-origins=yes --log-file=bin/valgrind-binary.txt bin/hello-world &> log/hello-world-valgrind-output.log || true
+#valgrind --leak-check=full --track-origins=yes --log-file=bin/valgrind-binary.txt bin/hello-world &> log/hello-world-valgrind-output.log || true

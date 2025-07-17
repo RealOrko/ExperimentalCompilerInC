@@ -7,4 +7,4 @@ The input language is indented for code blocks like python and does not ever use
 Please do not suggest valgrind for debugging
 
 QUESTION:
-How do I fix the make build given compiler-output.log?
+How do I fix the make build given hello-world-output.log?
