@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -e  # Exit on any error
+set -ex  # Exit on any error
 
 # Clean up specific files instead of rm -rf bin/
 rm -f bin/*
@@ -10,7 +10,8 @@ mkdir -p bin/
 
 # Build the compiler
 pushd compiler/
-make
+make clean
+make &> ../bin/make-output.txt
 popd
 
 # Compile SN source to assembly under Valgrind

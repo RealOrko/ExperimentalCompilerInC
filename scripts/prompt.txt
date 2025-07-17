@@ -6,28 +6,4 @@ You full functions in valid C when recommending changes with explanations.
 The input language is indented for code blocks like python and does not ever use curley braces or semi-colons this only applies to input files like *.sn.
 
 QUESTION:
-How do I fix this given the ouput?
-
-OUTPUT:
-(base) gavin@gavin-XPS-13-9360:~/code/ExperimentalCompilerInC$ ./scripts/compiler.sh 
-~/code/ExperimentalCompilerInC/compiler ~/code/ExperimentalCompilerInC
-gcc -Wall -Wextra -std=c99 -g -D_POSIX_C_SOURCE=200809L   -c -o token.o token.c
-gcc  -o ../bin/sn token.o lexer.o ast.o parser.o symbol_table.o code_gen.o compiler.o debug.o main.o
-~/code/ExperimentalCompilerInC
-AddressSanitizer:DEADLYSIGNAL
-=================================================================
-==39112==ERROR: AddressSanitizer: SEGV on unknown address (pc 0x7d96899398b3 bp 0x7ffc2be25ec8 sp 0x7ffc2be25df8 T0)
-==39112==The signal is caused by a READ memory access.
-==39112==Hint: this fault was caused by a dereference of a high value address (see register values below).  Disassemble the provided pc to learn which register was used.
-    #0 0x7d96899398b3 in __sanitizer::InternalMmapVectorNoCtor<__lsan::LeakedChunk>::Initialize(unsigned long) ../../../../src/libsanitizer/sanitizer_common/sanitizer_common.h:515
-    #1 0x7d96899398b3 in __sanitizer::InternalMmapVector<__lsan::LeakedChunk>::InternalMmapVector() ../../../../src/libsanitizer/sanitizer_common/sanitizer_common.h:624
-    #2 0x7d96899398b3 in __lsan::CheckForLeaksParam::CheckForLeaksParam() ../../../../src/libsanitizer/lsan/lsan_common.h:242
-    #3 0x7d96899398b3 in CheckForLeaks ../../../../src/libsanitizer/lsan/lsan_common.cpp:771
-    #4 0x7d968993a06f in CheckForLeaks ../../../../src/libsanitizer/lsan/lsan_common.cpp:765
-    #5 0x7d968993a06f in __lsan::DoLeakCheck() ../../../../src/libsanitizer/lsan/lsan_common.cpp:821
-    #6 0x7d9688c47381 in __cxa_finalize stdlib/cxa_finalize.c:82
-    #7 0x7d968983b7b6  (/lib/x86_64-linux-gnu/libasan.so.8+0x3b7b6) (BuildId: 23dfa6dbcac57919bae5fe1cac11feecc4fc26c7)
-
-AddressSanitizer can not provide additional info.
-SUMMARY: AddressSanitizer: SEGV ../../../../src/libsanitizer/sanitizer_common/sanitizer_common.h:515 in __sanitizer::InternalMmapVectorNoCtor<__lsan::LeakedChunk>::Initialize(unsigned long)
-==39112==ABORTING
+How do I fix this given the ouput from make-output.txt?
