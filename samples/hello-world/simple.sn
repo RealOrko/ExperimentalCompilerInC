@@ -2,7 +2,6 @@ fn add(x:int, y:int):int =>
   return x + y
 
 fn main():void => 
-  var z:int = add(1, 2) 
+  var z:int = add(6, 2) 
   print(z) 
 
-  print("Good to go!")
