@@ -30,6 +30,3 @@ gcc -pie -fsanitize=address -fno-omit-frame-pointer -g bin/hello-world.o -o bin/
 
 # Run the executable (with ASan enabled)
 bin/hello-world &> log/hello-world-output.log || true
-
-# Optional: Run Valgrind on the final binary for extra checks (comment out if not needed)
-#valgrind --leak-check=full --track-origins=yes --log-file=bin/valgrind-binary.txt bin/hello-world &> log/hello-world-valgrind-output.log || true

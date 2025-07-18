@@ -470,49 +470,56 @@ Expr *parser_primary(Parser *parser)
         LiteralValue value;
         value.int_value = parser->previous.literal.int_value;
         DEBUG_VERBOSE("Parsed integer literal: %d", (int)value.int_value);
-        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_INT));
+        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_INT), false);
     }
     if (parser_match(parser, TOKEN_LONG_LITERAL))
     {
         LiteralValue value;
         value.int_value = parser->previous.literal.int_value;
         DEBUG_VERBOSE("Parsed long literal: %ld", value.int_value);
-        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_LONG));
+        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_LONG), false);
     }
     if (parser_match(parser, TOKEN_DOUBLE_LITERAL))
     {
         LiteralValue value;
         value.double_value = parser->previous.literal.double_value;
         DEBUG_VERBOSE("Parsed double literal: %f", value.double_value);
-        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_DOUBLE));
+        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_DOUBLE), false);
     }
     if (parser_match(parser, TOKEN_CHAR_LITERAL))
     {
         LiteralValue value;
         value.char_value = parser->previous.literal.char_value;
         DEBUG_VERBOSE("Parsed char literal: %c", value.char_value);
-        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_CHAR));
+        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_CHAR), false);
     }
     if (parser_match(parser, TOKEN_STRING_LITERAL))
     {
         LiteralValue value;
         value.string_value = parser->previous.literal.string_value;
         DEBUG_VERBOSE("Parsed string literal: %s", value.string_value);
-        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_STRING));
+        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_STRING), false);
+    }
+    if (parser_match(parser, TOKEN_INTERPOL_STRING))
+    {
+        LiteralValue value;
+        value.string_value = parser->previous.literal.string_value;
+        DEBUG_VERBOSE("Parsed interpolated string literal: %s", value.string_value);
+        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_STRING), true);
     }
     if (parser_match(parser, TOKEN_BOOL_LITERAL))
     {
         LiteralValue value;
         value.bool_value = parser->previous.literal.bool_value;
         DEBUG_VERBOSE("Parsed bool literal: %s", value.bool_value ? "true" : "false");
-        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_BOOL));
+        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_BOOL), false);
     }
     if (parser_match(parser, TOKEN_NIL))
     {
         LiteralValue value;
         value.int_value = 0;
         DEBUG_VERBOSE("Parsed nil");
-        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_NIL));
+        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_NIL), false);
     }
     if (parser_match(parser, TOKEN_IDENTIFIER))
     {
@@ -529,7 +536,7 @@ Expr *parser_primary(Parser *parser)
     parser_error_at_current(parser, "Expected expression");
     LiteralValue value;
     value.int_value = 0;
-    return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_NIL));
+    return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_NIL), false);
 }
 
 Expr *parser_call(Parser *parser, Expr *callee)

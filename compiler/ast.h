@@ -8,6 +8,7 @@
 
 #include "token.h"
 #include <stddef.h>
+#include <stdbool.h>
 
 // Forward declarations for circular types
 typedef struct Expr Expr;
@@ -67,16 +68,6 @@ typedef enum
     EXPR_DECREMENT
 } ExprType;
 
-// Literal value union
-typedef union
-{
-    int64_t int_value;
-    double double_value;
-    char char_value;
-    const char *string_value;
-    int bool_value;
-} LiteralValue;
-
 // Binary expression
 typedef struct
 {
@@ -97,6 +88,7 @@ typedef struct
 {
     LiteralValue value;
     Type *type;
+    bool is_interpolated;
 } LiteralExpr;
 
 // Variable expression
@@ -290,7 +282,7 @@ void ast_free_type(Type *type);
 // Expression functions
 Expr *ast_create_binary_expr(Expr *left, TokenType operator, Expr * right);
 Expr *ast_create_unary_expr(TokenType operator, Expr * operand);
-Expr *ast_create_literal_expr(LiteralValue value, Type *type);
+Expr *ast_create_literal_expr(LiteralValue value, Type *type, bool is_interpolated);
 Expr *ast_create_variable_expr(Token name);
 Expr *ast_create_assign_expr(Token name, Expr *value);
 Expr *ast_create_call_expr(Expr *callee, Expr **arguments, int arg_count);

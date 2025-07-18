@@ -66,6 +66,8 @@ const char *token_type_to_string(TokenType type)
         return "CHAR_LITERAL";
     case TOKEN_STRING_LITERAL:
         return "STRING_LITERAL";
+    case TOKEN_INTERPOL_STRING:
+        return "INTERPOL_STRING";
     case TOKEN_BOOL_LITERAL:
         return "BOOL_LITERAL";
     case TOKEN_IDENTIFIER:
@@ -196,6 +198,7 @@ void token_print(Token *token)
         printf(", value: '%c'", token->literal.char_value);
         break;
     case TOKEN_STRING_LITERAL:
+    case TOKEN_INTERPOL_STRING:
         printf(", value: \"%s\"", token->literal.string_value);
         break;
     case TOKEN_BOOL_LITERAL:

@@ -49,7 +49,7 @@
  void code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr);
  void code_gen_variable_expression(CodeGen *gen, VariableExpr *expr);
  void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr);
- void code_gen_call_expression(CodeGen *gen, CallExpr *expr);
+ void code_gen_call_expression(CodeGen *gen, Expr *expr);
  void code_gen_array_expression(CodeGen *gen, ArrayExpr *expr);
  void code_gen_array_access_expression(CodeGen *gen, ArrayAccessExpr *expr);
  void code_gen_increment_expression(CodeGen *gen, Expr *expr);

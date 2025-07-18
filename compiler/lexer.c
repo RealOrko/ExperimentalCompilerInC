@@ -10,6 +10,9 @@
 #include <string.h>
 #include <ctype.h>
 
+// Static buffer for error messages to avoid use-after-return
+static char error_buffer[128];
+
 void lexer_init(Lexer *lexer, const char *source, const char *filename)
 {
     lexer->start = source;
@@ -36,10 +39,9 @@ void lexer_cleanup(Lexer *lexer)
 
 void lexer_report_indentation_error(Lexer *lexer, int expected, int actual)
 {
-    char message[100];
-    sprintf(message, "Indentation error: expected %d spaces, got %d spaces",
-            expected, actual);
-    lexer_error_token(lexer, message);
+    snprintf(error_buffer, sizeof(error_buffer), "Indentation error: expected %d spaces, got %d spaces",
+             expected, actual);
+    lexer_error_token(lexer, error_buffer);
 }
 
 int lexer_is_at_end(Lexer *lexer)
@@ -289,7 +291,8 @@ Token lexer_scan_number(Lexer *lexer)
             int length = (int)(lexer->current - lexer->start - 1); // -1 to exclude the 'd'
             if (length >= (int)sizeof(buffer))
             {
-                return lexer_error_token(lexer, "Number literal too long");
+                snprintf(error_buffer, sizeof(error_buffer), "Number literal too long");
+                return lexer_error_token(lexer, error_buffer);
             }
 
             strncpy(buffer, lexer->start, length);
@@ -309,7 +312,8 @@ Token lexer_scan_number(Lexer *lexer)
         int length = (int)(lexer->current - lexer->start);
         if (length >= (int)sizeof(buffer))
         {
-            return lexer_error_token(lexer, "Number literal too long");
+            snprintf(error_buffer, sizeof(error_buffer), "Number literal too long");
+            return lexer_error_token(lexer, error_buffer);
         }
 
         strncpy(buffer, lexer->start, length);
@@ -332,7 +336,8 @@ Token lexer_scan_number(Lexer *lexer)
         int length = (int)(lexer->current - lexer->start - 1); // -1 to exclude the 'l'
         if (length >= (int)sizeof(buffer))
         {
-            return lexer_error_token(lexer, "Number literal too long");
+            snprintf(error_buffer, sizeof(error_buffer), "Number literal too long");
+            return lexer_error_token(lexer, error_buffer);
         }
 
         strncpy(buffer, lexer->start, length);
@@ -352,7 +357,8 @@ Token lexer_scan_number(Lexer *lexer)
     int length = (int)(lexer->current - lexer->start);
     if (length >= (int)sizeof(buffer))
     {
-        return lexer_error_token(lexer, "Number literal too long");
+        snprintf(error_buffer, sizeof(error_buffer), "Number literal too long");
+        return lexer_error_token(lexer, error_buffer);
     }
 
     strncpy(buffer, lexer->start, length);
@@ -378,7 +384,8 @@ Token lexer_scan_string(Lexer *lexer)
     char *buffer = malloc(buffer_size);
     if (buffer == NULL)
     {
-        return lexer_error_token(lexer, "Memory allocation failed");
+        snprintf(error_buffer, sizeof(error_buffer), "Memory allocation failed");
+        return lexer_error_token(lexer, error_buffer);
     }
 
     int buffer_index = 0;
@@ -413,7 +420,8 @@ Token lexer_scan_string(Lexer *lexer)
                 break;
             default:
                 free(buffer);
-                return lexer_error_token(lexer, "Invalid escape sequence");
+                snprintf(error_buffer, sizeof(error_buffer), "Invalid escape sequence");
+                return lexer_error_token(lexer, error_buffer);
             }
         }
         else
@@ -431,7 +439,8 @@ Token lexer_scan_string(Lexer *lexer)
             if (new_buffer == NULL)
             {
                 free(buffer);
-                return lexer_error_token(lexer, "Memory allocation failed");
+                snprintf(error_buffer, sizeof(error_buffer), "Memory allocation failed");
+                return lexer_error_token(lexer, error_buffer);
             }
             buffer = new_buffer;
         }
@@ -441,7 +450,8 @@ Token lexer_scan_string(Lexer *lexer)
     if (lexer_is_at_end(lexer))
     {
         free(buffer);
-        return lexer_error_token(lexer, "Unterminated string");
+        snprintf(error_buffer, sizeof(error_buffer), "Unterminated string");
+        return lexer_error_token(lexer, error_buffer);
     }
 
     // Consume the closing quote
@@ -458,7 +468,8 @@ Token lexer_scan_string(Lexer *lexer)
     if (str_copy == NULL)
     {
         free(buffer);
-        return lexer_error_token(lexer, "Memory allocation failed");
+        snprintf(error_buffer, sizeof(error_buffer), "Memory allocation failed");
+        return lexer_error_token(lexer, error_buffer);
     }
 
     strcpy(str_copy, buffer);
@@ -496,12 +507,14 @@ Token lexer_scan_char(Lexer *lexer)
             value = '\'';
             break;
         default:
-            return lexer_error_token(lexer, "Invalid escape sequence");
+            snprintf(error_buffer, sizeof(error_buffer), "Invalid escape sequence");
+            return lexer_error_token(lexer, error_buffer);
         }
     }
     else if (lexer_peek(lexer) == '\'')
     {
-        return lexer_error_token(lexer, "Empty character literal");
+        snprintf(error_buffer, sizeof(error_buffer), "Empty character literal");
+        return lexer_error_token(lexer, error_buffer);
     }
     else
     {
@@ -513,7 +526,8 @@ Token lexer_scan_char(Lexer *lexer)
     // Make sure we found the closing quote
     if (lexer_peek(lexer) != '\'')
     {
-        return lexer_error_token(lexer, "Unterminated character literal");
+        snprintf(error_buffer, sizeof(error_buffer), "Unterminated character literal");
+        return lexer_error_token(lexer, error_buffer);
     }
 
     // Consume the closing quote
@@ -605,7 +619,8 @@ Token lexer_scan_token(Lexer *lexer)
                 {
                     DEBUG_VERBOSE("Line %d: Error - Inconsistent indentation (current %d > new_top %d)",
                                   lexer->line, current_indent, new_top);
-                    return lexer_error_token(lexer, "Inconsistent indentation");
+                    snprintf(error_buffer, sizeof(error_buffer), "Inconsistent indentation");
+                    return lexer_error_token(lexer, error_buffer);
                 }
                 else
                 {
@@ -727,6 +742,16 @@ Token lexer_scan_token(Lexer *lexer)
         Token string_token = lexer_scan_string(lexer);
         DEBUG_VERBOSE("Line %d: Emitting STRING_LITERAL", lexer->line);
         return string_token;
+    case '$':
+        if (lexer_peek(lexer) == '"')
+        {
+            lexer_advance(lexer); // Consume '"'
+            Token token = lexer_scan_string(lexer);
+            token.type = TOKEN_INTERPOL_STRING;
+            DEBUG_VERBOSE("Line %d: Emitting INTERPOL_STRING", lexer->line);
+            return token;
+        }
+        // Intentional fallthrough: invalid $ not followed by " is an unexpected character
     default:
         char msg[32];
         snprintf(msg, sizeof(msg), "Unexpected character '%c'", c);

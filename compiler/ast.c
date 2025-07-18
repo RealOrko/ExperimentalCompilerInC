@@ -145,7 +145,7 @@ void ast_print_expr(Expr *expr, int indent_level)
         break;
 
     case EXPR_LITERAL:
-        DEBUG_VERBOSE_INDENT(indent_level, "Literal: ");
+        DEBUG_VERBOSE_INDENT(indent_level, "Literal%s: ", expr->as.literal.is_interpolated ? " (interpolated)" : "");
         switch (expr->as.literal.type->kind)
         {
         case TYPE_INT:
@@ -592,7 +592,7 @@ Expr *ast_create_unary_expr(TokenType operator, Expr *operand)
     return expr;
 }
 
-Expr *ast_create_literal_expr(LiteralValue value, Type *type)
+Expr *ast_create_literal_expr(LiteralValue value, Type *type, bool is_interpolated)
 {
     Expr *expr = malloc(sizeof(Expr));
     if (expr == NULL)
@@ -603,6 +603,7 @@ Expr *ast_create_literal_expr(LiteralValue value, Type *type)
     expr->type = EXPR_LITERAL;
     expr->as.literal.value = value;
     expr->as.literal.type = type;
+    expr->as.literal.is_interpolated = is_interpolated;
     expr->expr_type = ast_clone_type(type); // Clone to avoid double free
     return expr;
 }

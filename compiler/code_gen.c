@@ -5,8 +5,21 @@
 
 #include "code_gen.h"
 #include "debug.h"
+#include "parser.h"       // For sub-parsing in interpolation
+#include "type_checker.h" // For type_check_expr
 #include <stdlib.h>
 #include <string.h>
+
+static char *my_strndup(const char *s, size_t n) {
+    if (s == NULL) return NULL;
+    size_t len = strlen(s);
+    if (len < n) n = len;
+    char *new_str = malloc(n + 1);
+    if (new_str == NULL) return NULL;
+    memcpy(new_str, s, n);
+    new_str[n] = '\0';
+    return new_str;
+}
 
 // Custom strdup implementation since it's not part of C99 standard
 static char *my_strdup(const char *s)
@@ -262,44 +275,34 @@ void code_gen_data_section(CodeGen *gen)
         current = current->next;
     }
 
+    // Add format strings (with and without \n)
+    fprintf(gen->output, "fmt_int db \"%%d\\n\", 0\n");
+    fprintf(gen->output, "fmt_long db \"%%ld\\n\", 0\n");
+    fprintf(gen->output, "fmt_double db \"%%f\\n\", 0\n");
+    fprintf(gen->output, "fmt_char db \"%%c\\n\", 0\n");
+    fprintf(gen->output, "fmt_string db \"%%s\\n\", 0\n");
+    fprintf(gen->output, "fmt_newline db 10, 0\n");
+    fprintf(gen->output, "fmt_int_no_nl db \"%%d\", 0\n");
+    fprintf(gen->output, "fmt_long_no_nl db \"%%ld\", 0\n");
+    fprintf(gen->output, "fmt_double_no_nl db \"%%f\", 0\n");
+    fprintf(gen->output, "fmt_char_no_nl db \"%%c\", 0\n");
+    fprintf(gen->output, "fmt_string_no_nl db \"%%s\", 0\n");
+    fprintf(gen->output, "true_str db \"true\", 0\n");
+    fprintf(gen->output, "false_str db \"false\", 0\n");
+    fprintf(gen->output, "true_str_nl db \"true\\n\", 0\n");
+    fprintf(gen->output, "false_str_nl db \"false\\n\", 0\n");
+
     fprintf(gen->output, "\n");
 }
 
 void code_gen_text_section(CodeGen *gen)
 {
     fprintf(gen->output, "section .text\n");
-    // Only make main global, not _start
+    // Only make main global
     fprintf(gen->output, "    global main\n\n");
 
-    // Add external functions (remove extern exit)
+    // Add external functions
     fprintf(gen->output, "    extern printf\n\n");
-
-    // Format strings for printf (add \n for flush)
-    fprintf(gen->output, "section .data\n");
-    fprintf(gen->output, "    fmt_int db \"%%d\\n\", 0\n");
-    fprintf(gen->output, "    fmt_long db \"%%ld\\n\", 0\n");
-    fprintf(gen->output, "    fmt_double db \"%%f\\n\", 0\n");
-    fprintf(gen->output, "    fmt_char db \"%%c\\n\", 0\n");
-    fprintf(gen->output, "    fmt_string db \"%%s\\n\", 0\n");
-    fprintf(gen->output, "    fmt_newline db 10, 0\n\n");
-
-    fprintf(gen->output, "section .text\n");
-
-    // Define the print function
-    fprintf(gen->output, "; Implementation of print function\n");
-    fprintf(gen->output, "print:\n");
-    fprintf(gen->output, "    push rbp\n");
-    fprintf(gen->output, "    mov rbp, rsp\n");
-
-    // The integer to print is in rdi
-    fprintf(gen->output, "    mov rsi, rdi       ; integer to print\n");
-    fprintf(gen->output, "    lea rdi, [rel fmt_long] ; format string for long/int\n");
-    fprintf(gen->output, "    xor rax, rax       ; no floating point args\n");
-    fprintf(gen->output, "    call printf wrt ..plt\n");
-
-    fprintf(gen->output, "    mov rsp, rbp\n");
-    fprintf(gen->output, "    pop rbp\n");
-    fprintf(gen->output, "    ret\n\n");
 }
 
 void code_gen_prologue(CodeGen *gen, const char *function_name)
@@ -319,7 +322,6 @@ void code_gen_prologue(CodeGen *gen, const char *function_name)
 void code_gen_epilogue(CodeGen *gen)
 {
     // This function is now a no-op
-    // All epilogue code is generated directly in generate_function
     (void)gen; // Avoid unused parameter warning
 }
 
@@ -340,52 +342,13 @@ static int code_gen_get_var_offset(CodeGen *gen, Token name)
 
     if (symbol == NULL)
     {
-        DEBUG_WARNING("Symbol not found in symbol table: '%s'", var_name);
-
-        // Manual string-based lookup for common variables
-        if (gen->current_function)
-        {
-            // Check all symbols in all scopes
-            Scope *scope = gen->symbol_table->current;
-            while (scope != NULL)
-            {
-                Symbol *sym = scope->symbols;
-                while (sym != NULL)
-                {
-                    char sym_name[256];
-                    int sym_len = sym->name.length < 255 ? sym->name.length : 255;
-                    strncpy(sym_name, sym->name.start, sym_len);
-                    sym_name[sym_len] = '\0';
-
-                    if (strcmp(sym_name, var_name) == 0)
-                    {
-                        DEBUG_VERBOSE("Manual string lookup found '%s' with offset %d\n",
-                                      var_name, sym->offset);
-                        return sym->offset;
-                    }
-                    sym = sym->next;
-                }
-                scope = scope->enclosing;
-            }
-        }
-
-        // For backward compatibility, fall back to hardcoded offsets
-        DEBUG_WARNING("Falling back to hardcoded offsets for '%s'", var_name);
-
-        // Hardcoded offsets for all variables in the factorial function
-        if (gen->current_function && strcmp(gen->current_function, "factorial") == 0)
-        {
-            if (strcmp(var_name, "n") == 0)
-                return 16;
-            if (strcmp(var_name, "result") == 0)
-                return 24;
-            if (strcmp(var_name, "i") == 0)
-                return 32;
-        }
-
-        // If we get here, the variable is not in our hardcoded list
-        DEBUG_ERROR("Undefined variable '%s'\n", var_name);
-        exit(1);
+        // For debugging, print the variable we're looking for
+        char temp[256];
+        int name_len = name.length < 255 ? name.length : 255;
+        strncpy(temp, name.start, name_len);
+        temp[name_len] = '\0';
+        DEBUG_ERROR("Symbol not found in get_symbol_offset: '%s'", temp);
+        return -1;
     }
 
     DEBUG_VERBOSE("Found symbol '%s' with offset %d", var_name, symbol->offset);
@@ -719,10 +682,160 @@ void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
     fprintf(gen->output, "    mov [rbp-%d], rax\n", symbol->offset);
 }
 
-void code_gen_call_expression(CodeGen *gen, CallExpr *expr)
+static void code_gen_interpolated_print(CodeGen *gen, const char *content)
 {
+    const char *p = content;
+    const char *start = p;
+
+    while (*p != '\0')
+    {
+        if (*p == '{')
+        {
+            // Generate printf for previous string part
+            if (p > start)
+            {
+                int len = p - start;
+                char *part_str = my_strndup(start, len);
+                int part_label = code_gen_add_string_literal(gen, part_str);
+                free(part_str);
+                fprintf(gen->output, "    lea rdi, [rel fmt_string_no_nl]\n");
+                fprintf(gen->output, "    lea rsi, [rel str_%d]\n", part_label);
+                fprintf(gen->output, "    xor rax, rax\n");
+                fprintf(gen->output, "    call printf wrt ..plt\n");
+            }
+
+            // Parse the expression inside { }
+            p++;
+            const char *expr_begin = p;
+            while (*p != '}' && *p != '\0')
+                p++;
+            if (*p == '\0')
+            {
+                DEBUG_ERROR("Unterminated { in interpolated string");
+                return;
+            }
+            int expr_length = p - expr_begin;
+            char *expr_source = my_strndup(expr_begin, expr_length);
+
+            // Set up temporary lexer and parser for the expression
+            Lexer temp_lexer;
+            lexer_init(&temp_lexer, expr_source, "interpolated expression");
+            temp_lexer.line = 0; // Placeholder line number
+
+            Parser temp_parser;
+            parser_init(&temp_parser, &temp_lexer);
+            temp_parser.symbol_table = gen->symbol_table;
+            temp_parser.had_error = 0;
+            temp_parser.panic_mode = 0;
+
+            Expr *inner_expr = parser_expression(&temp_parser);
+            if (temp_parser.had_error)
+            {
+                DEBUG_ERROR("Error parsing interpolated expression");
+                free(expr_source);
+                return;
+            }
+
+            // Type check the inner expression
+            Type *inner_type = type_check_expr(inner_expr, gen->symbol_table);
+            if (inner_type == NULL)
+            {
+                DEBUG_ERROR("Type check failed for interpolated expression");
+                ast_free_expr(inner_expr);
+                free(expr_source);
+                return;
+            }
+
+            // Generate code for the expression
+            code_gen_expression(gen, inner_expr);
+
+            // Generate printf based on type (no \n)
+            const char *fmt_rel = NULL;
+            const char *move_reg = "rsi";
+            bool is_fp = false;
+            switch (inner_type->kind)
+            {
+            case TYPE_INT:
+            case TYPE_LONG:
+                fmt_rel = "fmt_long_no_nl";
+                move_reg = "rsi";
+                break;
+            case TYPE_DOUBLE:
+                fmt_rel = "fmt_double_no_nl";
+                fprintf(gen->output, "    movq xmm0, rax\n");
+                is_fp = true;
+                break;
+            case TYPE_CHAR:
+                fmt_rel = "fmt_char_no_nl";
+                move_reg = "rsi";
+                break;
+            case TYPE_STRING:
+                fmt_rel = "fmt_string_no_nl";
+                move_reg = "rsi";
+                break;
+            case TYPE_BOOL:
+                int bool_label = code_gen_new_label(gen);
+                fprintf(gen->output, "    test rax, rax\n");
+                fprintf(gen->output, "    jz .bool_false_%d\n", bool_label);
+                fprintf(gen->output, "    lea rsi, [rel true_str]\n");
+                fprintf(gen->output, "    jmp .bool_end_%d\n", bool_label);
+                fprintf(gen->output, ".bool_false_%d:\n", bool_label);
+                fprintf(gen->output, "    lea rsi, [rel false_str]\n");
+                fprintf(gen->output, ".bool_end_%d:\n", bool_label);
+                fmt_rel = "fmt_string_no_nl";
+                break;
+            default:
+                DEBUG_ERROR("Unsupported type in interpolation");
+                break;
+            }
+            if (fmt_rel)
+            {
+                fprintf(gen->output, "    lea rdi, [rel %s]\n", fmt_rel);
+                if (!is_fp && strcmp(move_reg, "rsi") == 0 && inner_type->kind != TYPE_BOOL)
+                {
+                    fprintf(gen->output, "    mov %s, rax\n", move_reg);
+                }
+                fprintf(gen->output, "    mov rax, %d\n", is_fp ? 1 : 0);
+                fprintf(gen->output, "    call printf wrt ..plt\n");
+            }
+
+            // Cleanup
+            ast_free_expr(inner_expr);
+            free(expr_source);
+
+            p++; // Skip '}'
+            start = p;
+        }
+        else
+        {
+            p++;
+        }
+    }
+
+    // Last string part
+    if (p > start)
+    {
+        int len = p - start;
+        char *part_str = my_strndup(start, len);
+        int part_label = code_gen_add_string_literal(gen, part_str);
+        free(part_str);
+        fprintf(gen->output, "    lea rdi, [rel fmt_string_no_nl]\n");
+        fprintf(gen->output, "    lea rsi, [rel str_%d]\n", part_label);
+        fprintf(gen->output, "    xor rax, rax\n");
+        fprintf(gen->output, "    call printf wrt ..plt\n");
+    }
+
+    // Final newline for the entire print
+    fprintf(gen->output, "    lea rdi, [rel fmt_newline]\n");
+    fprintf(gen->output, "    xor rax, rax\n");
+    fprintf(gen->output, "    call printf wrt ..plt\n");
+}
+
+void code_gen_call_expression(CodeGen *gen, Expr *expr)
+{
+    CallExpr *call = &expr->as.call;
     // Validate the number of arguments
-    if (expr->arg_count > 6)
+    if (call->arg_count > 6)
     {
         DEBUG_ERROR("Too many arguments (max 6 supported)");
         return;
@@ -732,9 +845,9 @@ void code_gen_call_expression(CodeGen *gen, CallExpr *expr)
     const char *function_name = NULL;
 
     // Handle variable functions
-    if (expr->callee->type == EXPR_VARIABLE)
+    if (call->callee->type == EXPR_VARIABLE)
     {
-        VariableExpr *var = &expr->callee->as.variable;
+        VariableExpr *var = &call->callee->as.variable;
         // Copy function name
         char *name = malloc(var->name.length + 1);
         if (name == NULL)
@@ -753,13 +866,74 @@ void code_gen_call_expression(CodeGen *gen, CallExpr *expr)
         exit(1);
     }
 
-    fprintf(gen->output, "    ; Call to %s with %d arguments\n", function_name, expr->arg_count);
+    fprintf(gen->output, "    ; Call to %s with %d arguments\n", function_name, call->arg_count);
 
+    if (strcmp(function_name, "print") == 0 && call->arg_count == 1) {
+        Expr *arg = call->arguments[0];
+        if (arg->type == EXPR_LITERAL && arg->as.literal.type->kind == TYPE_STRING && arg->as.literal.is_interpolated) {
+            code_gen_interpolated_print(gen, arg->as.literal.value.string_value);
+            free((void *)function_name);
+            return;
+        } else {
+            // Normal print: evaluate arg and printf based on type
+            code_gen_expression(gen, arg);
+            Type *arg_type = arg->expr_type;
+            const char *fmt_rel = NULL;
+            const char *move_reg = "rsi";
+            bool is_fp = false;
+            switch (arg_type->kind) {
+            case TYPE_INT:
+            case TYPE_LONG:
+                fmt_rel = "fmt_long";
+                move_reg = "rsi";
+                break;
+            case TYPE_DOUBLE:
+                fmt_rel = "fmt_double";
+                fprintf(gen->output, "    movq xmm0, rax\n");
+                is_fp = true;
+                break;
+            case TYPE_CHAR:
+                fmt_rel = "fmt_char";
+                move_reg = "rsi";
+                break;
+            case TYPE_STRING:
+                fmt_rel = "fmt_string";
+                move_reg = "rsi";
+                break;
+            case TYPE_BOOL:
+                int bool_label = code_gen_new_label(gen);
+                fprintf(gen->output, "    test rax, rax\n");
+                fprintf(gen->output, "    jz .bool_false_%d\n", bool_label);
+                fprintf(gen->output, "    lea rsi, [rel true_str_nl]\n");
+                fprintf(gen->output, "    jmp .bool_end_%d\n", bool_label);
+                fprintf(gen->output, ".bool_false_%d:\n", bool_label);
+                fprintf(gen->output, "    lea rsi, [rel false_str_nl]\n");
+                fprintf(gen->output, ".bool_end_%d:\n", bool_label);
+                fmt_rel = "fmt_string_no_nl";
+                break;
+            default:
+                DEBUG_ERROR("Unsupported type for print");
+                break;
+            }
+            if (fmt_rel) {
+                fprintf(gen->output, "    lea rdi, [rel %s]\n", fmt_rel);
+                if (!is_fp && strcmp(move_reg, "rsi") == 0 && arg_type->kind != TYPE_BOOL) {
+                    fprintf(gen->output, "    mov %s, rax\n", move_reg);
+                }
+                fprintf(gen->output, "    mov rax, %d\n", is_fp ? 1 : 0);
+                fprintf(gen->output, "    call printf wrt ..plt\n");
+            }
+            free((void *)function_name);
+            return;
+        }
+    }
+
+    // Normal function call (existing code for evaluating args and call)
     // Evaluate arguments and move to registers in reverse order (x86-64 ABI)
-    for (int i = expr->arg_count - 1; i >= 0; i--)
+    for (int i = call->arg_count - 1; i >= 0; i--)
     {
         fprintf(gen->output, "    ; Evaluating argument %d\n", i);
-        code_gen_expression(gen, expr->arguments[i]);
+        code_gen_expression(gen, call->arguments[i]);
 
         // Use appropriate registers for the first 6 arguments
         switch (i)
@@ -887,7 +1061,7 @@ void code_gen_expression(CodeGen *gen, Expr *expr)
         break;
     case EXPR_CALL:
         DEBUG_VERBOSE("Call expression");
-        code_gen_call_expression(gen, &expr->as.call);
+        code_gen_call_expression(gen, expr);
         break;
     case EXPR_ARRAY:
         DEBUG_VERBOSE("Array expression");
