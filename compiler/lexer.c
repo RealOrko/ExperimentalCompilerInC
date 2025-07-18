@@ -751,7 +751,7 @@ Token lexer_scan_token(Lexer *lexer)
             DEBUG_VERBOSE("Line %d: Emitting INTERPOL_STRING", lexer->line);
             return token;
         }
-        // Intentional fallthrough: invalid $ not followed by " is an unexpected character
+        /* falls through */  // Intentional fallthrough to handle invalid '$'
     default:
         char msg[32];
         snprintf(msg, sizeof(msg), "Unexpected character '%c'", c);
@@ -770,3 +770,4 @@ Token lexer_scan_token(Lexer *lexer)
         return lexer_make_token(lexer, TOKEN_EOF);
     }
 }
+

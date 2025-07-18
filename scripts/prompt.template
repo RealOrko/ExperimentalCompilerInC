@@ -10,20 +10,16 @@ Please do not suggest valgrind for debugging
 INPUTS:
 
 The input program is the following (./samples/hello-world/simple.sn): 
-
-${INPUT_CODE}
+${SAMPLES_INPUT_CODE}
 
 The makefile is the following (./compiler/Makefile):
-
-${MAKE_FILE}
+${COMPILER_MAKE_FILE}
 
 The main build shell script is the following (./scripts/compiler.sh):
-
-${COMPILER_SCRIPT}
-
-QUESTION:
-How would I fix the compiler errors in my code? 
+${SCRIPTS_COMPILER_SCRIPT}
 
 OUTPUT:
-
 ${LOG_MAKE_OUTPUT}
+
+QUESTION:
+Can we please clean up these warnings? 

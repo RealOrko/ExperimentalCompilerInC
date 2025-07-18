@@ -14,8 +14,6 @@ static void type_error(const char *msg) {
     had_type_error = 1;
 }
 
-static Type *type_check_expr(Expr *expr, SymbolTable *table);
-
 static void type_check_stmt(Stmt *stmt, SymbolTable *table, Type *return_type);
 
 static bool is_numeric_type(Type *type) {
@@ -154,7 +152,7 @@ static Type *type_check_call(Expr *expr, SymbolTable *table) {
     }
 }
 
-static Type *type_check_expr(Expr *expr, SymbolTable *table) {
+Type *type_check_expr(Expr *expr, SymbolTable *table) {
     if (expr == NULL) return NULL;
     if (expr->expr_type) return expr->expr_type;
     Type *t = NULL;
