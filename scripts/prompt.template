@@ -15,16 +15,22 @@ ${SAMPLES_INPUT_CODE}
 The makefile is the following (./compiler/Makefile):
 ${COMPILER_MAKE_FILE}
 
-The main build shell script is the following (./scripts/compiler.sh):
-${SCRIPTS_COMPILER_SCRIPT}
+The main build shell script is the following (./scripts/compiler-build.sh):
+${SCRIPTS_COMPILER_BUILD_SCRIPT}
+
+log/compiler-build-output.log:
+${LOG_COMPILER_BUILD_OUTPUT}
+
+The main run shell script is the following (./scripts/compiler-run.sh):
+${SCRIPTS_COMPILER_RUN_SCRIPT}
 
 OUTPUT:
 
-log/make-output.log:
-${LOG_MAKE_OUTPUT}
+log/compiler-build-output.log:
+${LOG_COMPILER_BUILD_OUTPUT}
 
-log/compiler-output.log
-${LOG_COMPILER_OUTPUT}
+log/compiler-run-output.log:
+${LOG_COMPILER_RUN_OUTPUT}
 
 QUESTION:
-Can we please fix the compiler errors? 
+Can we please fix the runtime compiler errors? 

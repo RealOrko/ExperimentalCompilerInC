@@ -5,7 +5,10 @@
 
 #include "type_checker.h"
 #include "debug.h"
+#include "lexer.h"
+#include "parser.h"
 #include <string.h>
+#include <ctype.h>
 
 static int had_type_error = 0;
 
@@ -77,8 +80,71 @@ static Type *type_check_unary(Expr *expr, SymbolTable *table) {
     return NULL;
 }
 
+static Type *type_check_literal_interpolated(Expr *expr, SymbolTable *table) {
+    const char *content = expr->as.literal.value.string_value;
+    if (content == NULL) {
+        type_error("Null interpolated string");
+        return NULL;
+    }
+    const char *p = content;
+    while (*p) {
+        if (*p == '{') {
+            p++;
+            const char *start = p;
+            while (*p && *p != '}') p++;
+            if (!*p) {
+                type_error("Unterminated { in interpolated string");
+                return NULL;
+            }
+            int len = p - start;
+            char *src = malloc(len + 1);
+            if (!src) {
+                DEBUG_ERROR("Out of memory");
+                exit(1);
+            }
+            strncpy(src, start, len);
+            src[len] = '\0';
+
+            Lexer lexer;
+            lexer_init(&lexer, src, "interpolated expr");
+            Parser parser;
+            parser_init(&parser, &lexer);
+            parser.symbol_table = table;
+            Expr *inner = parser_expression(&parser);
+            if (inner == NULL || parser.had_error) {
+                type_error("Error parsing interpolated expression");
+                free(src);
+                ast_free_expr(inner);
+                return NULL;
+            }
+            Type *inner_type = type_check_expr(inner, table);
+            if (inner_type == NULL) {
+                type_error("Type error in interpolated expression");
+                free(src);
+                ast_free_expr(inner);
+                return NULL;
+            }
+            // Interpolated exprs must be printable (since concatenated to string)
+            if (!is_printable_type(inner_type)) {
+                type_error("Non-printable type in interpolated string");
+                free(src);
+                ast_free_expr(inner);
+                return NULL;
+            }
+            ast_free_expr(inner);
+            free(src);
+            p++;  // Skip '}'
+        } else {
+            p++;
+        }
+    }
+    return ast_clone_type(expr->as.literal.type);
+}
+
 static Type *type_check_literal(Expr *expr, SymbolTable *table) {
-    (void)table;
+    if (expr->as.literal.is_interpolated) {
+        return type_check_literal_interpolated(expr, table);
+    }
     return ast_clone_type(expr->as.literal.type);
 }
 
@@ -198,44 +264,55 @@ Type *type_check_expr(Expr *expr, SymbolTable *table) {
 
 static void type_check_var_decl(Stmt *stmt, SymbolTable *table, Type *return_type) {
     (void)return_type;
-    Type *init_type = NULL;
+    Type *init_type;
     if (stmt->as.var_decl.initializer) {
         init_type = type_check_expr(stmt->as.var_decl.initializer, table);
+        if (init_type == NULL) return;
     } else {
         init_type = ast_create_primitive_type(TYPE_NIL);
     }
-    if (init_type == NULL) return;
     if (!ast_type_equals(init_type, stmt->as.var_decl.type)) {
         type_error("Initializer type does not match variable type");
     }
-    ast_free_type(init_type);
+    if (!stmt->as.var_decl.initializer) {
+        ast_free_type(init_type);
+    }
 }
 
 static void type_check_function(Stmt *stmt, SymbolTable *table) {
-    // Params already added in parser
+    symbol_table_push_scope(table);
+    for (int i = 0; i < stmt->as.function.param_count; i++) {
+        symbol_table_add_symbol_with_kind(table, stmt->as.function.params[i].name,
+                                          stmt->as.function.params[i].type, SYMBOL_PARAM);
+    }
     for (int i = 0; i < stmt->as.function.body_count; i++) {
         type_check_stmt(stmt->as.function.body[i], table, stmt->as.function.return_type);
     }
+    symbol_table_pop_scope(table);
 }
 
 static void type_check_return(Stmt *stmt, SymbolTable *table, Type *return_type) {
-    Type *value_type = NULL;
+    Type *value_type;
     if (stmt->as.return_stmt.value) {
         value_type = type_check_expr(stmt->as.return_stmt.value, table);
+        if (value_type == NULL) return;
     } else {
         value_type = ast_create_primitive_type(TYPE_VOID);
     }
-    if (value_type == NULL) return;
     if (!ast_type_equals(value_type, return_type)) {
         type_error("Return type does not match function return type");
     }
-    ast_free_type(value_type);
+    if (!stmt->as.return_stmt.value) {
+        ast_free_type(value_type);
+    }
 }
 
 static void type_check_block(Stmt *stmt, SymbolTable *table, Type *return_type) {
+    symbol_table_push_scope(table);
     for (int i = 0; i < stmt->as.block.count; i++) {
         type_check_stmt(stmt->as.block.statements[i], table, return_type);
     }
+    symbol_table_pop_scope(table);
 }
 
 static void type_check_if(Stmt *stmt, SymbolTable *table, Type *return_type) {
@@ -243,7 +320,7 @@ static void type_check_if(Stmt *stmt, SymbolTable *table, Type *return_type) {
     if (cond_type && cond_type->kind != TYPE_BOOL) {
         type_error("If condition must be boolean");
     }
-    ast_free_type(cond_type);
+    // Do not free cond_type; owned by AST
     type_check_stmt(stmt->as.if_stmt.then_branch, table, return_type);
     if (stmt->as.if_stmt.else_branch) {
         type_check_stmt(stmt->as.if_stmt.else_branch, table, return_type);
@@ -255,11 +332,12 @@ static void type_check_while(Stmt *stmt, SymbolTable *table, Type *return_type) 
     if (cond_type && cond_type->kind != TYPE_BOOL) {
         type_error("While condition must be boolean");
     }
-    ast_free_type(cond_type);
+    // Do not free cond_type; owned by AST
     type_check_stmt(stmt->as.while_stmt.body, table, return_type);
 }
 
 static void type_check_for(Stmt *stmt, SymbolTable *table, Type *return_type) {
+    symbol_table_push_scope(table);
     if (stmt->as.for_stmt.initializer) {
         type_check_stmt(stmt->as.for_stmt.initializer, table, return_type);
     }
@@ -268,12 +346,13 @@ static void type_check_for(Stmt *stmt, SymbolTable *table, Type *return_type) {
         if (cond_type && cond_type->kind != TYPE_BOOL) {
             type_error("For condition must be boolean");
         }
-        ast_free_type(cond_type);
+        // Do not free cond_type; owned by AST
     }
     if (stmt->as.for_stmt.increment) {
         type_check_expr(stmt->as.for_stmt.increment, table);
     }
     type_check_stmt(stmt->as.for_stmt.body, table, return_type);
+    symbol_table_pop_scope(table);
 }
 
 static void type_check_stmt(Stmt *stmt, SymbolTable *table, Type *return_type) {
@@ -284,6 +363,9 @@ static void type_check_stmt(Stmt *stmt, SymbolTable *table, Type *return_type) {
         break;
     case STMT_VAR_DECL:
         type_check_var_decl(stmt, table, return_type);
+        // Add the variable to the current scope after checking initializer
+        symbol_table_add_symbol_with_kind(table, stmt->as.var_decl.name,
+                                          stmt->as.var_decl.type, SYMBOL_LOCAL);
         break;
     case STMT_FUNCTION:
         type_check_function(stmt, table);
