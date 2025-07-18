@@ -19,7 +19,12 @@ The main build shell script is the following (./scripts/compiler.sh):
 ${SCRIPTS_COMPILER_SCRIPT}
 
 OUTPUT:
+
+log/make-output.log:
 ${LOG_MAKE_OUTPUT}
 
+log/compiler-output.log
+${LOG_COMPILER_OUTPUT}
+
 QUESTION:
-Can we please clean up these warnings? 
+Can we please fix the compiler errors? 
