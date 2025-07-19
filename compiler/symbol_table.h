@@ -11,7 +11,7 @@
 
 // x86_64 stack layout constants
 #define PARAM_BASE_OFFSET 16 // First parameter is at rbp-16
-#define LOCAL_BASE_OFFSET 16  // First local is at rbp-8
+#define LOCAL_BASE_OFFSET 16 // First local is at rbp-8
 #define OFFSET_ALIGNMENT 8   // All variables are 8-byte aligned
 
 // Forward declaration for circular references

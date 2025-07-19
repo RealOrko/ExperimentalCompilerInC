@@ -5,7 +5,7 @@
 
 #include "compiler.h"
 #include "debug.h"
-#include "type_checker.h"  // New include
+#include "type_checker.h" // New include
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -93,8 +93,8 @@ int main(int argc, char **argv)
     ast_free_type(void_type); // Free temp after cloning
 
     symbol_table_add_symbol(parser.symbol_table, print_token, print_type);
-    ast_free_type(print_type);  // Free after adding (cloned in symbol table)
-    free(param_types);          // Free temp array after cloning
+    ast_free_type(print_type);       // Free after adding (cloned in symbol table)
+    free(param_types);               // Free temp array after cloning
     ast_free_type(placeholder_type); // Free original after cloning
 
     // Type checking

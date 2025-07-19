@@ -390,19 +390,27 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
     fprintf(gen->output, "    mov rcx, rax\n");
 
     Type *left_type = expr->left->expr_type;
-    if (left_type == NULL) { DEBUG_ERROR("No type"); exit(1); } // Add check
+    if (left_type == NULL)
+    {
+        DEBUG_ERROR("No type");
+        exit(1);
+    } // Add check
 
-    switch (expr->operator) {
+    switch (expr->operator)
+    {
     case TOKEN_PLUS:
-        if (left_type->kind == TYPE_STRING) {
-            fprintf(gen->output, "    mov rdi, rbx\n");  // left ptr as first arg
-            fprintf(gen->output, "    mov rsi, rcx\n");  // right ptr as second arg
+        if (left_type->kind == TYPE_STRING)
+        {
+            fprintf(gen->output, "    mov rdi, rbx\n"); // left ptr as first arg
+            fprintf(gen->output, "    mov rsi, rcx\n"); // right ptr as second arg
             fprintf(gen->output, "    mov r15, rsp\n");
             fprintf(gen->output, "    and r15, 15\n");
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_str_concat\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+        }
+        else if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -410,7 +418,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_add_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_DOUBLE) {
+        }
+        else if (left_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rbx\n");
             fprintf(gen->output, "    movq xmm1, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -419,13 +429,16 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    call rt_add_double\n");
             fprintf(gen->output, "    add rsp, r15\n");
             fprintf(gen->output, "    movq rax, xmm0\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported + type");
             exit(1);
         }
         break;
     case TOKEN_MINUS:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -433,7 +446,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_sub_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_DOUBLE) {
+        }
+        else if (left_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rbx\n");
             fprintf(gen->output, "    movq xmm1, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -442,13 +457,16 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    call rt_sub_double\n");
             fprintf(gen->output, "    add rsp, r15\n");
             fprintf(gen->output, "    movq rax, xmm0\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported - type");
             exit(1);
         }
         break;
     case TOKEN_STAR:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -456,7 +474,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_mul_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_DOUBLE) {
+        }
+        else if (left_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rbx\n");
             fprintf(gen->output, "    movq xmm1, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -465,13 +485,16 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    call rt_mul_double\n");
             fprintf(gen->output, "    add rsp, r15\n");
             fprintf(gen->output, "    movq rax, xmm0\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported * type");
             exit(1);
         }
         break;
     case TOKEN_SLASH:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -479,7 +502,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_div_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_DOUBLE) {
+        }
+        else if (left_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rbx\n");
             fprintf(gen->output, "    movq xmm1, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -488,13 +513,16 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    call rt_div_double\n");
             fprintf(gen->output, "    add rsp, r15\n");
             fprintf(gen->output, "    movq rax, xmm0\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported / type");
             exit(1);
         }
         break;
     case TOKEN_MODULO:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -502,13 +530,16 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_mod_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported % type");
             exit(1);
         }
         break;
     case TOKEN_EQUAL_EQUAL:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL || left_type->kind == TYPE_STRING) {
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL || left_type->kind == TYPE_STRING)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -516,7 +547,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_eq_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_DOUBLE) {
+        }
+        else if (left_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rbx\n");
             fprintf(gen->output, "    movq xmm1, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -524,13 +557,16 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_eq_double\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported == type");
             exit(1);
         }
         break;
     case TOKEN_BANG_EQUAL:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL || left_type->kind == TYPE_STRING) {
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL || left_type->kind == TYPE_STRING)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -538,7 +574,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_ne_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_DOUBLE) {
+        }
+        else if (left_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rbx\n");
             fprintf(gen->output, "    movq xmm1, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -546,13 +584,16 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_ne_double\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported != type");
             exit(1);
         }
         break;
     case TOKEN_LESS:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -560,7 +601,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_lt_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_DOUBLE) {
+        }
+        else if (left_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rbx\n");
             fprintf(gen->output, "    movq xmm1, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -568,13 +611,16 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_lt_double\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported < type");
             exit(1);
         }
         break;
     case TOKEN_LESS_EQUAL:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -582,7 +628,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_le_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_DOUBLE) {
+        }
+        else if (left_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rbx\n");
             fprintf(gen->output, "    movq xmm1, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -590,13 +638,16 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_le_double\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported <= type");
             exit(1);
         }
         break;
     case TOKEN_GREATER:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -604,7 +655,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_gt_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_DOUBLE) {
+        }
+        else if (left_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rbx\n");
             fprintf(gen->output, "    movq xmm1, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -612,13 +665,16 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_gt_double\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported > type");
             exit(1);
         }
         break;
     case TOKEN_GREATER_EQUAL:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
+        {
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -626,7 +682,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_ge_long\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else if (left_type->kind == TYPE_DOUBLE) {
+        }
+        else if (left_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rbx\n");
             fprintf(gen->output, "    movq xmm1, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -634,7 +692,9 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_ge_double\n");
             fprintf(gen->output, "    add rsp, r15\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported >= type");
             exit(1);
         }
@@ -680,7 +740,11 @@ void code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr)
     code_gen_expression(gen, expr->operand);
 
     Type *op_type = expr->operand->expr_type;
-    if (op_type == NULL) { DEBUG_ERROR("No type"); exit(1); } // Add check
+    if (op_type == NULL)
+    {
+        DEBUG_ERROR("No type");
+        exit(1);
+    } // Add check
 
     switch (expr->operator)
     {
@@ -688,14 +752,19 @@ void code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr)
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
         fprintf(gen->output, "    sub rsp, r15\n");
-        if (op_type->kind == TYPE_INT || op_type->kind == TYPE_LONG || op_type->kind == TYPE_CHAR || op_type->kind == TYPE_BOOL) {
+        if (op_type->kind == TYPE_INT || op_type->kind == TYPE_LONG || op_type->kind == TYPE_CHAR || op_type->kind == TYPE_BOOL)
+        {
             fprintf(gen->output, "    mov rdi, rax\n");
             fprintf(gen->output, "    call rt_neg_long\n");
-        } else if (op_type->kind == TYPE_DOUBLE) {
+        }
+        else if (op_type->kind == TYPE_DOUBLE)
+        {
             fprintf(gen->output, "    movq xmm0, rax\n");
             fprintf(gen->output, "    call rt_neg_double\n");
             fprintf(gen->output, "    movq rax, xmm0\n");
-        } else {
+        }
+        else
+        {
             DEBUG_ERROR("Unsupported - type");
             exit(1);
         }

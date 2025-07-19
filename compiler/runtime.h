@@ -2,13 +2,13 @@
 #define RUNTIME_H
 
 // String operations
-extern char* rt_str_concat(const char* left, const char* right);
+extern char *rt_str_concat(const char *left, const char *right);
 
 // Print functions
 extern void rt_print_long(long val);
 extern void rt_print_double(double val);
 extern void rt_print_char(long c);
-extern void rt_print_string(const char* s);
+extern void rt_print_string(const char *s);
 extern void rt_print_bool(long b);
 
 // Long (integer) operations
