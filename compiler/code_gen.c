@@ -286,22 +286,14 @@ void code_gen_data_section(CodeGen *gen)
     }
 
     // Add format strings (with and without \n)
-    fprintf(gen->output, "fmt_int db \"%%d\\n\", 0\n");
-    fprintf(gen->output, "fmt_long db \"%%ld\\n\", 0\n");
-    fprintf(gen->output, "fmt_double db \"%%f\\n\", 0\n");
-    fprintf(gen->output, "fmt_char db \"%%c\\n\", 0\n");
-    fprintf(gen->output, "fmt_string db \"%%s\\n\", 0\n");
-    fprintf(gen->output, "fmt_newline db 10, 0\n");
-    fprintf(gen->output, "fmt_int_no_nl db \"%%d\", 0\n");
-    fprintf(gen->output, "fmt_long_no_nl db \"%%ld\", 0\n");
-    fprintf(gen->output, "fmt_double_no_nl db \"%%f\", 0\n");
-    fprintf(gen->output, "fmt_char_no_nl db \"%%c\", 0\n");
-    fprintf(gen->output, "fmt_string_no_nl db \"%%s\", 0\n");
+    fprintf(gen->output, "fmt_int db \"%%d\", 0\n");
+    fprintf(gen->output, "fmt_long db \"%%ld\", 0\n");
+    fprintf(gen->output, "fmt_double db \"%%.5f\", 0\n"); // Limit to 5 decimals
+    fprintf(gen->output, "fmt_char db \"%%c\", 0\n");
+    fprintf(gen->output, "fmt_string db \"%%s\", 0\n");
+    fprintf(gen->output, "fmt_newline db 10, 0\n"); // Keep for manual use
     fprintf(gen->output, "true_str db \"true\", 0\n");
     fprintf(gen->output, "false_str db \"false\", 0\n");
-    fprintf(gen->output, "true_str_nl db \"true\\n\", 0\n");
-    fprintf(gen->output, "false_str_nl db \"false\\n\", 0\n");
-
     fprintf(gen->output, "\n");
 }
 
@@ -312,7 +304,11 @@ void code_gen_text_section(CodeGen *gen)
     fprintf(gen->output, "    global main\n\n");
 
     // Add external functions
-    fprintf(gen->output, "    extern printf\n\n");
+    fprintf(gen->output, "    extern printf\n");
+    fprintf(gen->output, "    extern malloc\n");
+    fprintf(gen->output, "    extern strlen\n");
+    fprintf(gen->output, "    extern strcpy\n");
+    fprintf(gen->output, "    extern strcat\n\n");
 }
 
 void code_gen_prologue(CodeGen *gen, const char *function_name)
@@ -370,31 +366,48 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
     DEBUG_VERBOSE("Generating binary expression in function '%s' with operator %d",
                   gen->current_function ? gen->current_function : "global", expr->operator);
 
-    // Generate the right operand first and push it on the stack
-    code_gen_expression(gen, expr->right);
-    fprintf(gen->output, "    push rax\n");
-
-    // Generate the left operand
+    // Generate left operand (result in rax)
     code_gen_expression(gen, expr->left);
+    // Save left ptr in rbx (callee-saved, but we manage)
+    fprintf(gen->output, "    mov rbx, rax\n");
 
-    // Pop the right operand into rcx
-    fprintf(gen->output, "    pop rcx\n");
+    // Generate right operand (result in rax)
+    code_gen_expression(gen, expr->right);
+    // Save right ptr in rcx
+    fprintf(gen->output, "    mov rcx, rax\n");
 
     // Perform the operation
     switch (expr->operator)
     {
     case TOKEN_PLUS:
-        // Check if either operand is a string for string concatenation
+        // Check if both operands are strings for concatenation
         if (expr->left->expr_type && expr->right->expr_type &&
-            (expr->left->expr_type->kind == TYPE_STRING ||
-             expr->right->expr_type->kind == TYPE_STRING))
+            expr->left->expr_type->kind == TYPE_STRING &&
+            expr->right->expr_type->kind == TYPE_STRING)
         {
-            // String concatenation not fully implemented
-            fprintf(gen->output, "    ; String concatenation not fully implemented\n");
+            // String concatenation: malloc(len_left + len_right + 1), strcpy left, strcat right
+            fprintf(gen->output, "    mov rdi, rbx\n");          // rdi = left ptr
+            fprintf(gen->output, "    call strlen wrt ..plt\n"); // rax = len_left
+            fprintf(gen->output, "    mov r12, rax\n");          // save len_left in r12
+            fprintf(gen->output, "    mov rdi, rcx\n");          // rdi = right ptr
+            fprintf(gen->output, "    call strlen wrt ..plt\n"); // rax = len_right
+            fprintf(gen->output, "    add rax, r12\n");          // rax = total len
+            fprintf(gen->output, "    inc rax\n");               // +1 for null
+            fprintf(gen->output, "    mov rdi, rax\n");          // rdi = size
+            fprintf(gen->output, "    call malloc wrt ..plt\n"); // rax = new ptr
+            fprintf(gen->output, "    mov rdi, rax\n");          // rdi = new ptr (for strcpy)
+            fprintf(gen->output, "    mov rsi, rbx\n");          // rsi = left ptr
+            fprintf(gen->output, "    call strcpy wrt ..plt\n"); // copy left
+            fprintf(gen->output, "    mov rdi, rax\n");          // rdi = new ptr (strcpy returns dest)
+            fprintf(gen->output, "    mov rsi, rcx\n");          // rsi = right ptr
+            fprintf(gen->output, "    call strcat wrt ..plt\n"); // append right (strcat returns dest)
+            // rax remains the new ptr
+            break;
         }
         else
         {
             fprintf(gen->output, "    add rax, rcx\n");
+            break;
         }
         break;
     case TOKEN_MINUS:
@@ -708,7 +721,7 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
                 char *part_str = my_strndup(start, len);
                 int part_label = code_gen_add_string_literal(gen, part_str);
                 free(part_str);
-                fprintf(gen->output, "    lea rdi, [rel fmt_string_no_nl]\n");
+                fprintf(gen->output, "    lea rdi, [rel fmt_string]\n");
                 fprintf(gen->output, "    lea rsi, [rel str_%d]\n", part_label);
                 fprintf(gen->output, "    xor rax, rax\n");
                 fprintf(gen->output, "    call printf wrt ..plt\n");
@@ -768,20 +781,20 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
             {
             case TYPE_INT:
             case TYPE_LONG:
-                fmt_rel = "fmt_long_no_nl";
+                fmt_rel = "fmt_long";
                 move_reg = "rsi";
                 break;
             case TYPE_DOUBLE:
-                fmt_rel = "fmt_double_no_nl";
+                fmt_rel = "fmt_double";
                 fprintf(gen->output, "    movq xmm0, rax\n");
                 is_fp = true;
                 break;
             case TYPE_CHAR:
-                fmt_rel = "fmt_char_no_nl";
+                fmt_rel = "fmt_char";
                 move_reg = "rsi";
                 break;
             case TYPE_STRING:
-                fmt_rel = "fmt_string_no_nl";
+                fmt_rel = "fmt_string";
                 move_reg = "rsi";
                 break;
             case TYPE_BOOL:
@@ -793,7 +806,7 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
                 fprintf(gen->output, ".bool_false_%d:\n", bool_label);
                 fprintf(gen->output, "    lea rsi, [rel false_str]\n");
                 fprintf(gen->output, ".bool_end_%d:\n", bool_label);
-                fmt_rel = "fmt_string_no_nl";
+                fmt_rel = "fmt_string";
                 break;
             default:
                 DEBUG_ERROR("Unsupported type in interpolation");
@@ -834,16 +847,11 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
         char *part_str = my_strndup(start, len);
         int part_label = code_gen_add_string_literal(gen, part_str);
         free(part_str);
-        fprintf(gen->output, "    lea rdi, [rel fmt_string_no_nl]\n");
+        fprintf(gen->output, "    lea rdi, [rel fmt_string]\n");
         fprintf(gen->output, "    lea rsi, [rel str_%d]\n", part_label);
         fprintf(gen->output, "    xor rax, rax\n");
         fprintf(gen->output, "    call printf wrt ..plt\n");
     }
-
-    // Final newline for the entire print
-    fprintf(gen->output, "    lea rdi, [rel fmt_newline]\n");
-    fprintf(gen->output, "    xor rax, rax\n");
-    fprintf(gen->output, "    call printf wrt ..plt\n");
 }
 
 void code_gen_call_expression(CodeGen *gen, Expr *expr)
@@ -929,7 +937,7 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
                 fprintf(gen->output, ".bool_false_%d:\n", bool_label);
                 fprintf(gen->output, "    lea rsi, [rel false_str_nl]\n");
                 fprintf(gen->output, ".bool_end_%d:\n", bool_label);
-                fmt_rel = "fmt_string_no_nl";
+                fmt_rel = "fmt_string";
                 break;
             default:
                 DEBUG_ERROR("Unsupported type for print");

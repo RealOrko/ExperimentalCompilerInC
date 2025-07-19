@@ -30,5 +30,14 @@ log/run-output.log:
 ${RUN_OUTPUT}
 
 QUESTION:
-Assuming main.sn is syntactically correct, how do we fix the compiler code?
-The compiler also goes into an infinite loop.
+The program executes succesfully with the following output: 
+
+Factorial of 5 is 120
+7 is prime\n\nSum 1 to 10: 55
+Pi approx: 3.141590
+Char: A
+Flag: true
+
+
+Can we improve the print function to give better output? 
+We should not have \n in output.
