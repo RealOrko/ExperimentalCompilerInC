@@ -13,5 +13,5 @@ mkdir -p log/
 # Build the compiler
 pushd compiler/
 make clean
-make &> ../log/compiler-build-output.log
+make &> ../log/build-output.log
 popd

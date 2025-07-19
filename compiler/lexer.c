@@ -692,6 +692,11 @@ Token lexer_scan_token(Lexer *lexer)
         DEBUG_VERBOSE("Line %d: Emitting STAR", lexer->line);
         return lexer_make_token(lexer, TOKEN_STAR);
     case '+':
+        if (lexer_match(lexer, '+'))
+        {
+            DEBUG_VERBOSE("Line %d: Emitting PLUS_PLUS", lexer->line);
+            return lexer_make_token(lexer, TOKEN_PLUS_PLUS);
+        }
         DEBUG_VERBOSE("Line %d: Emitting PLUS", lexer->line);
         return lexer_make_token(lexer, TOKEN_PLUS);
     case '(':
@@ -704,9 +709,14 @@ Token lexer_scan_token(Lexer *lexer)
         DEBUG_VERBOSE("Line %d: Emitting COLON", lexer->line);
         return lexer_make_token(lexer, TOKEN_COLON);
     case '-':
-        if (lexer_match(lexer, '>'))
+        if (lexer_match(lexer, '-'))
         {
-            DEBUG_VERBOSE("Line %d: Emitting ARROW (for '->')", lexer->line);
+            DEBUG_VERBOSE("Line %d: Emitting MINUS_MINUS", lexer->line);
+            return lexer_make_token(lexer, TOKEN_MINUS_MINUS);
+        }
+        else if (lexer_match(lexer, '>'))
+        {
+            DEBUG_VERBOSE("Line %d: Emitting ARROW", lexer->line);
             return lexer_make_token(lexer, TOKEN_ARROW);
         }
         DEBUG_VERBOSE("Line %d: Emitting MINUS", lexer->line);
@@ -751,7 +761,7 @@ Token lexer_scan_token(Lexer *lexer)
             DEBUG_VERBOSE("Line %d: Emitting INTERPOL_STRING", lexer->line);
             return token;
         }
-        /* falls through */  // Intentional fallthrough to handle invalid '$'
+        /* falls through */ // Intentional fallthrough to handle invalid '$'
     default:
         char msg[32];
         snprintf(msg, sizeof(msg), "Unexpected character '%c'", c);
@@ -770,4 +780,3 @@ Token lexer_scan_token(Lexer *lexer)
         return lexer_make_token(lexer, TOKEN_EOF);
     }
 }
-

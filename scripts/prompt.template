@@ -9,28 +9,26 @@ Please do not suggest valgrind for debugging
 
 INPUTS:
 
-The input program is the following (./samples/hello-world/simple.sn): 
-${SAMPLES_INPUT_CODE}
+The input program is the following (./samples/hello-world/main.sn): 
+${INPUT_CODE}
 
 The makefile is the following (./compiler/Makefile):
-${COMPILER_MAKE_FILE}
+${MAKE_FILE}
 
-The main build shell script is the following (./scripts/compiler-build.sh):
-${SCRIPTS_COMPILER_BUILD_SCRIPT}
+The main build shell script is the following (./scripts/build.sh):
+${BUILD_SCRIPT}
 
-log/compiler-build-output.log:
-${LOG_COMPILER_BUILD_OUTPUT}
-
-The main run shell script is the following (./scripts/compiler-run.sh):
-${SCRIPTS_COMPILER_RUN_SCRIPT}
+The main run shell script is the following (./scripts/run.sh):
+${RUN_SCRIPT}
 
 OUTPUT:
 
-log/compiler-build-output.log:
-${LOG_COMPILER_BUILD_OUTPUT}
+log/build-output.log:
+${BUILD_OUTPUT}
 
-log/compiler-run-output.log:
-${LOG_COMPILER_RUN_OUTPUT}
+log/run-output.log:
+${RUN_OUTPUT}
 
 QUESTION:
-How do we fix the compiler runtime errors? 
+Assuming main.sn is syntactically correct, how do we fix the compiler code?
+

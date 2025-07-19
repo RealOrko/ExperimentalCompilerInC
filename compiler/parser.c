@@ -844,10 +844,8 @@ Stmt *parser_return_statement(Parser *parser)
 
 Stmt *parser_if_statement(Parser *parser)
 {
-    parser_consume(parser, TOKEN_LEFT_PAREN, "Expected '(' after 'if'");
     Expr *condition = parser_expression(parser);
-    parser_consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
-    parser_consume(parser, TOKEN_ARROW, "Expected '=>' before 'if' body");
+    parser_consume(parser, TOKEN_ARROW, "Expected '=>' after if condition");
     skip_newlines(parser);
 
     Stmt *then_branch;
@@ -877,6 +875,7 @@ Stmt *parser_if_statement(Parser *parser)
     skip_newlines(parser);
     if (parser_match(parser, TOKEN_ELSE))
     {
+        parser_consume(parser, TOKEN_ARROW, "Expected '=>' after else");
         skip_newlines(parser);
         if (parser_check(parser, TOKEN_INDENT))
         {
@@ -906,10 +905,8 @@ Stmt *parser_if_statement(Parser *parser)
 
 Stmt *parser_while_statement(Parser *parser)
 {
-    parser_consume(parser, TOKEN_LEFT_PAREN, "Expected '(' after 'while'");
     Expr *condition = parser_expression(parser);
-    parser_consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after condition");
-    parser_consume(parser, TOKEN_ARROW, "Expected '=>' before 'while' body");
+    parser_consume(parser, TOKEN_ARROW, "Expected '=>' after while condition");
     skip_newlines(parser);
 
     Stmt *body;
@@ -940,35 +937,50 @@ Stmt *parser_while_statement(Parser *parser)
 
 Stmt *parser_for_statement(Parser *parser)
 {
-    parser_consume(parser, TOKEN_LEFT_PAREN, "Expected '(' after 'for'");
-    Stmt *initializer;
-    if (parser_match(parser, TOKEN_SEMICOLON))
+    Stmt *initializer = NULL;
+    if (parser_match(parser, TOKEN_VAR))
     {
-        initializer = NULL;
+        Token name;
+        if (parser_check(parser, TOKEN_IDENTIFIER))
+        {
+            name = parser->current;
+            parser_advance(parser);
+        }
+        else
+        {
+            parser_error_at_current(parser, "Expected variable name");
+            name = parser->current;
+            parser_advance(parser);
+        }
+        parser_consume(parser, TOKEN_COLON, "Expected ':' after variable name");
+        Type *type = parser_type(parser);
+        Expr *init_expr = NULL;
+        if (parser_match(parser, TOKEN_EQUAL))
+        {
+            init_expr = parser_expression(parser);
+        }
+        initializer = ast_create_var_decl_stmt(name, type, init_expr);
     }
-    else if (parser_match(parser, TOKEN_VAR))
+    else if (!parser_check(parser, TOKEN_SEMICOLON))
     {
-        initializer = parser_var_declaration(parser);
+        Expr *init_expr = parser_expression(parser);
+        initializer = ast_create_expr_stmt(init_expr);
     }
-    else
-    {
-        initializer = parser_expression_statement(parser);
-    }
+    parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after initializer");
 
     Expr *condition = NULL;
     if (!parser_check(parser, TOKEN_SEMICOLON))
     {
         condition = parser_expression(parser);
     }
-    parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after loop condition");
+    parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after condition");
 
     Expr *increment = NULL;
-    if (!parser_check(parser, TOKEN_RIGHT_PAREN))
+    if (!parser_check(parser, TOKEN_ARROW))
     {
         increment = parser_expression(parser);
     }
-    parser_consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after for clauses");
-    parser_consume(parser, TOKEN_ARROW, "Expected '=>' before 'for' body");
+    parser_consume(parser, TOKEN_ARROW, "Expected '=>' after for clauses");
     skip_newlines(parser);
 
     Stmt *body;

@@ -1,61 +1,47 @@
-// Function to calculate factorial 
-fn factorial(n:int):int =>
-  var result:int = 1;
-  
-  if (n <= 1) =>
-    return 1;
-  else
-    var i:int = 2;
-    while (i <= n) =>
-      result = result * i;
-      i = i + 1;
+fn factorial(n: int): int =>
+  if n <= 1 =>
+    return 1
+  return n * factorial(n - 1)
 
-  return result;
+fn is_prime(num: int): bool =>
+  if num <= 1 =>
+    return false
+  var i: int = 2
+  while i * i <= num =>
+    if num % i == 0 =>
+      return false
+    i = i + 1
+  return true
 
-// Function to check if a number is prime
-fn is_prime(num:int):bool =>
-  if (num <= 1) =>
-    return false;
-  
-  var i:int = 2;
-  while (i * i <= num) =>
-    if (num % i == 0) =>
-      return false;
-    i = i + 1;
-  
-  return true;
+fn repeat_string(text: str, count: int): str =>
+  var result: str = ""
+  for var j: int = 0; j < count; j++ =>
+    result = result + text
+  return result
 
-// String processing function
-fn repeat_string(text:str, count:int):void =>
-  var i:int = 0;
-  while (i < count) =>
-    print(text);
-    i = i + 1;
+fn main(): void =>
+  var num: int = 5
+  var fact: int = factorial(num)
+  print($"Factorial of {num} is {fact}")
 
-// Main function with variable types and operations
-fn main():void =>
-  print("SN Language Complex Test");
-  
-  // Test factorial function
-  var num:int = 5;
-  var fact:int = factorial(num);
-  print("Factorial of ");
-  print("5");
-  print(" is ");
-  
-  // Convert int to string for printing (using primitive conversion)
-  if (fact == 120) =>
-    print("120 (correct)");
-  else
-    print("incorrect!");
-  
-  // Test prime checker
-  var i:int = 1;
-  while (i <= 10) =>
-    if (is_prime(i)) =>
-      print("Prime: ");
-      print("i");  // Should be the values: 2, 3, 5, 7
-    i = i + 1;
-  
-  // Test string operations
-  repeat_string("Hello, SN! ", 3);
+  if is_prime(7) =>
+    print("7 is prime")
+  else =>
+    print("7 is not prime")
+
+  var repeated: str = repeat_string("hello ", 3)
+  print(repeated + "world!")
+
+  var sum: int = 0
+  for var k: int = 1; k <= 10; k++ =>
+    sum = sum + k
+  print($"Sum 1 to 10: {sum}")
+
+  var pi_approx: double = 3.14159
+  print($"Pi approx: {pi_approx}")
+
+  var ch: char = 'A'
+  print($"Char: {ch}")
+
+  var flag: bool = true
+  print($"Flag: {flag}")
