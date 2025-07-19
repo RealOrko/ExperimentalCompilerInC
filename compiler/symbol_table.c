@@ -127,7 +127,8 @@ void symbol_table_cleanup(SymbolTable *table)
     if (table == NULL)
         return;
     Scope *scope = table->current;
-    while (scope != NULL) {
+    while (scope != NULL)
+    {
         Scope *next = scope->enclosing;
         free_scope(scope);
         scope = next;
@@ -146,8 +147,8 @@ void symbol_table_push_scope(SymbolTable *table)
 
     scope->symbols = NULL;
     scope->enclosing = table->current;
-    scope->next_local_offset = LOCAL_BASE_OFFSET;
-    scope->next_param_offset = PARAM_BASE_OFFSET;
+    scope->next_local_offset = table->current ? table->current->next_local_offset : LOCAL_BASE_OFFSET;
+    scope->next_param_offset = table->current ? table->current->next_param_offset : PARAM_BASE_OFFSET;
 
     table->current = scope;
 }
@@ -286,10 +287,13 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
 
     // Smarter offset calculation (apply alignment based on type size)
     int type_size = get_type_size(type);
-    if (kind == SYMBOL_PARAM) {
-        table->current->next_param_offset += ((type_size + 7) / 8) * 8 - OFFSET_ALIGNMENT;  // Adjust for alignment
-    } else if (kind == SYMBOL_LOCAL) {
-        table->current->next_local_offset += ((type_size + 7) / 8) * 8 - OFFSET_ALIGNMENT;  // Adjust for alignment
+    if (kind == SYMBOL_PARAM)
+    {
+        table->current->next_param_offset += ((type_size + 7) / 8) * 8 - OFFSET_ALIGNMENT; // Adjust for alignment
+    }
+    else if (kind == SYMBOL_LOCAL)
+    {
+        table->current->next_local_offset += ((type_size + 7) / 8) * 8 - OFFSET_ALIGNMENT; // Adjust for alignment
     }
 }
 

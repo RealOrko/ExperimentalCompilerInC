@@ -235,7 +235,8 @@ void code_gen_string_literal(CodeGen *gen, const char *string, int label)
 {
     fprintf(gen->output, "str_%d db ", label);
 
-    if (*string == '\0') {
+    if (*string == '\0')
+    {
         fprintf(gen->output, "0\n");
         return;
     }
@@ -1016,20 +1017,46 @@ void code_gen_array_access_expression(CodeGen *gen, ArrayAccessExpr *expr)
 
 void code_gen_increment_expression(CodeGen *gen, Expr *expr)
 {
-    // Generate the operand
-    code_gen_expression(gen, expr->as.operand);
+    if (expr->as.operand->type != EXPR_VARIABLE)
+    {
+        fprintf(gen->output, "    ; Increment on non-variable not implemented\n");
+        return;
+    }
 
-    // Increment
-    fprintf(gen->output, "    inc rax\n");
+    Token name = expr->as.operand->as.variable.name;
+    int offset = code_gen_get_var_offset(gen, name);
+    if (offset == -1)
+    {
+        fprintf(gen->output, "    ; Invalid variable for increment\n");
+        return;
+    }
+
+    fprintf(gen->output, "    mov rax, [rbp-%d]\n", offset);
+    fprintf(gen->output, "    push rax\n");
+    fprintf(gen->output, "    inc qword [rbp-%d]\n", offset);
+    fprintf(gen->output, "    pop rax\n");
 }
 
 void code_gen_decrement_expression(CodeGen *gen, Expr *expr)
 {
-    // Generate the operand
-    code_gen_expression(gen, expr->as.operand);
+    if (expr->as.operand->type != EXPR_VARIABLE)
+    {
+        fprintf(gen->output, "    ; Decrement on non-variable not implemented\n");
+        return;
+    }
 
-    // Decrement
-    fprintf(gen->output, "    dec rax\n");
+    Token name = expr->as.operand->as.variable.name;
+    int offset = code_gen_get_var_offset(gen, name);
+    if (offset == -1)
+    {
+        fprintf(gen->output, "    ; Invalid variable for decrement\n");
+        return;
+    }
+
+    fprintf(gen->output, "    mov rax, [rbp-%d]\n", offset);
+    fprintf(gen->output, "    push rax\n");
+    fprintf(gen->output, "    dec qword [rbp-%d]\n", offset);
+    fprintf(gen->output, "    pop rax\n");
 }
 
 void code_gen_expression(CodeGen *gen, Expr *expr)
