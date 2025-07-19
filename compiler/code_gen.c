@@ -235,6 +235,11 @@ void code_gen_string_literal(CodeGen *gen, const char *string, int label)
 {
     fprintf(gen->output, "str_%d db ", label);
 
+    if (*string == '\0') {
+        fprintf(gen->output, "0\n");
+        return;
+    }
+
     const unsigned char *p = (const unsigned char *)string;
     int first = 1;
 

@@ -31,4 +31,4 @@ ${RUN_OUTPUT}
 
 QUESTION:
 Assuming main.sn is syntactically correct, how do we fix the compiler code?
-
+The compiler also goes into an infinite loop.

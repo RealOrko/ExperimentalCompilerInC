@@ -250,13 +250,16 @@ Type *type_check_expr(Expr *expr, SymbolTable *table) {
         t = ast_create_primitive_type(TYPE_NIL);
         break;
     case EXPR_INCREMENT:
-    case EXPR_DECREMENT:
-        t = type_check_expr(expr->as.operand, table);
-        if (t == NULL || !is_numeric_type(t)) {
+    case EXPR_DECREMENT: {
+        Type *operand_type = type_check_expr(expr->as.operand, table);
+        t = ast_clone_type(operand_type);
+        if (operand_type == NULL || !is_numeric_type(operand_type)) {
             type_error("Increment/decrement on non-numeric type");
+            ast_free_type(t);
             t = NULL;
         }
         break;
+    }
     }
     expr->expr_type = t;
     return t;

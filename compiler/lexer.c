@@ -752,6 +752,10 @@ Token lexer_scan_token(Lexer *lexer)
         Token string_token = lexer_scan_string(lexer);
         DEBUG_VERBOSE("Line %d: Emitting STRING_LITERAL", lexer->line);
         return string_token;
+    case '\'':
+        Token char_token = lexer_scan_char(lexer);
+        DEBUG_VERBOSE("Line %d: Emitting CHAR_LITERAL", lexer->line);
+        return char_token;
     case '$':
         if (lexer_peek(lexer) == '"')
         {
@@ -763,10 +767,9 @@ Token lexer_scan_token(Lexer *lexer)
         }
         /* falls through */ // Intentional fallthrough to handle invalid '$'
     default:
-        char msg[32];
-        snprintf(msg, sizeof(msg), "Unexpected character '%c'", c);
-        DEBUG_VERBOSE("Line %d: Error - %s", lexer->line, msg);
-        return lexer_error_token(lexer, msg);
+        snprintf(error_buffer, sizeof(error_buffer), "Unexpected character '%c'", c);
+        DEBUG_VERBOSE("Line %d: Error - %s", lexer->line, error_buffer);
+        return lexer_error_token(lexer, error_buffer);
     }
 
     if (lexer_is_at_end(lexer))
