@@ -265,6 +265,7 @@ void code_gen_string_literal(CodeGen *gen, const char *string, int label)
 void code_gen_data_section(CodeGen *gen)
 {
     fprintf(gen->output, "section .data\n");
+    fprintf(gen->output, "empty_str db 0\n");
 
     // Generate string literals
     StringLiteral *current = string_literals;
@@ -322,7 +323,15 @@ void code_gen_text_section(CodeGen *gen)
     fprintf(gen->output, "    extern rt_not_bool\n");
 
     fprintf(gen->output, "    extern rt_post_inc_long\n");
-    fprintf(gen->output, "    extern rt_post_dec_long\n\n");
+    fprintf(gen->output, "    extern rt_post_dec_long\n");
+
+    // New externs for to_string and free
+    fprintf(gen->output, "    extern rt_to_string_long\n");
+    fprintf(gen->output, "    extern rt_to_string_double\n");
+    fprintf(gen->output, "    extern rt_to_string_char\n");
+    fprintf(gen->output, "    extern rt_to_string_bool\n");
+    fprintf(gen->output, "    extern rt_to_string_string\n");
+    fprintf(gen->output, "    extern free\n\n");
 }
 
 void code_gen_prologue(CodeGen *gen, const char *function_name)
@@ -877,148 +886,199 @@ void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
     fprintf(gen->output, "    mov [rbp + %d], rax\n", offset);
 }
 
-static void code_gen_interpolated_print(CodeGen *gen, const char *content)
+void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
 {
-    const char *p = content;
-    const char *start = p;
-
-    while (*p != '\0')
+    int count = expr->part_count;
+    if (count == 0)
     {
-        if (*p == '{')
+        fprintf(gen->output, "    lea rax, [rel empty_str]\n");
+        return;
+    }
+
+    if (count == 1)
+    {
+        Expr *part = expr->parts[0];
+        Type *pt = part->expr_type;
+        code_gen_expression(gen, part);
+        if (pt->kind != TYPE_STRING)
         {
-            // Generate print for previous string part
-            if (p > start)
-            {
-                int len = p - start;
-                char *part_str = my_strndup(start, len);
-                int part_label = code_gen_add_string_literal(gen, part_str);
-                free(part_str);
-                fprintf(gen->output, "    mov r15, rsp\n");
-                fprintf(gen->output, "    and r15, 15\n");
-                fprintf(gen->output, "    sub rsp, r15\n");
-                fprintf(gen->output, "    lea rdi, [rel str_%d]\n", part_label);
-                fprintf(gen->output, "    call rt_print_string\n");
-                fprintf(gen->output, "    add rsp, r15\n");
-            }
-
-            // Parse the expression inside { }
-            p++;
-            const char *expr_begin = p;
-            while (*p != '}' && *p != '\0')
-                p++;
-            if (*p == '\0')
-            {
-                DEBUG_ERROR("Unterminated { in interpolated string");
-                return;
-            }
-            int expr_length = p - expr_begin;
-            char *expr_source = my_strndup(expr_begin, expr_length);
-
-            // Set up temporary lexer and parser for the expression
-            Lexer temp_lexer;
-            lexer_init(&temp_lexer, expr_source, "interpolated expression");
-            temp_lexer.line = 0; // Placeholder line number
-
-            Parser temp_parser;
-            parser_init(&temp_parser, &temp_lexer);
-            temp_parser.had_error = 0;
-            temp_parser.panic_mode = 0;
-
-            Expr *inner_expr = parser_expression(&temp_parser);
-            if (inner_expr == NULL || temp_parser.had_error)
-            {
-                DEBUG_ERROR("Error parsing interpolated expression");
-                ast_free_expr(inner_expr);
-                free(expr_source);
-                parser_cleanup(&temp_parser);
-                return;
-            }
-
-            Type *inner_type = type_check_expr(inner_expr, gen->symbol_table);
-            if (inner_type == NULL)
-            {
-                DEBUG_ERROR("Type check failed for interpolated expression");
-                ast_free_expr(inner_expr);
-                free(expr_source);
-                parser_cleanup(&temp_parser);
-                return;
-            }
-
-            // Generate code for the expression
-            code_gen_expression(gen, inner_expr);
-
-            // Generate runtime print call based on type (no \n)
-            bool is_double = false;
-            const char *rt_func = NULL;
-            switch (inner_type->kind)
+            const char *to_str_func = NULL;
+            switch (pt->kind)
             {
             case TYPE_INT:
             case TYPE_LONG:
-                rt_func = "rt_print_long";
+            case TYPE_CHAR:
+            case TYPE_BOOL:
+                to_str_func = "rt_to_string_long";
                 break;
             case TYPE_DOUBLE:
-                rt_func = "rt_print_double";
-                is_double = true;
-                break;
-            case TYPE_CHAR:
-                rt_func = "rt_print_char";
-                break;
-            case TYPE_STRING:
-                rt_func = "rt_print_string";
-                break;
-            case TYPE_BOOL:
-                rt_func = "rt_print_bool";
+                to_str_func = "rt_to_string_double";
                 break;
             default:
-                DEBUG_ERROR("Unsupported type in interpolation");
-                ast_free_expr(inner_expr);
-                free(expr_source);
-                parser_cleanup(&temp_parser);
-                return;
+                DEBUG_ERROR("Unsupported type in single-part interpolated string");
+                exit(1);
             }
-            if (rt_func)
-            {
-                fprintf(gen->output, "    mov r15, rsp\n");
-                fprintf(gen->output, "    and r15, 15\n");
-                fprintf(gen->output, "    sub rsp, r15\n");
-                if (is_double)
-                {
-                    fprintf(gen->output, "    movq xmm0, rax\n");
-                }
-                else
-                {
-                    fprintf(gen->output, "    mov rdi, rax\n");
-                }
-                fprintf(gen->output, "    call %s\n", rt_func);
-                fprintf(gen->output, "    add rsp, r15\n");
-            }
-
-            // Cleanup
-            ast_free_expr(inner_expr);
-            free(expr_source);
-            parser_cleanup(&temp_parser);
-
-            p++; // Skip '}'
-            start = p;
+            fprintf(gen->output, "    mov rdi, rax\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call %s\n", to_str_func);
+            fprintf(gen->output, "    add rsp, r15\n");
         }
-        else
-        {
-            p++;
-        }
+        return;
     }
 
-    // Last string part
-    if (p > start)
+    // Multi-part: build with concatenation, freeing intermediates
+    // Generate first part
+    Expr *part = expr->parts[0];
+    Type *pt = part->expr_type;
+    code_gen_expression(gen, part);
+    bool current_malloced = false;
+    if (pt->kind != TYPE_STRING)
     {
-        int len = p - start;
-        char *part_str = my_strndup(start, len);
-        int part_label = code_gen_add_string_literal(gen, part_str);
-        free(part_str);
+        const char *to_str_func = NULL;
+        switch (pt->kind)
+        {
+        case TYPE_INT:
+        case TYPE_LONG:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+            to_str_func = "rt_to_string_long";
+            break;
+        case TYPE_DOUBLE:
+            to_str_func = "rt_to_string_double";
+            break;
+        default:
+            DEBUG_ERROR("Unsupported type in interpolated string");
+            exit(1);
+        }
+        fprintf(gen->output, "    mov rdi, rax\n");
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
         fprintf(gen->output, "    sub rsp, r15\n");
-        fprintf(gen->output, "    lea rdi, [rel str_%d]\n", part_label);
-        fprintf(gen->output, "    call rt_print_string\n");
+        fprintf(gen->output, "    call %s\n", to_str_func);
+        fprintf(gen->output, "    add rsp, r15\n");
+        current_malloced = true;
+    }
+    // Push first/current
+    fprintf(gen->output, "    push rax\n");
+
+    // For each subsequent part
+    for (int i = 1; i < count; i++)
+    {
+        part = expr->parts[i];
+        pt = part->expr_type;
+        code_gen_expression(gen, part);
+        bool part_malloced = false;
+        if (pt->kind != TYPE_STRING)
+        {
+            const char *to_str_func = NULL;
+            switch (pt->kind)
+            {
+            case TYPE_INT:
+            case TYPE_LONG:
+            case TYPE_CHAR:
+            case TYPE_BOOL:
+                to_str_func = "rt_to_string_long";
+                break;
+            case TYPE_DOUBLE:
+                to_str_func = "rt_to_string_double";
+                break;
+            default:
+                DEBUG_ERROR("Unsupported type in interpolated string");
+                exit(1);
+            }
+            fprintf(gen->output, "    mov rdi, rax\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call %s\n", to_str_func);
+            fprintf(gen->output, "    add rsp, r15\n");
+            part_malloced = true;
+        }
+        // Push part str
+        fprintf(gen->output, "    push rax\n");
+
+        // Concat: rdi = old current (rsp+8), rsi = part (rsp)
+        fprintf(gen->output, "    mov rsi, [rsp]\n");
+        fprintf(gen->output, "    mov rdi, [rsp + 8]\n");
+        fprintf(gen->output, "    mov r15, rsp\n");
+        fprintf(gen->output, "    and r15, 15\n");
+        fprintf(gen->output, "    sub rsp, r15\n");
+        fprintf(gen->output, "    call rt_str_concat\n");
+        fprintf(gen->output, "    add rsp, r15\n");
+
+        // Pop and free part if malloced
+        fprintf(gen->output, "    pop rdi\n");
+        if (part_malloced)
+        {
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call free\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        }
+
+        // Pop and free old current if malloced
+        fprintf(gen->output, "    pop rdi\n");
+        if (current_malloced)
+        {
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call free\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        }
+
+        // Push new current
+        fprintf(gen->output, "    push rax\n");
+        current_malloced = true; // Concat always mallocs new string
+    }
+
+    // Pop final string to rax (leave unfreed)
+    fprintf(gen->output, "    pop rax\n");
+}
+
+static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr)
+{
+    for (int i = 0; i < expr->part_count; i++)
+    {
+        Expr *part = expr->parts[i];
+        Type *pt = part->expr_type;
+        code_gen_expression(gen, part);
+        const char *rt_func = NULL;
+        bool is_double = false;
+        switch (pt->kind)
+        {
+        case TYPE_STRING:
+            rt_func = "rt_print_string";
+            break;
+        case TYPE_INT:
+        case TYPE_LONG:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+            rt_func = "rt_print_long";
+            break;
+        case TYPE_DOUBLE:
+            rt_func = "rt_print_double";
+            is_double = true;
+            break;
+        default:
+            DEBUG_ERROR("Unsupported type in interpolated print");
+            exit(1);
+        }
+        fprintf(gen->output, "    mov r15, rsp\n");
+        fprintf(gen->output, "    and r15, 15\n");
+        fprintf(gen->output, "    sub rsp, r15\n");
+        if (is_double)
+        {
+            fprintf(gen->output, "    movq xmm0, rax\n");
+        }
+        else
+        {
+            fprintf(gen->output, "    mov rdi, rax\n");
+        }
+        fprintf(gen->output, "    call %s\n", rt_func);
         fprintf(gen->output, "    add rsp, r15\n");
     }
 }
@@ -1063,9 +1123,9 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
     if (strcmp(function_name, "print") == 0 && call->arg_count == 1)
     {
         Expr *arg = call->arguments[0];
-        if (arg->type == EXPR_LITERAL && arg->as.literal.type->kind == TYPE_STRING && arg->as.literal.is_interpolated)
+        if (arg->type == EXPR_INTERPOLATED)
         {
-            code_gen_interpolated_print(gen, arg->as.literal.value.string_value);
+            code_gen_interpolated_print(gen, &arg->as.interpol);
             free((void *)function_name);
             return;
         }
@@ -1300,6 +1360,10 @@ void code_gen_expression(CodeGen *gen, Expr *expr)
     case EXPR_DECREMENT:
         DEBUG_VERBOSE("Decrement expression");
         code_gen_decrement_expression(gen, expr);
+        break;
+    case EXPR_INTERPOLATED:
+        DEBUG_VERBOSE("Interpolated string expression");
+        code_gen_interpolated_expression(gen, &expr->as.interpol);
         break;
     }
 

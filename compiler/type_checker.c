@@ -105,85 +105,25 @@ static Type *type_check_unary(Expr *expr, SymbolTable *table)
     return NULL;
 }
 
-static Type *type_check_literal_interpolated(Expr *expr, SymbolTable *table)
+static Type *type_check_interpolated(Expr *expr, SymbolTable *table)
 {
-    const char *content = expr->as.literal.value.string_value;
-    if (content == NULL)
+    for (int i = 0; i < expr->as.interpol.part_count; i++)
     {
-        type_error("Null interpolated string");
-        return NULL;
-    }
-    const char *p = content;
-    while (*p)
-    {
-        if (*p == '{')
+        Type *part_type = type_check_expr(expr->as.interpol.parts[i], table);
+        if (part_type == NULL)
+            return NULL;
+        if (!is_printable_type(part_type))
         {
-            p++;
-            const char *start = p;
-            while (*p && *p != '}')
-                p++;
-            if (!*p)
-            {
-                type_error("Unterminated { in interpolated string");
-                return NULL;
-            }
-            int len = p - start;
-            char *src = malloc(len + 1);
-            if (!src)
-            {
-                DEBUG_ERROR("Out of memory");
-                exit(1);
-            }
-            strncpy(src, start, len);
-            src[len] = '\0';
-
-            Lexer lexer;
-            lexer_init(&lexer, src, "interpolated expr");
-            Parser parser;
-            parser_init(&parser, &lexer);
-            parser.symbol_table = table;
-            Expr *inner = parser_expression(&parser);
-            if (inner == NULL || parser.had_error)
-            {
-                type_error("Error parsing interpolated expression");
-                free(src);
-                ast_free_expr(inner);
-                return NULL;
-            }
-            Type *inner_type = type_check_expr(inner, table);
-            if (inner_type == NULL)
-            {
-                type_error("Type error in interpolated expression");
-                free(src);
-                ast_free_expr(inner);
-                return NULL;
-            }
-            // Interpolated exprs must be printable (since concatenated to string)
-            if (!is_printable_type(inner_type))
-            {
-                type_error("Non-printable type in interpolated string");
-                free(src);
-                ast_free_expr(inner);
-                return NULL;
-            }
-            ast_free_expr(inner);
-            free(src);
-            p++; // Skip '}'
-        }
-        else
-        {
-            p++;
+            type_error("Non-printable type in interpolated string");
+            return NULL;
         }
     }
-    return ast_clone_type(expr->as.literal.type);
+    return ast_create_primitive_type(TYPE_STRING);
 }
 
 static Type *type_check_literal(Expr *expr, SymbolTable *table)
 {
-    if (expr->as.literal.is_interpolated)
-    {
-        return type_check_literal_interpolated(expr, table);
-    }
+    (void)table; // Unused
     return ast_clone_type(expr->as.literal.type);
 }
 
@@ -326,6 +266,9 @@ Type *type_check_expr(Expr *expr, SymbolTable *table)
         }
         break;
     }
+    case EXPR_INTERPOLATED:
+        t = type_check_interpolated(expr, table);
+        break;
     }
     expr->expr_type = t;
     return t;
@@ -363,8 +306,6 @@ static void type_check_function(Stmt *stmt, SymbolTable *table)
         symbol_table_add_symbol_with_kind(table, stmt->as.function.params[i].name,
                                           stmt->as.function.params[i].type, SYMBOL_PARAM);
     }
-    // Optionally set local offset after params for consistency (though unused in type checking)
-    table->current->next_local_offset = table->current->next_param_offset;
     for (int i = 0; i < stmt->as.function.body_count; i++)
     {
         type_check_stmt(stmt->as.function.body[i], table, stmt->as.function.return_type);

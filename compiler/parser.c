@@ -500,13 +500,6 @@ Expr *parser_primary(Parser *parser)
         DEBUG_VERBOSE("Parsed string literal: %s", value.string_value);
         return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_STRING), false);
     }
-    if (parser_match(parser, TOKEN_INTERPOL_STRING))
-    {
-        LiteralValue value;
-        value.string_value = parser->previous.literal.string_value;
-        DEBUG_VERBOSE("Parsed interpolated string literal: %s", value.string_value);
-        return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_STRING), true);
-    }
     if (parser_match(parser, TOKEN_BOOL_LITERAL))
     {
         LiteralValue value;
@@ -531,6 +524,124 @@ Expr *parser_primary(Parser *parser)
         Expr *expr = parser_expression(parser);
         parser_consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
         return expr;
+    }
+    if (parser_match(parser, TOKEN_INTERPOL_STRING))
+    {
+        char *content = parser->previous.literal.string_value;
+        DEBUG_VERBOSE("Parsing interpolated string: %s", content);
+
+        Expr **parts = NULL;
+        int capacity = 0;
+        int count = 0;
+
+        const char *p = content;
+        const char *segment_start = p;
+
+        while (*p)
+        {
+            if (*p == '{')
+            {
+                // Add previous string segment if any
+                if (p > segment_start)
+                {
+                    int len = p - segment_start;
+                    char *seg = malloc(len + 1);
+                    strncpy(seg, segment_start, len);
+                    seg[len] = '\0';
+                    LiteralValue v;
+                    v.string_value = seg;
+                    Expr *seg_expr = ast_create_literal_expr(v, ast_create_primitive_type(TYPE_STRING), false);
+
+                    if (count >= capacity)
+                    {
+                        capacity = capacity == 0 ? 8 : capacity * 2;
+                        parts = realloc(parts, sizeof(Expr *) * capacity);
+                    }
+                    parts[count++] = seg_expr;
+                }
+
+                p++; // Skip '{'
+                const char *expr_start = p;
+                while (*p && *p != '}')
+                    p++;
+                if (!*p)
+                {
+                    parser_error_at_current(parser, "Unterminated interpolated expression");
+                    // Cleanup partial parts
+                    for (int j = 0; j < count; j++)
+                        ast_free_expr(parts[j]);
+                    free(parts);
+                    free(content);
+                    return ast_create_literal_expr((LiteralValue){0}, ast_create_primitive_type(TYPE_STRING), false);
+                }
+                int expr_len = p - expr_start;
+                char *expr_src = malloc(expr_len + 1);
+                strncpy(expr_src, expr_start, expr_len);
+                expr_src[expr_len] = '\0';
+
+                // Sub-parser for the expression
+                Lexer sub_lexer;
+                lexer_init(&sub_lexer, expr_src, "interpolated");
+                Parser sub_parser;
+                parser_init(&sub_parser, &sub_lexer);
+                sub_parser.symbol_table = parser->symbol_table; // Share symbol table
+
+                Expr *inner = parser_expression(&sub_parser);
+                if (inner == NULL || sub_parser.had_error)
+                {
+                    parser_error_at_current(parser, "Invalid expression in interpolation");
+                    ast_free_expr(inner);
+                    free(expr_src);
+                    parser_cleanup(&sub_parser);
+                    // Cleanup partial parts
+                    for (int j = 0; j < count; j++)
+                        ast_free_expr(parts[j]);
+                    free(parts);
+                    free(content);
+                    return ast_create_literal_expr((LiteralValue){0}, ast_create_primitive_type(TYPE_STRING), false);
+                }
+
+                if (count >= capacity)
+                {
+                    capacity = capacity == 0 ? 8 : capacity * 2;
+                    parts = realloc(parts, sizeof(Expr *) * capacity);
+                }
+                parts[count++] = inner;
+
+                free(expr_src); // Source freed after parsing
+                parser_cleanup(&sub_parser);
+
+                p++; // Skip '}'
+                segment_start = p;
+            }
+            else
+            {
+                p++;
+            }
+        }
+
+        // Add final string segment if any
+        if (p > segment_start)
+        {
+            int len = p - segment_start;
+            char *seg = malloc(len + 1);
+            strncpy(seg, segment_start, len);
+            seg[len] = '\0';
+            LiteralValue v;
+            v.string_value = seg;
+            Expr *seg_expr = ast_create_literal_expr(v, ast_create_primitive_type(TYPE_STRING), false);
+
+            if (count >= capacity)
+            {
+                capacity = capacity == 0 ? 8 : capacity * 2;
+                parts = realloc(parts, sizeof(Expr *) * capacity);
+            }
+            parts[count++] = seg_expr;
+        }
+
+        free(content); // Free original content after parsing
+
+        return ast_create_interpolated_expr(parts, count);
     }
 
     parser_error_at_current(parser, "Expected expression");

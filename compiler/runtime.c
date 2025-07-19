@@ -45,6 +45,36 @@ char *rt_str_concat(const char *left, const char *right)
     return new_str;
 }
 
+char *rt_to_string_long(long val)
+{
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%ld", val);
+    return strdup(buf);
+}
+
+char *rt_to_string_double(double val)
+{
+    char buf[64];
+    snprintf(buf, sizeof(buf), "%.5f", val);
+    return strdup(buf);
+}
+
+char *rt_to_string_char(char val)
+{
+    char buf[2] = {val, '\0'};
+    return strdup(buf);
+}
+
+char *rt_to_string_bool(int val)
+{
+    return strdup(val ? "true" : "false");
+}
+
+char *rt_to_string_string(const char *val)
+{
+    return strdup(val);
+}
+
 void rt_print_long(long val)
 {
     // No specific checks needed for long, as printf handles all values

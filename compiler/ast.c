@@ -218,6 +218,14 @@ void ast_print_expr(Expr *expr, int indent_level)
         DEBUG_VERBOSE_INDENT(indent_level, "Decrement:");
         ast_print_expr(expr->as.operand, indent_level + 1);
         break;
+
+    case EXPR_INTERPOLATED:
+        DEBUG_VERBOSE_INDENT(indent_level, "Interpolated String:");
+        for (int i = 0; i < expr->as.interpol.part_count; i++)
+        {
+            ast_print_expr(expr->as.interpol.parts[i], indent_level + 1);
+        }
+        break;
     }
 }
 
@@ -711,6 +719,21 @@ Expr *ast_create_decrement_expr(Expr *operand)
     return expr;
 }
 
+Expr *ast_create_interpolated_expr(Expr **parts, int part_count)
+{
+    Expr *expr = malloc(sizeof(Expr));
+    if (expr == NULL)
+    {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
+    expr->type = EXPR_INTERPOLATED;
+    expr->as.interpol.parts = parts;
+    expr->as.interpol.part_count = part_count;
+    expr->expr_type = ast_create_primitive_type(TYPE_STRING);
+    return expr;
+}
+
 void ast_free_expr(Expr *expr)
 {
     if (expr == NULL)
@@ -822,6 +845,22 @@ void ast_free_expr(Expr *expr)
         {
             ast_free_expr(expr->as.operand);
             expr->as.operand = NULL;
+        }
+        break;
+
+    case EXPR_INTERPOLATED:
+        if (expr->as.interpol.parts != NULL)
+        {
+            for (int i = 0; i < expr->as.interpol.part_count; i++)
+            {
+                if (expr->as.interpol.parts[i] != NULL)
+                {
+                    ast_free_expr(expr->as.interpol.parts[i]);
+                    expr->as.interpol.parts[i] = NULL;
+                }
+            }
+            free(expr->as.interpol.parts);
+            expr->as.interpol.parts = NULL;
         }
         break;
     }
