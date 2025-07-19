@@ -10,6 +10,8 @@
 #include <stdlib.h>
 #include <string.h>
 
+static void pre_build_symbols(CodeGen *gen, Stmt *stmt);
+
 static char *my_strndup(const char *s, size_t n)
 {
     if (s == NULL)
@@ -36,16 +38,6 @@ static char *my_strdup(const char *s)
         return NULL;
     return memcpy(new_str, s, len);
 }
-
-// String table for string literals
-typedef struct StringLiteral
-{
-    const char *string;
-    int label;
-    struct StringLiteral *next;
-} StringLiteral;
-
-static StringLiteral *string_literals = NULL;
 
 // Initialize the function context stack
 void code_gen_init_function_stack(CodeGen *gen)
@@ -285,30 +277,52 @@ void code_gen_data_section(CodeGen *gen)
         current = current->next;
     }
 
-    // Add format strings (with and without \n)
-    fprintf(gen->output, "fmt_int db \"%%d\", 0\n");
-    fprintf(gen->output, "fmt_long db \"%%ld\", 0\n");
-    fprintf(gen->output, "fmt_double db \"%%.5f\", 0\n"); // Limit to 5 decimals
-    fprintf(gen->output, "fmt_char db \"%%c\", 0\n");
-    fprintf(gen->output, "fmt_string db \"%%s\", 0\n");
-    fprintf(gen->output, "fmt_newline db 10, 0\n"); // Keep for manual use
-    fprintf(gen->output, "true_str db \"true\", 0\n");
-    fprintf(gen->output, "false_str db \"false\", 0\n");
     fprintf(gen->output, "\n");
 }
 
 void code_gen_text_section(CodeGen *gen)
 {
     fprintf(gen->output, "section .text\n");
-    // Only make main global
     fprintf(gen->output, "    global main\n\n");
 
-    // Add external functions
-    fprintf(gen->output, "    extern printf\n");
-    fprintf(gen->output, "    extern malloc\n");
-    fprintf(gen->output, "    extern strlen\n");
-    fprintf(gen->output, "    extern strcpy\n");
-    fprintf(gen->output, "    extern strcat\n\n");
+    // Existing externs
+    fprintf(gen->output, "    extern rt_str_concat\n");
+    fprintf(gen->output, "    extern rt_print_long\n");
+    fprintf(gen->output, "    extern rt_print_double\n");
+    fprintf(gen->output, "    extern rt_print_char\n");
+    fprintf(gen->output, "    extern rt_print_string\n");
+    fprintf(gen->output, "    extern rt_print_bool\n");
+
+    // New externs for ops
+    fprintf(gen->output, "    extern rt_add_long\n");
+    fprintf(gen->output, "    extern rt_sub_long\n");
+    fprintf(gen->output, "    extern rt_mul_long\n");
+    fprintf(gen->output, "    extern rt_div_long\n");
+    fprintf(gen->output, "    extern rt_mod_long\n");
+    fprintf(gen->output, "    extern rt_eq_long\n");
+    fprintf(gen->output, "    extern rt_ne_long\n");
+    fprintf(gen->output, "    extern rt_lt_long\n");
+    fprintf(gen->output, "    extern rt_le_long\n");
+    fprintf(gen->output, "    extern rt_gt_long\n");
+    fprintf(gen->output, "    extern rt_ge_long\n");
+
+    fprintf(gen->output, "    extern rt_add_double\n");
+    fprintf(gen->output, "    extern rt_sub_double\n");
+    fprintf(gen->output, "    extern rt_mul_double\n");
+    fprintf(gen->output, "    extern rt_div_double\n");
+    fprintf(gen->output, "    extern rt_eq_double\n");
+    fprintf(gen->output, "    extern rt_ne_double\n");
+    fprintf(gen->output, "    extern rt_lt_double\n");
+    fprintf(gen->output, "    extern rt_le_double\n");
+    fprintf(gen->output, "    extern rt_gt_double\n");
+    fprintf(gen->output, "    extern rt_ge_double\n");
+
+    fprintf(gen->output, "    extern rt_neg_long\n");
+    fprintf(gen->output, "    extern rt_neg_double\n");
+    fprintf(gen->output, "    extern rt_not_bool\n");
+
+    fprintf(gen->output, "    extern rt_post_inc_long\n");
+    fprintf(gen->output, "    extern rt_post_dec_long\n\n");
 }
 
 void code_gen_prologue(CodeGen *gen, const char *function_name)
@@ -318,10 +332,9 @@ void code_gen_prologue(CodeGen *gen, const char *function_name)
     fprintf(gen->output, "    mov rbp, rsp\n");
 
     // Dynamically calculate stack space needed
-    int stack_space = 64; // Base allocation
+    int stack_space = 72; // Base allocation (adjusted for alignment)
     if (strcmp(function_name, "main") == 0)
-        stack_space = 128; // More space for main function
-
+        stack_space = 136; // More space for main function (adjusted)
     fprintf(gen->output, "    sub rsp, %d\n", stack_space);
 }
 
@@ -376,89 +389,260 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
     // Save right ptr in rcx
     fprintf(gen->output, "    mov rcx, rax\n");
 
-    // Perform the operation
-    switch (expr->operator)
-    {
+    Type *left_type = expr->left->expr_type;
+    if (left_type == NULL) { DEBUG_ERROR("No type"); exit(1); } // Add check
+
+    switch (expr->operator) {
     case TOKEN_PLUS:
-        // Check if both operands are strings for concatenation
-        if (expr->left->expr_type && expr->right->expr_type &&
-            expr->left->expr_type->kind == TYPE_STRING &&
-            expr->right->expr_type->kind == TYPE_STRING)
-        {
-            // String concatenation: malloc(len_left + len_right + 1), strcpy left, strcat right
-            fprintf(gen->output, "    mov rdi, rbx\n");          // rdi = left ptr
-            fprintf(gen->output, "    call strlen wrt ..plt\n"); // rax = len_left
-            fprintf(gen->output, "    mov r12, rax\n");          // save len_left in r12
-            fprintf(gen->output, "    mov rdi, rcx\n");          // rdi = right ptr
-            fprintf(gen->output, "    call strlen wrt ..plt\n"); // rax = len_right
-            fprintf(gen->output, "    add rax, r12\n");          // rax = total len
-            fprintf(gen->output, "    inc rax\n");               // +1 for null
-            fprintf(gen->output, "    mov rdi, rax\n");          // rdi = size
-            fprintf(gen->output, "    call malloc wrt ..plt\n"); // rax = new ptr
-            fprintf(gen->output, "    mov rdi, rax\n");          // rdi = new ptr (for strcpy)
-            fprintf(gen->output, "    mov rsi, rbx\n");          // rsi = left ptr
-            fprintf(gen->output, "    call strcpy wrt ..plt\n"); // copy left
-            fprintf(gen->output, "    mov rdi, rax\n");          // rdi = new ptr (strcpy returns dest)
-            fprintf(gen->output, "    mov rsi, rcx\n");          // rsi = right ptr
-            fprintf(gen->output, "    call strcat wrt ..plt\n"); // append right (strcat returns dest)
-            // rax remains the new ptr
-            break;
-        }
-        else
-        {
-            fprintf(gen->output, "    add rax, rcx\n");
-            break;
+        if (left_type->kind == TYPE_STRING) {
+            fprintf(gen->output, "    mov rdi, rbx\n");  // left ptr as first arg
+            fprintf(gen->output, "    mov rsi, rcx\n");  // right ptr as second arg
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_str_concat\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_add_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rbx\n");
+            fprintf(gen->output, "    movq xmm1, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_add_double\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+            fprintf(gen->output, "    movq rax, xmm0\n");
+        } else {
+            DEBUG_ERROR("Unsupported + type");
+            exit(1);
         }
         break;
     case TOKEN_MINUS:
-        fprintf(gen->output, "    sub rax, rcx\n");
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_sub_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rbx\n");
+            fprintf(gen->output, "    movq xmm1, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_sub_double\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+            fprintf(gen->output, "    movq rax, xmm0\n");
+        } else {
+            DEBUG_ERROR("Unsupported - type");
+            exit(1);
+        }
         break;
     case TOKEN_STAR:
-        fprintf(gen->output, "    imul rax, rcx\n");
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_mul_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rbx\n");
+            fprintf(gen->output, "    movq xmm1, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_mul_double\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+            fprintf(gen->output, "    movq rax, xmm0\n");
+        } else {
+            DEBUG_ERROR("Unsupported * type");
+            exit(1);
+        }
         break;
     case TOKEN_SLASH:
-        fprintf(gen->output, "    xor rdx, rdx\n"); // Clear rdx for division
-        fprintf(gen->output, "    idiv rcx\n");
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_div_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rbx\n");
+            fprintf(gen->output, "    movq xmm1, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_div_double\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+            fprintf(gen->output, "    movq rax, xmm0\n");
+        } else {
+            DEBUG_ERROR("Unsupported / type");
+            exit(1);
+        }
         break;
     case TOKEN_MODULO:
-        fprintf(gen->output, "    xor rdx, rdx\n"); // Clear rdx for division
-        fprintf(gen->output, "    idiv rcx\n");
-        fprintf(gen->output, "    mov rax, rdx\n"); // Remainder is in rdx
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_mod_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else {
+            DEBUG_ERROR("Unsupported % type");
+            exit(1);
+        }
         break;
     case TOKEN_EQUAL_EQUAL:
-        fprintf(gen->output, "    cmp rax, rcx\n");
-        fprintf(gen->output, "    sete al\n");
-        fprintf(gen->output, "    movzx rax, al\n");
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL || left_type->kind == TYPE_STRING) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_eq_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rbx\n");
+            fprintf(gen->output, "    movq xmm1, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_eq_double\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else {
+            DEBUG_ERROR("Unsupported == type");
+            exit(1);
+        }
         break;
     case TOKEN_BANG_EQUAL:
-        fprintf(gen->output, "    cmp rax, rcx\n");
-        fprintf(gen->output, "    setne al\n");
-        fprintf(gen->output, "    movzx rax, al\n");
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL || left_type->kind == TYPE_STRING) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_ne_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rbx\n");
+            fprintf(gen->output, "    movq xmm1, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_ne_double\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else {
+            DEBUG_ERROR("Unsupported != type");
+            exit(1);
+        }
         break;
     case TOKEN_LESS:
-        fprintf(gen->output, "    cmp rax, rcx\n");
-        fprintf(gen->output, "    setl al\n");
-        fprintf(gen->output, "    movzx rax, al\n");
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_lt_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rbx\n");
+            fprintf(gen->output, "    movq xmm1, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_lt_double\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else {
+            DEBUG_ERROR("Unsupported < type");
+            exit(1);
+        }
         break;
     case TOKEN_LESS_EQUAL:
-        fprintf(gen->output, "    cmp rax, rcx\n");
-        fprintf(gen->output, "    setle al\n");
-        fprintf(gen->output, "    movzx rax, al\n");
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_le_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rbx\n");
+            fprintf(gen->output, "    movq xmm1, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_le_double\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else {
+            DEBUG_ERROR("Unsupported <= type");
+            exit(1);
+        }
         break;
     case TOKEN_GREATER:
-        fprintf(gen->output, "    cmp rax, rcx\n");
-        fprintf(gen->output, "    setg al\n");
-        fprintf(gen->output, "    movzx rax, al\n");
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_gt_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rbx\n");
+            fprintf(gen->output, "    movq xmm1, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_gt_double\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else {
+            DEBUG_ERROR("Unsupported > type");
+            exit(1);
+        }
         break;
     case TOKEN_GREATER_EQUAL:
-        fprintf(gen->output, "    cmp rax, rcx\n");
-        fprintf(gen->output, "    setge al\n");
-        fprintf(gen->output, "    movzx rax, al\n");
+        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL) {
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_ge_long\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else if (left_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rbx\n");
+            fprintf(gen->output, "    movq xmm1, rcx\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_ge_double\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        } else {
+            DEBUG_ERROR("Unsupported >= type");
+            exit(1);
+        }
         break;
     case TOKEN_AND:
     {
         int end_label = code_gen_new_label(gen);
-        fprintf(gen->output, "    test rax, rax\n");
+        fprintf(gen->output, "    test rbx, rbx\n");
         fprintf(gen->output, "    jz .L%d\n", end_label);
         fprintf(gen->output, "    test rcx, rcx\n");
         fprintf(gen->output, "    jz .L%d\n", end_label);
@@ -472,7 +656,7 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
     case TOKEN_OR:
     {
         int end_label = code_gen_new_label(gen);
-        fprintf(gen->output, "    test rax, rax\n");
+        fprintf(gen->output, "    test rbx, rbx\n");
         fprintf(gen->output, "    jnz .L%d\n", end_label);
         fprintf(gen->output, "    test rcx, rcx\n");
         fprintf(gen->output, "    jz .L%d_false\n", end_label);
@@ -495,16 +679,35 @@ void code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr)
     // Generate the operand
     code_gen_expression(gen, expr->operand);
 
-    // Perform the unary operation
+    Type *op_type = expr->operand->expr_type;
+    if (op_type == NULL) { DEBUG_ERROR("No type"); exit(1); } // Add check
+
     switch (expr->operator)
     {
     case TOKEN_MINUS:
-        fprintf(gen->output, "    neg rax\n");
+        fprintf(gen->output, "    mov r15, rsp\n");
+        fprintf(gen->output, "    and r15, 15\n");
+        fprintf(gen->output, "    sub rsp, r15\n");
+        if (op_type->kind == TYPE_INT || op_type->kind == TYPE_LONG || op_type->kind == TYPE_CHAR || op_type->kind == TYPE_BOOL) {
+            fprintf(gen->output, "    mov rdi, rax\n");
+            fprintf(gen->output, "    call rt_neg_long\n");
+        } else if (op_type->kind == TYPE_DOUBLE) {
+            fprintf(gen->output, "    movq xmm0, rax\n");
+            fprintf(gen->output, "    call rt_neg_double\n");
+            fprintf(gen->output, "    movq rax, xmm0\n");
+        } else {
+            DEBUG_ERROR("Unsupported - type");
+            exit(1);
+        }
+        fprintf(gen->output, "    add rsp, r15\n");
         break;
     case TOKEN_BANG:
-        fprintf(gen->output, "    test rax, rax\n");
-        fprintf(gen->output, "    setz al\n");
-        fprintf(gen->output, "    movzx rax, al\n");
+        fprintf(gen->output, "    mov r15, rsp\n");
+        fprintf(gen->output, "    and r15, 15\n");
+        fprintf(gen->output, "    sub rsp, r15\n");
+        fprintf(gen->output, "    mov rdi, rax\n");
+        fprintf(gen->output, "    call rt_not_bool\n");
+        fprintf(gen->output, "    add rsp, r15\n");
         break;
     default:
         DEBUG_ERROR("Unsupported unary operator\n");
@@ -571,77 +774,14 @@ void code_gen_variable_expression(CodeGen *gen, VariableExpr *expr)
     DEBUG_VERBOSE("Accessing variable '%s' in function '%s'",
                   var_name, gen->current_function ? gen->current_function : "global");
 
-    // If we're in the function factorial and the variable is 'n', use the hardcoded offset
-    if (gen->current_function && strcmp(gen->current_function, "factorial") == 0 &&
-        strcmp(var_name, "n") == 0)
+    int offset = code_gen_get_var_offset(gen, expr->name);
+    if (offset == -1)
     {
-        DEBUG_VERBOSE("Direct handling of parameter 'n' in factorial function");
-        fprintf(gen->output, "    mov rax, [rbp-16]\n"); // n is at offset 16
-        return;
-    }
-
-    // If we're in the function is_prime and the variable is 'num', use the hardcoded offset
-    if (gen->current_function && strcmp(gen->current_function, "is_prime") == 0 &&
-        strcmp(var_name, "num") == 0)
-    {
-        DEBUG_VERBOSE("Direct handling of parameter 'num' in is_prime function");
-        fprintf(gen->output, "    mov rax, [rbp-16]\n"); // num is at offset 16
-        return;
-    }
-
-    // If we're in the function repeat_string and the variable is 'text' or 'count', use hardcoded offsets
-    if (gen->current_function && strcmp(gen->current_function, "repeat_string") == 0)
-    {
-        if (strcmp(var_name, "text") == 0)
-        {
-            DEBUG_VERBOSE("Direct handling of parameter 'text' in repeat_string function");
-            fprintf(gen->output, "    mov rax, [rbp-16]\n"); // text is at offset 16
-            return;
-        }
-        if (strcmp(var_name, "count") == 0)
-        {
-            DEBUG_VERBOSE("Direct handling of parameter 'count' in repeat_string function");
-            fprintf(gen->output, "    mov rax, [rbp-24]\n"); // count is at offset 24
-            return;
-        }
-    }
-
-    // Try normal lookup first
-    Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, expr->name);
-
-    if (symbol == NULL)
-    {
-        DEBUG_VERBOSE("Symbol lookup failed for '%s', trying string comparison", var_name);
-
-        // Try a manual string comparison for all symbols
-        Scope *scope = gen->symbol_table->current;
-        while (scope != NULL)
-        {
-            Symbol *sym = scope->symbols;
-            while (sym != NULL)
-            {
-                char sym_name[256];
-                int sym_len = sym->name.length < 255 ? sym->name.length : 255;
-                strncpy(sym_name, sym->name.start, sym_len);
-                sym_name[sym_len] = '\0';
-
-                if (strcmp(sym_name, var_name) == 0)
-                {
-                    DEBUG_VERBOSE("Manual match found for '%s' with offset %d\n",
-                                  var_name, sym->offset);
-                    fprintf(gen->output, "    mov rax, [rbp-%d]\n", sym->offset);
-                    return;
-                }
-                sym = sym->next;
-            }
-            scope = scope->enclosing;
-        }
-
         DEBUG_ERROR("Undefined variable '%s'", var_name);
         exit(1);
     }
 
-    fprintf(gen->output, "    mov rax, [rbp-%d]\n", symbol->offset);
+    fprintf(gen->output, "    mov rax, [rbp + %d]\n", offset);
 }
 
 void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
@@ -658,51 +798,14 @@ void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
     // Evaluate the value
     code_gen_expression(gen, expr->value);
 
-    // Attempt direct lookup
-    Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, expr->name);
-
-    if (symbol == NULL)
+    int offset = code_gen_get_var_offset(gen, expr->name);
+    if (offset == -1)
     {
-        DEBUG_VERBOSE("Symbol lookup failed for '%s', trying string comparison", var_name);
-
-        // Try a manual string comparison for parameters
-        // This is needed because parameters might have been created with different token instances
-        if (gen->current_function)
-        {
-            // Check all symbols in the current scope first
-            Scope *scope = gen->symbol_table->current;
-            Symbol *sym = scope->symbols;
-            while (sym != NULL)
-            {
-                char sym_name[256];
-                int sym_len = sym->name.length < 255 ? sym->name.length : 255;
-                strncpy(sym_name, sym->name.start, sym_len);
-                sym_name[sym_len] = '\0';
-
-                DEBUG_VERBOSE("Comparing '%s' with symbol '%s'", var_name, sym_name);
-
-                if (strcmp(sym_name, var_name) == 0)
-                {
-                    DEBUG_VERBOSE("Manual match found for '%s' with offset %d",
-                                  var_name, sym->offset);
-
-                    // Store the computed value in the variable
-                    fprintf(gen->output, "    mov [rbp-%d], rax\n", sym->offset);
-                    return;
-                }
-                sym = sym->next;
-            }
-        }
-
         DEBUG_ERROR("Undefined variable '%s'", var_name);
         exit(1);
     }
 
-    // If we got here, we found the symbol
-    DEBUG_VERBOSE("Found symbol '%s' with offset %d", var_name, symbol->offset);
-
-    // Store the computed value in the variable
-    fprintf(gen->output, "    mov [rbp-%d], rax\n", symbol->offset);
+    fprintf(gen->output, "    mov [rbp + %d], rax\n", offset);
 }
 
 static void code_gen_interpolated_print(CodeGen *gen, const char *content)
@@ -714,17 +817,19 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
     {
         if (*p == '{')
         {
-            // Generate printf for previous string part
+            // Generate print for previous string part
             if (p > start)
             {
                 int len = p - start;
                 char *part_str = my_strndup(start, len);
                 int part_label = code_gen_add_string_literal(gen, part_str);
                 free(part_str);
-                fprintf(gen->output, "    lea rdi, [rel fmt_string]\n");
-                fprintf(gen->output, "    lea rsi, [rel str_%d]\n", part_label);
-                fprintf(gen->output, "    xor rax, rax\n");
-                fprintf(gen->output, "    call printf wrt ..plt\n");
+                fprintf(gen->output, "    mov r15, rsp\n");
+                fprintf(gen->output, "    and r15, 15\n");
+                fprintf(gen->output, "    sub rsp, r15\n");
+                fprintf(gen->output, "    lea rdi, [rel str_%d]\n", part_label);
+                fprintf(gen->output, "    call rt_print_string\n");
+                fprintf(gen->output, "    add rsp, r15\n");
             }
 
             // Parse the expression inside { }
@@ -773,40 +878,27 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
             // Generate code for the expression
             code_gen_expression(gen, inner_expr);
 
-            // Generate printf based on type (no \n)
-            const char *fmt_rel = NULL;
-            const char *move_reg = "rsi";
-            bool is_fp = false;
+            // Generate runtime print call based on type (no \n)
+            bool is_double = false;
+            const char *rt_func = NULL;
             switch (inner_type->kind)
             {
             case TYPE_INT:
             case TYPE_LONG:
-                fmt_rel = "fmt_long";
-                move_reg = "rsi";
+                rt_func = "rt_print_long";
                 break;
             case TYPE_DOUBLE:
-                fmt_rel = "fmt_double";
-                fprintf(gen->output, "    movq xmm0, rax\n");
-                is_fp = true;
+                rt_func = "rt_print_double";
+                is_double = true;
                 break;
             case TYPE_CHAR:
-                fmt_rel = "fmt_char";
-                move_reg = "rsi";
+                rt_func = "rt_print_char";
                 break;
             case TYPE_STRING:
-                fmt_rel = "fmt_string";
-                move_reg = "rsi";
+                rt_func = "rt_print_string";
                 break;
             case TYPE_BOOL:
-                int bool_label = code_gen_new_label(gen);
-                fprintf(gen->output, "    test rax, rax\n");
-                fprintf(gen->output, "    jz .bool_false_%d\n", bool_label);
-                fprintf(gen->output, "    lea rsi, [rel true_str]\n");
-                fprintf(gen->output, "    jmp .bool_end_%d\n", bool_label);
-                fprintf(gen->output, ".bool_false_%d:\n", bool_label);
-                fprintf(gen->output, "    lea rsi, [rel false_str]\n");
-                fprintf(gen->output, ".bool_end_%d:\n", bool_label);
-                fmt_rel = "fmt_string";
+                rt_func = "rt_print_bool";
                 break;
             default:
                 DEBUG_ERROR("Unsupported type in interpolation");
@@ -815,15 +907,21 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
                 parser_cleanup(&temp_parser);
                 return;
             }
-            if (fmt_rel)
+            if (rt_func)
             {
-                fprintf(gen->output, "    lea rdi, [rel %s]\n", fmt_rel);
-                if (!is_fp && strcmp(move_reg, "rsi") == 0 && inner_type->kind != TYPE_BOOL)
+                fprintf(gen->output, "    mov r15, rsp\n");
+                fprintf(gen->output, "    and r15, 15\n");
+                fprintf(gen->output, "    sub rsp, r15\n");
+                if (is_double)
                 {
-                    fprintf(gen->output, "    mov %s, rax\n", move_reg);
+                    fprintf(gen->output, "    movq xmm0, rax\n");
                 }
-                fprintf(gen->output, "    mov rax, %d\n", is_fp ? 1 : 0);
-                fprintf(gen->output, "    call printf wrt ..plt\n");
+                else
+                {
+                    fprintf(gen->output, "    mov rdi, rax\n");
+                }
+                fprintf(gen->output, "    call %s\n", rt_func);
+                fprintf(gen->output, "    add rsp, r15\n");
             }
 
             // Cleanup
@@ -847,10 +945,12 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
         char *part_str = my_strndup(start, len);
         int part_label = code_gen_add_string_literal(gen, part_str);
         free(part_str);
-        fprintf(gen->output, "    lea rdi, [rel fmt_string]\n");
-        fprintf(gen->output, "    lea rsi, [rel str_%d]\n", part_label);
-        fprintf(gen->output, "    xor rax, rax\n");
-        fprintf(gen->output, "    call printf wrt ..plt\n");
+        fprintf(gen->output, "    mov r15, rsp\n");
+        fprintf(gen->output, "    and r15, 15\n");
+        fprintf(gen->output, "    sub rsp, r15\n");
+        fprintf(gen->output, "    lea rdi, [rel str_%d]\n", part_label);
+        fprintf(gen->output, "    call rt_print_string\n");
+        fprintf(gen->output, "    add rsp, r15\n");
     }
 }
 
@@ -902,56 +1002,49 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
         }
         else
         {
-            // Normal print: evaluate arg and printf based on type
+            // Normal print: evaluate arg and call runtime print based on type
             code_gen_expression(gen, arg);
             Type *arg_type = arg->expr_type;
-            const char *fmt_rel = NULL;
-            const char *move_reg = "rsi";
-            bool is_fp = false;
+            const char *rt_func = NULL;
+            bool is_double = false;
             switch (arg_type->kind)
             {
             case TYPE_INT:
             case TYPE_LONG:
-                fmt_rel = "fmt_long";
-                move_reg = "rsi";
+                rt_func = "rt_print_long";
                 break;
             case TYPE_DOUBLE:
-                fmt_rel = "fmt_double";
-                fprintf(gen->output, "    movq xmm0, rax\n");
-                is_fp = true;
+                rt_func = "rt_print_double";
+                is_double = true;
                 break;
             case TYPE_CHAR:
-                fmt_rel = "fmt_char";
-                move_reg = "rsi";
+                rt_func = "rt_print_char";
                 break;
             case TYPE_STRING:
-                fmt_rel = "fmt_string";
-                move_reg = "rsi";
+                rt_func = "rt_print_string";
                 break;
             case TYPE_BOOL:
-                int bool_label = code_gen_new_label(gen);
-                fprintf(gen->output, "    test rax, rax\n");
-                fprintf(gen->output, "    jz .bool_false_%d\n", bool_label);
-                fprintf(gen->output, "    lea rsi, [rel true_str_nl]\n");
-                fprintf(gen->output, "    jmp .bool_end_%d\n", bool_label);
-                fprintf(gen->output, ".bool_false_%d:\n", bool_label);
-                fprintf(gen->output, "    lea rsi, [rel false_str_nl]\n");
-                fprintf(gen->output, ".bool_end_%d:\n", bool_label);
-                fmt_rel = "fmt_string";
+                rt_func = "rt_print_bool";
                 break;
             default:
                 DEBUG_ERROR("Unsupported type for print");
                 break;
             }
-            if (fmt_rel)
+            if (rt_func)
             {
-                fprintf(gen->output, "    lea rdi, [rel %s]\n", fmt_rel);
-                if (!is_fp && strcmp(move_reg, "rsi") == 0 && arg_type->kind != TYPE_BOOL)
+                fprintf(gen->output, "    mov r15, rsp\n");
+                fprintf(gen->output, "    and r15, 15\n");
+                fprintf(gen->output, "    sub rsp, r15\n");
+                if (is_double)
                 {
-                    fprintf(gen->output, "    mov %s, rax\n", move_reg);
+                    fprintf(gen->output, "    movq xmm0, rax\n");
                 }
-                fprintf(gen->output, "    mov rax, %d\n", is_fp ? 1 : 0);
-                fprintf(gen->output, "    call printf wrt ..plt\n");
+                else
+                {
+                    fprintf(gen->output, "    mov rdi, rax\n");
+                }
+                fprintf(gen->output, "    call %s\n", rt_func);
+                fprintf(gen->output, "    add rsp, r15\n");
             }
             free((void *)function_name);
             return;
@@ -994,15 +1087,15 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
 
     // Ensure stack is 16-byte aligned before call (ABI requirement)
     fprintf(gen->output, "    ; Aligning stack for function call\n");
-    fprintf(gen->output, "    mov r10, rsp\n");
-    fprintf(gen->output, "    and r10, 15\n");
-    fprintf(gen->output, "    sub rsp, r10\n");
+    fprintf(gen->output, "    mov r15, rsp\n");
+    fprintf(gen->output, "    and r15, 15\n");
+    fprintf(gen->output, "    sub rsp, r15\n");
 
     // Call the function
     fprintf(gen->output, "    call %s\n", function_name);
 
     // Restore stack alignment
-    fprintf(gen->output, "    add rsp, r10\n");
+    fprintf(gen->output, "    add rsp, r15\n");
 
     free((void *)function_name);
 }
@@ -1039,10 +1132,12 @@ void code_gen_increment_expression(CodeGen *gen, Expr *expr)
         return;
     }
 
-    fprintf(gen->output, "    mov rax, [rbp-%d]\n", offset);
-    fprintf(gen->output, "    push rax\n");
-    fprintf(gen->output, "    inc qword [rbp-%d]\n", offset);
-    fprintf(gen->output, "    pop rax\n");
+    fprintf(gen->output, "    mov r15, rsp\n");
+    fprintf(gen->output, "    and r15, 15\n");
+    fprintf(gen->output, "    sub rsp, r15\n");
+    fprintf(gen->output, "    lea rdi, [rbp + %d]\n", offset);
+    fprintf(gen->output, "    call rt_post_inc_long\n");
+    fprintf(gen->output, "    add rsp, r15\n");
 }
 
 void code_gen_decrement_expression(CodeGen *gen, Expr *expr)
@@ -1061,10 +1156,12 @@ void code_gen_decrement_expression(CodeGen *gen, Expr *expr)
         return;
     }
 
-    fprintf(gen->output, "    mov rax, [rbp-%d]\n", offset);
-    fprintf(gen->output, "    push rax\n");
-    fprintf(gen->output, "    dec qword [rbp-%d]\n", offset);
-    fprintf(gen->output, "    pop rax\n");
+    fprintf(gen->output, "    mov r15, rsp\n");
+    fprintf(gen->output, "    and r15, 15\n");
+    fprintf(gen->output, "    sub rsp, r15\n");
+    fprintf(gen->output, "    lea rdi, [rbp + %d]\n", offset);
+    fprintf(gen->output, "    call rt_post_dec_long\n");
+    fprintf(gen->output, "    add rsp, r15\n");
 }
 
 void code_gen_expression(CodeGen *gen, Expr *expr)
@@ -1167,7 +1264,7 @@ void code_gen_var_declaration(CodeGen *gen, VarDeclStmt *stmt)
     int offset = code_gen_get_var_offset(gen, stmt->name);
 
     // Store it in the variable's location
-    fprintf(gen->output, "    mov [rbp-%d], rax\n", offset);
+    fprintf(gen->output, "    mov [rbp + %d], rax\n", offset);
 }
 
 void code_gen_block(CodeGen *gen, BlockStmt *stmt)
@@ -1181,16 +1278,54 @@ void code_gen_block(CodeGen *gen, BlockStmt *stmt)
     symbol_table_pop_scope(gen->symbol_table);
 }
 
+static void pre_build_symbols(CodeGen *gen, Stmt *stmt)
+{
+    if (stmt == NULL)
+        return;
+    switch (stmt->type)
+    {
+    case STMT_VAR_DECL:
+        symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->as.var_decl.name, stmt->as.var_decl.type, SYMBOL_LOCAL);
+        break;
+    case STMT_BLOCK:
+        symbol_table_push_scope(gen->symbol_table);
+        for (int i = 0; i < stmt->as.block.count; i++)
+        {
+            pre_build_symbols(gen, stmt->as.block.statements[i]);
+        }
+        symbol_table_pop_scope(gen->symbol_table);
+        break;
+    case STMT_IF:
+        pre_build_symbols(gen, stmt->as.if_stmt.then_branch);
+        if (stmt->as.if_stmt.else_branch)
+            pre_build_symbols(gen, stmt->as.if_stmt.else_branch);
+        break;
+    case STMT_WHILE:
+        pre_build_symbols(gen, stmt->as.while_stmt.body);
+        break;
+    case STMT_FOR:
+        symbol_table_push_scope(gen->symbol_table);
+        if (stmt->as.for_stmt.initializer)
+            pre_build_symbols(gen, stmt->as.for_stmt.initializer);
+        pre_build_symbols(gen, stmt->as.for_stmt.body);
+        symbol_table_pop_scope(gen->symbol_table);
+        break;
+    case STMT_EXPR:
+    case STMT_RETURN:
+    case STMT_FUNCTION:
+    case STMT_IMPORT:
+        // No locals to add
+        break;
+    }
+}
+
 void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
 {
-    DEBUG_VERBOSE("==== GENERATING FUNCTION '%.*s' ====",
-                  stmt->name.length, stmt->name.start);
+    DEBUG_VERBOSE("==== GENERATING FUNCTION '%.*s' ====", stmt->name.length, stmt->name.start);
 
-    // Save the current function context
     char *old_function = gen->current_function;
     Type *old_return_type = gen->current_return_type;
 
-    // Set up new function context
     if (stmt->name.length < 256)
     {
         gen->current_function = malloc(stmt->name.length + 1);
@@ -1199,7 +1334,6 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
             DEBUG_ERROR("Out of memory");
             exit(1);
         }
-
         strncpy(gen->current_function, stmt->name.start, stmt->name.length);
         gen->current_function[stmt->name.length] = '\0';
     }
@@ -1208,40 +1342,52 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
         DEBUG_ERROR("Function name too long");
         exit(1);
     }
-
     gen->current_return_type = stmt->return_type;
 
-    // Generate function prologue
-    code_gen_prologue(gen, gen->current_function);
+    symbol_table_push_scope(gen->symbol_table);
+    for (int i = 0; i < stmt->param_count; i++)
+    {
+        symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->params[i].name, stmt->params[i].type, SYMBOL_PARAM);
+    }
 
+    // Pre-pass to compute max stack usage
+    for (int i = 0; i < stmt->body_count; i++)
+    {
+        pre_build_symbols(gen, stmt->body[i]);
+    }
+
+    // Compute aligned stack space (locals + padding for calls/alignments/pushes)
+    int local_space = gen->symbol_table->current->next_local_offset;
+    int stack_space = local_space + 128; // Padding for calls, alignments, pushes
+    stack_space = ((stack_space + 15) / 16) * 16;
+    if (stack_space < 128)
+        stack_space = 128;
+
+    // Generate prologue with computed space
+    fprintf(gen->output, "%s:\n", gen->current_function);
+    fprintf(gen->output, "    push rbp\n");
+    fprintf(gen->output, "    mov rbp, rsp\n");
+    fprintf(gen->output, "    sub rsp, %d\n", stack_space);
+
+    // Store parameters in their stack slots
     const char *param_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
     for (int i = 0; i < stmt->param_count && i < 6; i++)
     {
-        int offset = 16 + i * 8; // rbp-16, rbp-24, etc.
-        fprintf(gen->output, "    mov [rbp-%d], %s\n", offset, param_regs[i]);
+        int offset = symbol_table_get_symbol_offset(gen->symbol_table, stmt->params[i].name);
+        fprintf(gen->output, "    mov [rbp + %d], %s\n", offset, param_regs[i]);
     }
 
-    // Create a new scope for function parameters
-    symbol_table_push_scope(gen->symbol_table);
-
-    // Add all parameters to this scope
-    for (int i = 0; i < stmt->param_count; i++)
-    {
-        symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->params[i].name,
-                                          stmt->params[i].type, SYMBOL_PARAM);
-    }
-
-    // Generate function body
+    // Generate body
     for (int i = 0; i < stmt->body_count; i++)
     {
         code_gen_statement(gen, stmt->body[i]);
     }
 
-    // Generate epilogue (special handling for main)
+    // Epilogue
     if (strcmp(gen->current_function, "main") == 0)
     {
         fprintf(gen->output, "main_return:\n");
-        fprintf(gen->output, "    mov rax, 0\n"); // Return 0 for main
+        fprintf(gen->output, "    mov rax, 0\n");
         fprintf(gen->output, "    mov rsp, rbp\n");
         fprintf(gen->output, "    pop rbp\n");
         fprintf(gen->output, "    ret\n");
@@ -1254,16 +1400,12 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
         fprintf(gen->output, "    ret\n");
     }
 
-    // Clean up
     symbol_table_pop_scope(gen->symbol_table);
-
-    // Restore old function context
     free(gen->current_function);
     gen->current_function = old_function;
     gen->current_return_type = old_return_type;
 
-    DEBUG_VERBOSE("==== COMPLETED FUNCTION '%.*s' ====",
-                  stmt->name.length, stmt->name.start);
+    DEBUG_VERBOSE("==== COMPLETED FUNCTION '%.*s' (stack space: %d) ====", stmt->name.length, stmt->name.start, stack_space);
 }
 
 void code_gen_return_statement(CodeGen *gen, ReturnStmt *stmt)

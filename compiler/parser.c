@@ -795,6 +795,9 @@ Stmt *parser_function_declaration(Parser *parser)
         symbol_table_add_symbol_with_kind(parser->symbol_table, params[i].name, params[i].type, SYMBOL_PARAM);
     }
 
+    // Set the starting local offset to follow the last parameter offset (avoids overlap).
+    parser->symbol_table->current->next_local_offset = parser->symbol_table->current->next_param_offset;
+
     parser_consume(parser, TOKEN_ARROW, "Expected '=>' before function body");
     skip_newlines(parser);
 

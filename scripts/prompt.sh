@@ -2,12 +2,31 @@
 
 set -e  # Exit on any error
 
-export INPUT_CODE=$(cat samples/hello-world/main.sn)
-export MAKE_FILE=$(cat compiler/Makefile)
-export BUILD_SCRIPT=$(cat scripts/build.sh)
-export RUN_SCRIPT=$(cat scripts/run.sh)
-export BUILD_OUTPUT=$(cat log/build-output.log)
-export RUN_OUTPUT=$(cat log/run-output.log)
-export PROMPT_TEMPLATE=$(cat scripts/prompt.template)
-
-cat scripts/prompt.template | envsubst > log/prompt.txt
+awk '
+BEGIN {
+    # Map placeholders (as they appear in the template) to their file paths
+    files["${INPUT_CODE}"] = "samples/hello-world/main.sn"
+    files["${MAKE_FILE}"] = "compiler/Makefile"
+    files["${BUILD_SCRIPT}"] = "scripts/build.sh"
+    files["${RUN_SCRIPT}"] = "scripts/run.sh"
+    files["${BUILD_OUTPUT}"] = "log/build-output.log"
+    files["${RUN_OUTPUT}"] = "log/run-output.log"
+    files["${HELLO_WORLD_OUTPUT}"] = "log/hello-world-output.log"
+}
+{
+    # Trim whitespace from the line for matching (in case of extra spaces)
+    trimmed = $0
+    gsub(/^[ \t]+|[ \t]+$/, "", trimmed)
+    
+    if (trimmed in files) {
+        # If the line matches a placeholder, read and print the file content line by line
+        while ((getline line < files[trimmed]) > 0) {
+            print line
+        }
+        close(files[trimmed])  # Close the file to avoid too many open files
+    } else {
+        # Otherwise, print the template line as-is
+        print $0
+    }
+}
+' scripts/prompt.template > log/prompt.txt

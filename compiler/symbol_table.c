@@ -9,10 +9,7 @@
 #include <string.h>
 #include <stdio.h>
 
-// x86_64 stack layout constants
-#define PARAM_BASE_OFFSET 16 // First parameter is at rbp-16
-#define LOCAL_BASE_OFFSET 8  // First local is at rbp-8
-#define OFFSET_ALIGNMENT 8   // All variables are 8-byte aligned
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 // New helper function to determine type size
 int get_type_size(Type *type)
@@ -167,8 +164,13 @@ void symbol_table_pop_scope(SymbolTable *table)
         return;
     Scope *to_free = table->current;
     table->current = to_free->enclosing;
+    if (table->current != NULL)
+    {
+        table->current->next_local_offset = MAX(table->current->next_local_offset, to_free->next_local_offset);
+        table->current->next_param_offset = MAX(table->current->next_param_offset, to_free->next_param_offset);
+    }
     free_scope(to_free);
-    DEBUG_VERBOSE("After pop, current scope symbols: %p", table->current->symbols);
+    DEBUG_VERBOSE("After pop, current scope symbols: %p", table->current ? table->current->symbols : NULL);
 }
 
 static int tokens_equal(Token a, Token b)
@@ -257,15 +259,17 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     // Determine offset based on symbol kind
     if (kind == SYMBOL_PARAM)
     {
-        // Parameters are allocated from rbp-16 down
         symbol->offset = table->current->next_param_offset;
-        table->current->next_param_offset += OFFSET_ALIGNMENT;
+        int type_size = get_type_size(type);
+        int aligned_size = ((type_size + OFFSET_ALIGNMENT - 1) / OFFSET_ALIGNMENT) * OFFSET_ALIGNMENT;
+        table->current->next_param_offset += aligned_size;
     }
     else if (kind == SYMBOL_LOCAL)
     {
-        // Local variables are allocated from rbp-8 down
-        symbol->offset = table->current->next_local_offset;
-        table->current->next_local_offset += OFFSET_ALIGNMENT;
+        symbol->offset = -table->current->next_local_offset;
+        int type_size = get_type_size(type);
+        int aligned_size = ((type_size + OFFSET_ALIGNMENT - 1) / OFFSET_ALIGNMENT) * OFFSET_ALIGNMENT;
+        table->current->next_local_offset += aligned_size;
     }
     else
     {

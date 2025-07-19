@@ -29,15 +29,28 @@ ${BUILD_OUTPUT}
 log/run-output.log:
 ${RUN_OUTPUT}
 
+log/hello-world-output.log:
+${HELLO_WORLD_OUTPUT}
+
 QUESTION:
-The program executes succesfully with the following output: 
+Can we make sure that string interpolation is dealt with as a first class citizen?
+You should prefer using runtime.c as an alternative instead of assembly code in code_gen.c. 
+Also be sure to include any changes to the lexer, parser and anything else otherwise to make
+this a coherent/production ready change. 
 
-Factorial of 5 is 120
-7 is prime\n\nSum 1 to 10: 55
-Pi approx: 3.141590
-Char: A
-Flag: true
+It should be able to deal with input code like this: 
+
+fn main():void => 
+  var y:int = 7
+  var z:str = $"The answer is {y}" 
+  print(z) // The answer is 7
+
+We should also change print to honour the approach for above: 
+
+fn main():void => 
+  var y:int = 7
+  print($"The answer is {y}") 
+
+Interpolation should be dealt with in exactly the same way for all of the upstream compiler code. 
 
 
-Can we improve the print function to give better output? 
-We should not have \n in output.

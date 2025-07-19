@@ -1,5 +1,6 @@
 {
     "files.associations": {
-        "type_checker.h": "c"
+        "type_checker.h": "c",
+        "symbol_table.h": "c"
     }
 }
