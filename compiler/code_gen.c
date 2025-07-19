@@ -10,12 +10,16 @@
 #include <stdlib.h>
 #include <string.h>
 
-static char *my_strndup(const char *s, size_t n) {
-    if (s == NULL) return NULL;
+static char *my_strndup(const char *s, size_t n)
+{
+    if (s == NULL)
+        return NULL;
     size_t len = strlen(s);
-    if (len < n) n = len;
+    if (len < n)
+        n = len;
     char *new_str = malloc(n + 1);
-    if (new_str == NULL) return NULL;
+    if (new_str == NULL)
+        return NULL;
     memcpy(new_str, s, n);
     new_str[n] = '\0';
     return new_str;
@@ -724,25 +728,26 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
 
             Parser temp_parser;
             parser_init(&temp_parser, &temp_lexer);
-            temp_parser.symbol_table = gen->symbol_table;
             temp_parser.had_error = 0;
             temp_parser.panic_mode = 0;
 
             Expr *inner_expr = parser_expression(&temp_parser);
-            if (temp_parser.had_error)
+            if (inner_expr == NULL || temp_parser.had_error)
             {
                 DEBUG_ERROR("Error parsing interpolated expression");
+                ast_free_expr(inner_expr);
                 free(expr_source);
+                parser_cleanup(&temp_parser);
                 return;
             }
 
-            // Type check the inner expression
             Type *inner_type = type_check_expr(inner_expr, gen->symbol_table);
             if (inner_type == NULL)
             {
                 DEBUG_ERROR("Type check failed for interpolated expression");
                 ast_free_expr(inner_expr);
                 free(expr_source);
+                parser_cleanup(&temp_parser);
                 return;
             }
 
@@ -786,7 +791,10 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
                 break;
             default:
                 DEBUG_ERROR("Unsupported type in interpolation");
-                break;
+                ast_free_expr(inner_expr);
+                free(expr_source);
+                parser_cleanup(&temp_parser);
+                return;
             }
             if (fmt_rel)
             {
@@ -802,6 +810,7 @@ static void code_gen_interpolated_print(CodeGen *gen, const char *content)
             // Cleanup
             ast_free_expr(inner_expr);
             free(expr_source);
+            parser_cleanup(&temp_parser);
 
             p++; // Skip '}'
             start = p;
@@ -868,20 +877,25 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
 
     fprintf(gen->output, "    ; Call to %s with %d arguments\n", function_name, call->arg_count);
 
-    if (strcmp(function_name, "print") == 0 && call->arg_count == 1) {
+    if (strcmp(function_name, "print") == 0 && call->arg_count == 1)
+    {
         Expr *arg = call->arguments[0];
-        if (arg->type == EXPR_LITERAL && arg->as.literal.type->kind == TYPE_STRING && arg->as.literal.is_interpolated) {
+        if (arg->type == EXPR_LITERAL && arg->as.literal.type->kind == TYPE_STRING && arg->as.literal.is_interpolated)
+        {
             code_gen_interpolated_print(gen, arg->as.literal.value.string_value);
             free((void *)function_name);
             return;
-        } else {
+        }
+        else
+        {
             // Normal print: evaluate arg and printf based on type
             code_gen_expression(gen, arg);
             Type *arg_type = arg->expr_type;
             const char *fmt_rel = NULL;
             const char *move_reg = "rsi";
             bool is_fp = false;
-            switch (arg_type->kind) {
+            switch (arg_type->kind)
+            {
             case TYPE_INT:
             case TYPE_LONG:
                 fmt_rel = "fmt_long";
@@ -915,9 +929,11 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
                 DEBUG_ERROR("Unsupported type for print");
                 break;
             }
-            if (fmt_rel) {
+            if (fmt_rel)
+            {
                 fprintf(gen->output, "    lea rdi, [rel %s]\n", fmt_rel);
-                if (!is_fp && strcmp(move_reg, "rsi") == 0 && arg_type->kind != TYPE_BOOL) {
+                if (!is_fp && strcmp(move_reg, "rsi") == 0 && arg_type->kind != TYPE_BOOL)
+                {
                     fprintf(gen->output, "    mov %s, rax\n", move_reg);
                 }
                 fprintf(gen->output, "    mov rax, %d\n", is_fp ? 1 : 0);

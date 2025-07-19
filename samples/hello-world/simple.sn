@@ -4,3 +4,4 @@ fn add(x:int, y:int):int =>
 fn main():void => 
   var z:int = add(6, 2) 
   print($"The answer is {z}")
+  print("Hello")

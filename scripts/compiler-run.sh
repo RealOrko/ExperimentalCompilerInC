@@ -3,7 +3,7 @@
 set -ex  # Exit on any error
 
 # Compile SN source to assembly under Valgrind
-bin/sn samples/hello-world/simple.sn -o bin/hello-world.asm -l 4 &> log/compiler-run-output.log
+bin/sn samples/hello-world/simple.sn -o bin/hello-world.asm -l 3 &> log/compiler-run-output.log
 
 # Assemble with NASM (specify elf64 format)
 nasm -f elf64 bin/hello-world.asm -o bin/hello-world.o &> log/compiler-run-nasm-output.log

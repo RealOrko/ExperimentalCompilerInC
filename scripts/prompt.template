@@ -33,4 +33,4 @@ log/compiler-run-output.log:
 ${LOG_COMPILER_RUN_OUTPUT}
 
 QUESTION:
-Can we please fix the runtime compiler errors? 
+How do we fix the compiler runtime errors? 
