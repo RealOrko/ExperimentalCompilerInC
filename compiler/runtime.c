@@ -3,6 +3,7 @@
  * Runtime helpers for the compiler, including string operations.
  */
 
+#include "standard.h"
 #include <stdlib.h>
 #include <string.h>
 #include <stdio.h> // For potential error handling
@@ -49,30 +50,30 @@ char *rt_to_string_long(long val)
 {
     char buf[32];
     snprintf(buf, sizeof(buf), "%ld", val);
-    return strdup(buf);
+    return my_strdup(buf);
 }
 
 char *rt_to_string_double(double val)
 {
     char buf[64];
     snprintf(buf, sizeof(buf), "%.5f", val);
-    return strdup(buf);
+    return my_strdup(buf);
 }
 
 char *rt_to_string_char(char val)
 {
     char buf[2] = {val, '\0'};
-    return strdup(buf);
+    return my_strdup(buf);
 }
 
 char *rt_to_string_bool(int val)
 {
-    return strdup(val ? "true" : "false");
+    return my_strdup(val ? "true" : "false");
 }
 
 char *rt_to_string_string(const char *val)
 {
-    return strdup(val);
+    return my_strdup(val);
 }
 
 void rt_print_long(long val)

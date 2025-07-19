@@ -290,6 +290,7 @@ Expr *ast_create_array_expr(Expr **elements, int element_count);
 Expr *ast_create_array_access_expr(Expr *array, Expr *index);
 Expr *ast_create_increment_expr(Expr *operand);
 Expr *ast_create_decrement_expr(Expr *operand);
+Expr *ast_create_interpolated_expr(Expr **parts, int part_count); // <-- Add this line
 Expr *ast_create_comparison_expr(Expr *left, Expr *right, TokenType comparison_type);
 void ast_free_expr(Expr *expr);
 

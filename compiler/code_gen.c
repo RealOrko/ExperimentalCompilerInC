@@ -3,6 +3,7 @@
  * Implementation of the code generator with fixes for string handling
  */
 
+#include "standard.h"
 #include "code_gen.h"
 #include "debug.h"
 #include "parser.h"       // For sub-parsing in interpolation
@@ -11,33 +12,6 @@
 #include <string.h>
 
 static void pre_build_symbols(CodeGen *gen, Stmt *stmt);
-
-static char *my_strndup(const char *s, size_t n)
-{
-    if (s == NULL)
-        return NULL;
-    size_t len = strlen(s);
-    if (len < n)
-        n = len;
-    char *new_str = malloc(n + 1);
-    if (new_str == NULL)
-        return NULL;
-    memcpy(new_str, s, n);
-    new_str[n] = '\0';
-    return new_str;
-}
-
-// Custom strdup implementation since it's not part of C99 standard
-static char *my_strdup(const char *s)
-{
-    if (s == NULL)
-        return NULL;
-    size_t len = strlen(s) + 1;
-    char *new_str = malloc(len);
-    if (new_str == NULL)
-        return NULL;
-    return memcpy(new_str, s, len);
-}
 
 // Initialize the function context stack
 void code_gen_init_function_stack(CodeGen *gen)
