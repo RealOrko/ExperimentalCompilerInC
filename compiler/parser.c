@@ -196,11 +196,13 @@ void parser_cleanup(Parser *parser)
     }
     free(parser->interp_sources);
     // Free final tokens
-    if (parser->previous.start != NULL) {
+    if (parser->previous.start != NULL)
+    {
         free((void *)parser->previous.start);
         parser->previous.start = NULL;
     }
-    if (parser->current.start != NULL) {
+    if (parser->current.start != NULL)
+    {
         free((void *)parser->current.start);
         parser->current.start = NULL;
     }
@@ -246,7 +248,8 @@ void parser_error_at(Parser *parser, Token *token, const char *message)
 void parser_advance(Parser *parser)
 {
     // Free the old previous token's start (discarded after consumption)
-    if (parser->previous.start != NULL) {
+    if (parser->previous.start != NULL)
+    {
         free((void *)parser->previous.start);
         parser->previous.start = NULL;
     }
@@ -828,12 +831,24 @@ Stmt *parser_var_declaration(Parser *parser)
     {
         name = parser->current;
         parser_advance(parser);
+        name.start = strndup(name.start, name.length);
+        if (name.start == NULL)
+        {
+            parser_error_at_current(parser, "Out of memory");
+            return NULL;
+        }
     }
     else
     {
         parser_error_at_current(parser, "Expected variable name");
         name = parser->current;
         parser_advance(parser);
+        name.start = strndup(name.start, name.length);
+        if (name.start == NULL)
+        {
+            parser_error_at_current(parser, "Out of memory");
+            return NULL;
+        }
     }
 
     parser_consume(parser, TOKEN_COLON, "Expected ':' after variable name");
@@ -852,6 +867,7 @@ Stmt *parser_var_declaration(Parser *parser)
     }
 
     DEBUG_VERBOSE("Declared variable %.*s", name.length, name.start);
+    free((void *)name.start);
     return ast_create_var_decl_stmt(name, type, initializer);
 }
 
@@ -862,12 +878,24 @@ Stmt *parser_function_declaration(Parser *parser)
     {
         name = parser->current;
         parser_advance(parser);
+        name.start = strndup(name.start, name.length);
+        if (name.start == NULL)
+        {
+            parser_error_at_current(parser, "Out of memory");
+            return NULL;
+        }
     }
     else
     {
         parser_error_at_current(parser, "Expected function name");
         name = parser->current;
         parser_advance(parser);
+        name.start = strndup(name.start, name.length);
+        if (name.start == NULL)
+        {
+            parser_error_at_current(parser, "Out of memory");
+            return NULL;
+        }
     }
     DEBUG_VERBOSE("Declaring function %.*s", name.length, name.start);
 
@@ -891,12 +919,24 @@ Stmt *parser_function_declaration(Parser *parser)
                 {
                     param_name = parser->current;
                     parser_advance(parser);
+                    param_name.start = strndup(param_name.start, param_name.length);
+                    if (param_name.start == NULL)
+                    {
+                        parser_error_at_current(parser, "Out of memory");
+                        return NULL;
+                    }
                 }
                 else
                 {
                     parser_error_at_current(parser, "Expected parameter name");
                     param_name = parser->current;
                     parser_advance(parser);
+                    param_name.start = strndup(param_name.start, param_name.length);
+                    if (param_name.start == NULL)
+                    {
+                        parser_error_at_current(parser, "Out of memory");
+                        return NULL;
+                    }
                 }
                 parser_consume(parser, TOKEN_COLON, "Expected ':' after parameter name");
                 Type *param_type = parser_type(parser);
@@ -965,6 +1005,7 @@ Stmt *parser_function_declaration(Parser *parser)
     Stmt *func_stmt = ast_create_function_stmt(name, params, param_count, return_type,
                                                stmts, stmt_count);
 
+    free((void *)name.start); // Free the name string after creating the function statement
     return func_stmt;
 }
 
@@ -1093,12 +1134,24 @@ Stmt *parser_for_statement(Parser *parser)
         {
             name = parser->current;
             parser_advance(parser);
+            name.start = strndup(name.start, name.length);
+            if (name.start == NULL)
+            {
+                parser_error_at_current(parser, "Out of memory");
+                return NULL;
+            }
         }
         else
         {
             parser_error_at_current(parser, "Expected variable name");
             name = parser->current;
             parser_advance(parser);
+            name.start = strndup(name.start, name.length);
+            if (name.start == NULL)
+            {
+                parser_error_at_current(parser, "Out of memory");
+                return NULL;
+            }
         }
         parser_consume(parser, TOKEN_COLON, "Expected ':' after variable name");
         Type *type = parser_type(parser);
@@ -1108,6 +1161,7 @@ Stmt *parser_for_statement(Parser *parser)
             init_expr = parser_expression(parser);
         }
         initializer = ast_create_var_decl_stmt(name, type, init_expr);
+        free((void *)name.start);
     }
     else if (!parser_check(parser, TOKEN_SEMICOLON))
     {
@@ -1221,16 +1275,29 @@ Stmt *parser_import_statement(Parser *parser)
     {
         module_name = parser->current;
         parser_advance(parser);
+        module_name.start = strndup(module_name.start, module_name.length);
+        if (module_name.start == NULL)
+        {
+            parser_error_at_current(parser, "Out of memory");
+            return NULL;
+        }
     }
     else
     {
         parser_error_at_current(parser, "Expected module name");
         module_name = parser->current;
         parser_advance(parser);
+        module_name.start = strndup(module_name.start, module_name.length);
+        if (module_name.start == NULL)
+        {
+            parser_error_at_current(parser, "Out of memory");
+            return NULL;
+        }
     }
     DEBUG_VERBOSE("Parsed import: %.*s", module_name.length, module_name.start);
 
     parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after import statement");
+    free((void *)module_name.start);
     return ast_create_import_stmt(module_name);
 }
 
