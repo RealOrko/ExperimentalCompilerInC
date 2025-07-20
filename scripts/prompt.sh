@@ -11,6 +11,8 @@ BEGIN {
     files["${RUN_SCRIPT}"] = "scripts/run.sh"
     files["${BUILD_OUTPUT}"] = "log/build-output.log"
     files["${RUN_OUTPUT}"] = "log/run-output.log"
+    files["${NASM_OUTPUT}"] = "log/nasm-output.log"
+    files["${GCC_OUTPUT}"] = "log/gcc-output.log"
     files["${HELLO_WORLD_OUTPUT}"] = "log/hello-world-output.log"
 }
 {

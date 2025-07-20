@@ -29,14 +29,15 @@ ${BUILD_OUTPUT}
 log/run-output.log:
 ${RUN_OUTPUT}
 
+log/nasm-output.log:
+${NASM_OUTPUT}
+
+log/gcc-output.log:
+${GCC_OUTPUT}
+
 log/hello-world-output.log:
 ${HELLO_WORLD_OUTPUT}
 
 QUESTION:
 
-The log/run-output.log and log/hello-world-output.log are empty. 
-This is because the compiler bin/sn goes into an infinite loop and 
-never exists. 
-
-How can I debug the application using gdb and get a stacktrace to 
-understand where the infinite loop is happening? 
+The problem is in the gcc-output.log. Can you explain how to fix it? 
