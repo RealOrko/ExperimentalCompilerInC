@@ -624,6 +624,17 @@ Expr *parser_primary(Parser *parser)
                 symbol_table_cleanup(unused_table);
 
                 Expr *inner = parser_expression(&sub_parser);
+                // Manually free sub_parser's remaining token strings (fixes leak)
+                if (sub_parser.previous.start != NULL)
+                {
+                    free((void *)sub_parser.previous.start);
+                    sub_parser.previous.start = NULL;
+                }
+                if (sub_parser.current.start != NULL)
+                {
+                    free((void *)sub_parser.current.start);
+                    sub_parser.current.start = NULL;
+                }
                 if (inner == NULL || sub_parser.had_error)
                 {
                     parser_error_at_current(parser, "Invalid expression in interpolation");
