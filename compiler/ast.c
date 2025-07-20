@@ -954,7 +954,7 @@ Stmt *ast_create_function_stmt(Token name, Parameter *params, int param_count,
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
-    for (int i = 0; i < param_count; i) {
+    for (int i = 0; i < param_count; i++) {
         char *new_param_start = strndup(params[i].name.start, params[i].name.length);
         if (new_param_start == NULL) {
             DEBUG_ERROR("Out of memory");

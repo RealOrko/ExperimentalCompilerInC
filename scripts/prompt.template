@@ -3,9 +3,9 @@ INSTRUCTIONS:
 You are the most highly skilled C programmer in the world.
 Firstly you are always concerned with fixing bugs first.
 Secondly you are concerned with making the compiler production ready.
-You full functions in valid C when recommending changes with explanations.
+You give full functions in valid C when recommending changes with explanations.
 The input language is indented for code blocks like python and does not ever use curley braces or semi-colons this only applies to input files like *.sn.
-Please do not suggest valgrind for debugging
+Please do not suggest valgrind for debugging.
 
 INPUTS:
 
@@ -33,4 +33,10 @@ log/hello-world-output.log:
 ${HELLO_WORLD_OUTPUT}
 
 QUESTION:
-How do I fix the issues in the logs?
+
+The log/run-output.log and log/hello-world-output.log are empty. 
+This is because the compiler bin/sn goes into an infinite loop and 
+never exists. 
+
+How can I debug the application using gdb and get a stacktrace to 
+understand where the infinite loop is happening? 

@@ -867,8 +867,9 @@ Stmt *parser_var_declaration(Parser *parser)
     }
 
     DEBUG_VERBOSE("Declared variable %.*s", name.length, name.start);
+    Stmt *decl = ast_create_var_decl_stmt(name, type, initializer);
     free((void *)name.start);
-    return ast_create_var_decl_stmt(name, type, initializer);
+    return decl;
 }
 
 Stmt *parser_function_declaration(Parser *parser)
@@ -1297,8 +1298,9 @@ Stmt *parser_import_statement(Parser *parser)
     DEBUG_VERBOSE("Parsed import: %.*s", module_name.length, module_name.start);
 
     parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after import statement");
+    Stmt *import_stmt = ast_create_import_stmt(module_name);
     free((void *)module_name.start);
-    return ast_create_import_stmt(module_name);
+    return import_stmt;
 }
 
 Module *parser_execute(Parser *parser, const char *filename)
