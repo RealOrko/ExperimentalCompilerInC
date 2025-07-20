@@ -634,7 +634,15 @@ Expr *ast_create_variable_expr(Token name)
         exit(1);
     }
     expr->type = EXPR_VARIABLE;
-    expr->as.variable.name = name;
+    char *new_start = strndup(name.start, name.length);
+    if (new_start == NULL) {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
+    expr->as.variable.name.start = new_start;
+    expr->as.variable.name.length = name.length;
+    expr->as.variable.name.line = name.line;
+    expr->as.variable.name.type = name.type;    
     expr->expr_type = NULL; // Will be set during type checking
     return expr;
 }
@@ -908,8 +916,15 @@ Stmt *ast_create_var_decl_stmt(Token name, Type *type, Expr *initializer)
         exit(1);
     }
     stmt->type = STMT_VAR_DECL;
-    stmt->as.var_decl.name = name;
-    stmt->as.var_decl.type = type;
+    char *new_start = strndup(name.start, name.length);
+    if (new_start == NULL) {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
+    stmt->as.var_decl.name.start = new_start;
+    stmt->as.var_decl.name.length = name.length;
+    stmt->as.var_decl.name.line = name.line;
+    stmt->as.var_decl.name.type = name.type;    stmt->as.var_decl.type = type;
     stmt->as.var_decl.initializer = initializer;
     return stmt;
 }
@@ -924,8 +939,34 @@ Stmt *ast_create_function_stmt(Token name, Parameter *params, int param_count,
         exit(1);
     }
     stmt->type = STMT_FUNCTION;
-    stmt->as.function.name = name;
-    stmt->as.function.params = params;
+    char *new_name_start = strndup(name.start, name.length);
+    if (new_name_start == NULL) {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
+    stmt->as.function.name.start = new_name_start;
+    stmt->as.function.name.length = name.length;
+    stmt->as.function.name.line = name.line;
+    stmt->as.function.name.type = name.type;
+
+    Parameter *new_params = malloc(sizeof(Parameter) * param_count);
+    if (new_params == NULL && param_count > 0) {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
+    for (int i = 0; i < param_count; i) {
+        char *new_param_start = strndup(params[i].name.start, params[i].name.length);
+        if (new_param_start == NULL) {
+            DEBUG_ERROR("Out of memory");
+            exit(1);
+        }
+        new_params[i].name.start = new_param_start;
+        new_params[i].name.length = params[i].name.length;
+        new_params[i].name.line = params[i].name.line;
+        new_params[i].name.type = params[i].name.type;
+        new_params[i].type = params[i].type;  // Type is already cloned/owned
+    }
+    stmt->as.function.params = new_params;
     stmt->as.function.param_count = param_count;
     stmt->as.function.return_type = return_type;
     stmt->as.function.body = body;
@@ -1015,7 +1056,15 @@ Stmt *ast_create_import_stmt(Token module_name)
         exit(1);
     }
     stmt->type = STMT_IMPORT;
-    stmt->as.import.module_name = module_name;
+    char *new_start = strndup(module_name.start, module_name.length);
+    if (new_start == NULL) {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
+    stmt->as.import.module_name.start = new_start;
+    stmt->as.import.module_name.length = module_name.length;
+    stmt->as.import.module_name.line = module_name.line;
+    stmt->as.import.module_name.type = module_name.type;
     return stmt;
 }
 

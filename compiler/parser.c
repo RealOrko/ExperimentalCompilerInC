@@ -195,6 +195,15 @@ void parser_cleanup(Parser *parser)
         free(parser->interp_sources[i]);
     }
     free(parser->interp_sources);
+    // Free final tokens
+    if (parser->previous.start != NULL) {
+        free((void *)parser->previous.start);
+        parser->previous.start = NULL;
+    }
+    if (parser->current.start != NULL) {
+        free((void *)parser->current.start);
+        parser->current.start = NULL;
+    }
 }
 
 void parser_error(Parser *parser, const char *message)
@@ -236,6 +245,12 @@ void parser_error_at(Parser *parser, Token *token, const char *message)
 
 void parser_advance(Parser *parser)
 {
+    // Free the old previous token's start (discarded after consumption)
+    if (parser->previous.start != NULL) {
+        free((void *)parser->previous.start);
+        parser->previous.start = NULL;
+    }
+
     parser->previous = parser->current;
 
     for (;;)

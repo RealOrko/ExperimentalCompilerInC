@@ -121,7 +121,8 @@ void free_scope(Scope *scope)
     {
         Symbol *next = symbol->next;
         ast_free_type(symbol->type);
-        // Removed: free((char*)symbol->name.start);  // Invalid free; token.start not owned
+        free((char*)symbol->name.start);
+        symbol->name.start = NULL;
         free(symbol);
         symbol = next;
     }
@@ -296,13 +297,16 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
         symbol->offset = 0;
     }
 
-    // Debug output
-    char temp[256];
-    int name_len = name.length < 255 ? name.length : 255;
-    strncpy(temp, name.start, name_len);
-    temp[name_len] = '\0';
-    DEBUG_VERBOSE("Added symbol '%s' with kind %d, offset %d",
-                  temp, kind, symbol->offset);
+    symbol->name.start = strndup(name.start, name.length);
+    if (symbol->name.start == NULL)
+    {
+        DEBUG_ERROR("Out of memory duplicating token string");
+        free(symbol);
+        return;
+    }
+    symbol->name.length = name.length;
+    symbol->name.line = name.line;
+    symbol->name.type = name.type;
 
     // Add to current scope
     symbol->next = table->current->symbols;
