@@ -739,7 +739,7 @@ Expr *ast_create_interpolated_expr(Expr **parts, int part_count)
     expr->type = EXPR_INTERPOLATED;
     expr->as.interpol.parts = parts;
     expr->as.interpol.part_count = part_count;
-    expr->expr_type = ast_create_primitive_type(TYPE_STRING);
+    expr->expr_type = NULL;
     return expr;
 }
 
