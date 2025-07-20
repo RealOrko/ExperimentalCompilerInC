@@ -1007,6 +1007,11 @@ Stmt *parser_function_declaration(Parser *parser)
                                                stmts, stmt_count);
 
     free((void *)name.start); // Free the name string after creating the function statement
+    for (int i = 0; i < param_count; i++)
+    {
+        free((void *)params[i].name.start);
+    }
+    free(params);
     return func_stmt;
 }
 
@@ -1014,6 +1019,13 @@ Stmt *parser_return_statement(Parser *parser)
 {
     Token keyword = parser->previous;
     Expr *value = NULL;
+
+    keyword.start = strndup(keyword.start, keyword.length);
+    if (keyword.start == NULL)
+    {
+        parser_error_at_current(parser, "Out of memory");
+        return NULL;
+    }
 
     if (!parser_check(parser, TOKEN_SEMICOLON) && !parser_check(parser, TOKEN_NEWLINE) && !parser_is_at_end(parser))
     {
