@@ -18,6 +18,9 @@ typedef struct
     int had_error;
     int panic_mode;
     SymbolTable *symbol_table;
+    char **interp_sources;
+    int interp_count;
+    int interp_capacity;
 } Parser;
 
 // Parser initialization and cleanup

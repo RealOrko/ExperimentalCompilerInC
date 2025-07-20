@@ -97,6 +97,31 @@ int main(int argc, char **argv)
     free(param_types);               // Free temp array after cloning
     ast_free_type(placeholder_type); // Free original after cloning
 
+    // Built-in to_string (takes any printable type, returns string)
+    Token to_string_token;
+    to_string_token.start = "to_string";
+    to_string_token.length = 9;
+    to_string_token.line = 0;
+    to_string_token.type = TOKEN_IDENTIFIER;
+
+    placeholder_type = ast_create_primitive_type(TYPE_STRING); // placeholder
+    param_types = malloc(sizeof(Type *));
+    if (param_types == NULL)
+    {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
+    param_types[0] = placeholder_type;
+
+    Type *string_type = ast_create_primitive_type(TYPE_STRING);
+    Type *to_string_type = ast_create_function_type(string_type, param_types, 1);
+    ast_free_type(string_type); // Free temp
+
+    symbol_table_add_symbol(parser.symbol_table, to_string_token, to_string_type);
+    ast_free_type(to_string_type);   // Free after adding
+    free(param_types);               // Free temp array
+    ast_free_type(placeholder_type); // Free original
+
     // Type checking
     DEBUG_INFO("Starting type checking");
     int type_check_success = type_check_module(module, parser.symbol_table);

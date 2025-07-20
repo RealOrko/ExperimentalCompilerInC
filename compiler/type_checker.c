@@ -12,13 +12,15 @@
 
 static int had_type_error = 0;
 
+static void type_check_stmt(Stmt *stmt, SymbolTable *table, Type *return_type);
+
+static Type *type_check_expr(Expr *expr, SymbolTable *table);
+
 static void type_error(const char *msg)
 {
     DEBUG_ERROR("Type error: %s", msg);
     had_type_error = 1;
 }
-
-static void type_check_stmt(Stmt *stmt, SymbolTable *table, Type *return_type);
 
 static bool is_numeric_type(Type *type)
 {
@@ -32,7 +34,7 @@ static bool is_comparison_operator(TokenType op)
 
 static bool is_arithmetic_operator(TokenType op)
 {
-    return op == TOKEN_PLUS || op == TOKEN_MINUS || op == TOKEN_STAR || op == TOKEN_SLASH || op == TOKEN_MODULO;
+    return op == TOKEN_MINUS || op == TOKEN_STAR || op == TOKEN_SLASH || op == TOKEN_MODULO;
 }
 
 static bool is_printable_type(Type *type)
@@ -45,29 +47,46 @@ static Type *type_check_binary(Expr *expr, SymbolTable *table)
     Type *left = type_check_expr(expr->as.binary.left, table);
     Type *right = type_check_expr(expr->as.binary.right, table);
     if (left == NULL || right == NULL)
-        return NULL;
-    if (!ast_type_equals(left, right))
     {
-        type_error("Type mismatch in binary expression");
+        type_error("Invalid operand in binary expression");
         return NULL;
     }
-    if (is_comparison_operator(expr->as.binary.operator))
+    TokenType op = expr->as.binary.operator;
+    if (is_comparison_operator(op))
     {
+        if (!ast_type_equals(left, right))
+        {
+            type_error("Type mismatch in comparison");
+            return NULL;
+        }
         return ast_create_primitive_type(TYPE_BOOL);
     }
-    else if (is_arithmetic_operator(expr->as.binary.operator))
+    else if (is_arithmetic_operator(op))
     {
-        if (is_numeric_type(left))
+        if (!ast_type_equals(left, right) || !is_numeric_type(left))
+        {
+            type_error("Invalid types for arithmetic operator");
+            return NULL;
+        }
+        return ast_clone_type(left);
+    }
+    else if (op == TOKEN_PLUS)
+    {
+        if (is_numeric_type(left) && ast_type_equals(left, right))
         {
             return ast_clone_type(left);
         }
-        else if (left->kind == TYPE_STRING && expr->as.binary.operator == TOKEN_PLUS)
+        else if (left->kind == TYPE_STRING && is_printable_type(right))
         {
             return ast_clone_type(left);
+        }
+        else if (is_printable_type(left) && right->kind == TYPE_STRING)
+        {
+            return ast_clone_type(right);
         }
         else
         {
-            type_error("Invalid types for arithmetic operator");
+            type_error("Invalid types for + operator");
             return NULL;
         }
     }
@@ -111,7 +130,10 @@ static Type *type_check_interpolated(Expr *expr, SymbolTable *table)
     {
         Type *part_type = type_check_expr(expr->as.interpol.parts[i], table);
         if (part_type == NULL)
+        {
+            type_error("Invalid expression in interpolated string part");
             return NULL;
+        }
         if (!is_printable_type(part_type))
         {
             type_error("Non-printable type in interpolated string");
@@ -133,6 +155,11 @@ static Type *type_check_variable(Expr *expr, SymbolTable *table)
     if (sym == NULL)
     {
         type_error("Undefined variable");
+        return NULL;
+    }
+    if (sym->type == NULL)
+    {
+        type_error("Symbol has no type");
         return NULL;
     }
     return ast_clone_type(sym->type);
@@ -190,6 +217,35 @@ static Type *type_check_call(Expr *expr, SymbolTable *table)
             return NULL;
         }
         return ast_create_primitive_type(TYPE_VOID);
+    }
+    bool is_to_string = false;
+    if (expr->as.call.callee->type == EXPR_VARIABLE)
+    {
+        Token name = expr->as.call.callee->as.variable.name;
+        char name_str[256];
+        strncpy(name_str, name.start, name.length);
+        name_str[name.length] = '\0';
+        if (strcmp(name_str, "to_string") == 0)
+        {
+            is_to_string = true;
+        }
+    }
+    if (is_to_string)
+    {
+        if (expr->as.call.arg_count != 1)
+        {
+            type_error("to_string takes exactly one argument");
+            return NULL;
+        }
+        Type *arg_type = type_check_expr(expr->as.call.arguments[0], table);
+        if (arg_type == NULL)
+            return NULL;
+        if (!is_printable_type(arg_type))
+        {
+            type_error("Unsupported type for to_string");
+            return NULL;
+        }
+        return ast_create_primitive_type(TYPE_STRING);
     }
     else
     {
@@ -296,16 +352,25 @@ static void type_check_var_decl(Stmt *stmt, SymbolTable *table, Type *return_typ
     {
         ast_free_type(init_type);
     }
+    // Add the variable to the current scope after checking initializer
+    symbol_table_add_symbol_with_kind(table, stmt->as.var_decl.name,
+                                      stmt->as.var_decl.type, SYMBOL_LOCAL);
 }
 
 static void type_check_function(Stmt *stmt, SymbolTable *table)
 {
     symbol_table_push_scope(table);
+    
+    // Add parameters to the new scope
     for (int i = 0; i < stmt->as.function.param_count; i++)
     {
-        symbol_table_add_symbol_with_kind(table, stmt->as.function.params[i].name,
-                                          stmt->as.function.params[i].type, SYMBOL_PARAM);
+        Parameter param = stmt->as.function.params[i];
+        symbol_table_add_symbol_with_kind(table, param.name, param.type, SYMBOL_PARAM);
     }
+    
+    // Set starting local offset after last parameter (avoids overlap)
+    table->current->next_local_offset = table->current->next_param_offset;
+    
     for (int i = 0; i < stmt->as.function.body_count; i++)
     {
         type_check_stmt(stmt->as.function.body[i], table, stmt->as.function.return_type);
@@ -407,9 +472,6 @@ static void type_check_stmt(Stmt *stmt, SymbolTable *table, Type *return_type)
         break;
     case STMT_VAR_DECL:
         type_check_var_decl(stmt, table, return_type);
-        // Add the variable to the current scope after checking initializer
-        symbol_table_add_symbol_with_kind(table, stmt->as.var_decl.name,
-                                          stmt->as.var_decl.type, SYMBOL_LOCAL);
         break;
     case STMT_FUNCTION:
         type_check_function(stmt, table);

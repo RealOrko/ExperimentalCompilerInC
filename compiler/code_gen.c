@@ -3,13 +3,13 @@
  * Implementation of the code generator with fixes for string handling
  */
 
-#include "standard.h"
 #include "code_gen.h"
 #include "debug.h"
 #include "parser.h"       // For sub-parsing in interpolation
-#include "type_checker.h" // For type_check_expr
 #include <stdlib.h>
 #include <string.h>
+
+static StringLiteral *string_literals = NULL;
 
 static void pre_build_symbols(CodeGen *gen, Stmt *stmt);
 
@@ -44,7 +44,7 @@ void code_gen_push_function_context(CodeGen *gen)
     // Store current function (even if NULL)
     if (gen->current_function != NULL)
     {
-        gen->function_stack[gen->function_stack_size] = my_strdup(gen->current_function);
+        gen->function_stack[gen->function_stack_size] = strdup(gen->current_function);
         if (gen->function_stack[gen->function_stack_size] == NULL)
         {
             DEBUG_ERROR("Failed to duplicate function name");
@@ -182,7 +182,7 @@ int code_gen_add_string_literal(CodeGen *gen, const char *string)
         exit(1);
     }
 
-    literal->string = my_strdup(string);
+    literal->string = strdup(string);
     if (literal->string == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -516,7 +516,7 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported % type");
+            DEBUG_ERROR("Unsupported %% type");
             exit(1);
         }
         break;
@@ -874,6 +874,12 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
         Expr *part = expr->parts[0];
         Type *pt = part->expr_type;
         code_gen_expression(gen, part);
+        if (pt == NULL)
+        {
+            DEBUG_ERROR("Type not set for single-part interpolated string");
+            fprintf(gen->output, "    lea rax, [rel empty_str]\n");
+            return;
+        }
         if (pt->kind != TYPE_STRING)
         {
             const char *to_str_func = NULL;
@@ -908,7 +914,12 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
     Type *pt = part->expr_type;
     code_gen_expression(gen, part);
     bool current_malloced = false;
-    if (pt->kind != TYPE_STRING)
+    if (pt == NULL)
+    {
+        DEBUG_ERROR("Type not set for interpolated part 0");
+        fprintf(gen->output, "    lea rax, [rel empty_str]\n");
+    }
+    else if (pt->kind != TYPE_STRING)
     {
         const char *to_str_func = NULL;
         switch (pt->kind)
@@ -944,7 +955,12 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
         pt = part->expr_type;
         code_gen_expression(gen, part);
         bool part_malloced = false;
-        if (pt->kind != TYPE_STRING)
+        if (pt == NULL)
+        {
+            DEBUG_ERROR("Type not set for interpolated part %d", i);
+            fprintf(gen->output, "    lea rax, [rel empty_str]\n");
+        }
+        else if (pt->kind != TYPE_STRING)
         {
             const char *to_str_func = NULL;
             switch (pt->kind)
@@ -1019,6 +1035,17 @@ static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr)
     {
         Expr *part = expr->parts[i];
         Type *pt = part->expr_type;
+        if (pt == NULL)
+        {
+            DEBUG_ERROR("Type not set for interpolated part %d", i);
+            fprintf(gen->output, "    mov rdi, [rel empty_str]\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_print_string\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+            continue;
+        }
         code_gen_expression(gen, part);
         const char *rt_func = NULL;
         bool is_double = false;

@@ -567,6 +567,15 @@ void ast_free_type(Type *type)
     free(type);
 }
 
+void ast_free_token(Token *token)
+{
+    if (token && token->start)
+    {
+        free((void *)token->start);
+        token->start = NULL;
+    }
+}
+
 // Expression functions
 
 Expr *ast_create_binary_expr(Expr *left, TokenType operator, Expr *right)
@@ -777,7 +786,7 @@ void ast_free_expr(Expr *expr)
         break;
 
     case EXPR_VARIABLE:
-        // Nothing to free
+        ast_free_token(&expr->as.variable.name);
         break;
 
     case EXPR_ASSIGN:
@@ -786,6 +795,7 @@ void ast_free_expr(Expr *expr)
             ast_free_expr(expr->as.assign.value);
             expr->as.assign.value = NULL;
         }
+        ast_free_token(&expr->as.assign.name);
         break;
 
     case EXPR_CALL:
@@ -1035,6 +1045,7 @@ void ast_free_stmt(Stmt *stmt)
             ast_free_expr(stmt->as.var_decl.initializer);
             stmt->as.var_decl.initializer = NULL;
         }
+        ast_free_token(&stmt->as.var_decl.name);
         break;
 
     case STMT_FUNCTION:
@@ -1053,6 +1064,7 @@ void ast_free_stmt(Stmt *stmt)
                     ast_free_type(stmt->as.function.params[i].type);
                     stmt->as.function.params[i].type = NULL;
                 }
+                ast_free_token(&stmt->as.function.params[i].name);
             }
             free(stmt->as.function.params);
             stmt->as.function.params = NULL;
@@ -1071,6 +1083,7 @@ void ast_free_stmt(Stmt *stmt)
             free(stmt->as.function.body);
             stmt->as.function.body = NULL;
         }
+        ast_free_token(&stmt->as.function.name);
         break;
 
     case STMT_RETURN:
@@ -1079,6 +1092,7 @@ void ast_free_stmt(Stmt *stmt)
             ast_free_expr(stmt->as.return_stmt.value);
             stmt->as.return_stmt.value = NULL;
         }
+        ast_free_token(&stmt->as.return_stmt.keyword);
         break;
 
     case STMT_BLOCK:
@@ -1152,7 +1166,7 @@ void ast_free_stmt(Stmt *stmt)
         break;
 
     case STMT_IMPORT:
-        // Nothing to free
+        ast_free_token(&stmt->as.import.module_name);
         break;
     }
 

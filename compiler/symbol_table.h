@@ -45,10 +45,12 @@ typedef struct Scope
 } Scope;
 
 // Symbol table
-typedef struct
-{
+typedef struct {
     Scope *current;
     Scope *global_scope;
+    Scope **scopes;
+    int scopes_count;
+    int scopes_capacity;
 } SymbolTable;
 
 // debug

@@ -77,8 +77,7 @@ Stmt *parser_indented_block(Parser *parser)
     int count = 0;
     int capacity = 0;
 
-    DEBUG_VERBOSE("Pushing new scope for block");
-    symbol_table_push_scope(parser->symbol_table);
+    // REMOVED: symbol_table_push_scope(parser->symbol_table);
 
     while (!parser_is_at_end(parser) &&
            parser->lexer->indent_stack[parser->lexer->indent_size - 1] >= current_indent)
@@ -133,8 +132,7 @@ Stmt *parser_indented_block(Parser *parser)
         parser_error(parser, "Expected dedent to end block");
     }
 
-    DEBUG_VERBOSE("Popping scope for block");
-    symbol_table_pop_scope(parser->symbol_table);
+    // REMOVED: symbol_table_pop_scope(parser->symbol_table);
 
     DEBUG_VERBOSE("Exiting parse_indented_block with %d statements", count);
     return ast_create_block_stmt(statements, count);
@@ -182,6 +180,9 @@ void parser_init(Parser *parser, Lexer *lexer)
     parser->current = parser->previous; // Copy to current
 
     parser_advance(parser);
+    parser->interp_sources = NULL;
+    parser->interp_count = 0;
+    parser->interp_capacity = 0;
 }
 
 void parser_cleanup(Parser *parser)
@@ -189,6 +190,11 @@ void parser_cleanup(Parser *parser)
     DEBUG_VERBOSE("Cleaning up parser");
     symbol_table_cleanup(parser->symbol_table);
     lexer_cleanup(parser->lexer);
+    for (int i = 0; i < parser->interp_count; i++)
+    {
+        free(parser->interp_sources[i]);
+    }
+    free(parser->interp_sources);
 }
 
 void parser_error(Parser *parser, const char *message)
@@ -342,10 +348,18 @@ Expr *parser_assignment(Parser *parser)
         if (expr->type == EXPR_VARIABLE)
         {
             Token name = expr->as.variable.name;
+            char *new_start = strndup(name.start, name.length);
+            if (new_start == NULL)
+            {
+                DEBUG_ERROR("Out of memory duplicating token string");
+                exit(1);
+            }
             ast_free_expr(expr);
+            name.start = new_start;
             return ast_create_assign_expr(name, value);
         }
         parser_error(parser, "Invalid assignment target");
+        ast_free_expr(value);
     }
     return expr;
 }
@@ -525,9 +539,10 @@ Expr *parser_primary(Parser *parser)
         parser_consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
         return expr;
     }
+
     if (parser_match(parser, TOKEN_INTERPOL_STRING))
     {
-        char *content = parser->previous.literal.string_value;
+        const char *content = parser->previous.literal.string_value;
         DEBUG_VERBOSE("Parsing interpolated string: %s", content);
 
         Expr **parts = NULL;
@@ -571,7 +586,7 @@ Expr *parser_primary(Parser *parser)
                     for (int j = 0; j < count; j++)
                         ast_free_expr(parts[j]);
                     free(parts);
-                    free(content);
+                    free((char *)content);
                     return ast_create_literal_expr((LiteralValue){0}, ast_create_primitive_type(TYPE_STRING), false);
                 }
                 int expr_len = p - expr_start;
@@ -584,7 +599,11 @@ Expr *parser_primary(Parser *parser)
                 lexer_init(&sub_lexer, expr_src, "interpolated");
                 Parser sub_parser;
                 parser_init(&sub_parser, &sub_lexer);
-                sub_parser.symbol_table = parser->symbol_table; // Share symbol table
+                SymbolTable *unused_table = sub_parser.symbol_table; // Save unused table created by init
+                sub_parser.symbol_table = parser->symbol_table;      // Share symbol table
+
+                // Free the unused table immediately
+                symbol_table_cleanup(unused_table);
 
                 Expr *inner = parser_expression(&sub_parser);
                 if (inner == NULL || sub_parser.had_error)
@@ -592,12 +611,12 @@ Expr *parser_primary(Parser *parser)
                     parser_error_at_current(parser, "Invalid expression in interpolation");
                     ast_free_expr(inner);
                     free(expr_src);
-                    parser_cleanup(&sub_parser);
+                    lexer_cleanup(&sub_lexer); // Manual cleanup
                     // Cleanup partial parts
                     for (int j = 0; j < count; j++)
                         ast_free_expr(parts[j]);
                     free(parts);
-                    free(content);
+                    free((char *)content);
                     return ast_create_literal_expr((LiteralValue){0}, ast_create_primitive_type(TYPE_STRING), false);
                 }
 
@@ -608,8 +627,20 @@ Expr *parser_primary(Parser *parser)
                 }
                 parts[count++] = inner;
 
-                free(expr_src); // Source freed after parsing
-                parser_cleanup(&sub_parser);
+                // Add to parser's interp_sources
+                if (parser->interp_count >= parser->interp_capacity)
+                {
+                    parser->interp_capacity = parser->interp_capacity ? parser->interp_capacity * 2 : 8;
+                    parser->interp_sources = realloc(parser->interp_sources, sizeof(char *) * parser->interp_capacity);
+                    if (parser->interp_sources == NULL)
+                    {
+                        DEBUG_ERROR("Out of memory");
+                        exit(1);
+                    }
+                }
+                parser->interp_sources[parser->interp_count++] = expr_src;
+
+                lexer_cleanup(&sub_lexer); // Manual cleanup
 
                 p++; // Skip '}'
                 segment_start = p;
@@ -639,7 +670,7 @@ Expr *parser_primary(Parser *parser)
             parts[count++] = seg_expr;
         }
 
-        free(content); // Free original content after parsing
+        free((char *)content); // Free original content after parsing
 
         return ast_create_interpolated_expr(parts, count);
     }
@@ -825,7 +856,7 @@ Stmt *parser_function_declaration(Parser *parser)
     }
     DEBUG_VERBOSE("Declaring function %.*s", name.length, name.start);
 
-    // Parameter parsing
+    // Parameter parsing (unchanged)
     Parameter *params = NULL;
     int param_count = 0;
     int param_capacity = 0;
@@ -898,23 +929,11 @@ Stmt *parser_function_declaration(Parser *parser)
     symbol_table_add_symbol(parser->symbol_table, name, function_type);
     ast_free_type(function_type); // Free after adding (cloned in symbol table)
 
-    DEBUG_VERBOSE("Beginning function scope for %.*s", name.length, name.start);
-    symbol_table_begin_function_scope(parser->symbol_table);
-
-    for (int i = 0; i < param_count; i++)
-    {
-        symbol_table_add_symbol_with_kind(parser->symbol_table, params[i].name, params[i].type, SYMBOL_PARAM);
-    }
-
-    // Set the starting local offset to follow the last parameter offset (avoids overlap).
-    parser->symbol_table->current->next_local_offset = parser->symbol_table->current->next_param_offset;
-
     parser_consume(parser, TOKEN_ARROW, "Expected '=>' before function body");
     skip_newlines(parser);
 
     DEBUG_VERBOSE("Parsing function body for %.*s", name.length, name.start);
     Stmt *body = parser_indented_block(parser);
-    symbol_table_pop_scope(parser->symbol_table);
     if (body == NULL)
     {
         body = ast_create_block_stmt(NULL, 0); // Empty block as fallback

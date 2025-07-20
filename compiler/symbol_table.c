@@ -91,9 +91,18 @@ SymbolTable *symbol_table_init()
     if (table == NULL)
     {
         DEBUG_ERROR("Out of memory creating symbol table");
-        exit(1);
+        return NULL; // Changed to return NULL for production
     }
     table->current = NULL;
+    table->scopes = malloc(sizeof(Scope *) * 8);
+    if (table->scopes == NULL)
+    {
+        DEBUG_ERROR("Out of memory creating scopes array");
+        free(table);
+        return NULL;
+    }
+    table->scopes_count = 0;
+    table->scopes_capacity = 8;
 
     // Start with a global scope
     symbol_table_push_scope(table);
@@ -112,6 +121,7 @@ void free_scope(Scope *scope)
     {
         Symbol *next = symbol->next;
         ast_free_type(symbol->type);
+        // Removed: free((char*)symbol->name.start);  // Invalid free; token.start not owned
         free(symbol);
         symbol = next;
     }
@@ -123,13 +133,11 @@ void symbol_table_cleanup(SymbolTable *table)
 {
     if (table == NULL)
         return;
-    Scope *scope = table->current;
-    while (scope != NULL)
+    for (int i = 0; i < table->scopes_count; i++)
     {
-        Scope *next = scope->enclosing;
-        free_scope(scope);
-        scope = next;
+        free_scope(table->scopes[i]);
     }
+    free(table->scopes);
     free(table);
 }
 
@@ -139,7 +147,7 @@ void symbol_table_push_scope(SymbolTable *table)
     if (scope == NULL)
     {
         DEBUG_ERROR("Out of memory creating scope");
-        exit(1);
+        return;
     }
 
     scope->symbols = NULL;
@@ -148,6 +156,18 @@ void symbol_table_push_scope(SymbolTable *table)
     scope->next_param_offset = table->current ? table->current->next_param_offset : PARAM_BASE_OFFSET;
 
     table->current = scope;
+
+    if (table->scopes_count >= table->scopes_capacity)
+    {
+        table->scopes_capacity *= 2;
+        table->scopes = realloc(table->scopes, sizeof(Scope *) * table->scopes_capacity);
+        if (table->scopes == NULL)
+        {
+            DEBUG_ERROR("Out of memory expanding scopes array");
+            return;
+        }
+    }
+    table->scopes[table->scopes_count++] = scope;
 }
 
 // Initialize a function scope with proper offset tracking
@@ -169,8 +189,7 @@ void symbol_table_pop_scope(SymbolTable *table)
         table->current->next_local_offset = MAX(table->current->next_local_offset, to_free->next_local_offset);
         table->current->next_param_offset = MAX(table->current->next_param_offset, to_free->next_param_offset);
     }
-    free_scope(to_free);
-    DEBUG_VERBOSE("After pop, current scope symbols: %p", table->current ? table->current->symbols : NULL);
+    // Do not free_scope(to_free); defer to cleanup
 }
 
 static int tokens_equal(Token a, Token b)
@@ -249,7 +268,7 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     if (symbol == NULL)
     {
         DEBUG_ERROR("Out of memory when creating symbol");
-        exit(1);
+        return;
     }
 
     symbol->name = name;
@@ -288,17 +307,6 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     // Add to current scope
     symbol->next = table->current->symbols;
     table->current->symbols = symbol;
-
-    // Smarter offset calculation (apply alignment based on type size)
-    int type_size = get_type_size(type);
-    if (kind == SYMBOL_PARAM)
-    {
-        table->current->next_param_offset += ((type_size + 7) / 8) * 8 - OFFSET_ALIGNMENT; // Adjust for alignment
-    }
-    else if (kind == SYMBOL_LOCAL)
-    {
-        table->current->next_local_offset += ((type_size + 7) / 8) * 8 - OFFSET_ALIGNMENT; // Adjust for alignment
-    }
 }
 
 /**

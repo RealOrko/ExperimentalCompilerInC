@@ -45,3 +45,21 @@ fn main(): void =>
 
   var flag: bool = true
   print($"Flag: {flag}")
+
+  var any: str = $"This is a thing {num}"
+  print(any)
+
+  any = $"This is a thing {fact}"
+  print(any)
+
+  any = $"This is a thing {sum}"
+  print(any)
+
+  any = $"This is a thing {pi_approx}"
+  print(any)
+
+  any = $"This is a thing {ch}"
+  print(any)
+
+  any = $"This is a thing {flag}"
+  print(any)

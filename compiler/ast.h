@@ -65,7 +65,8 @@ typedef enum
     EXPR_ARRAY,
     EXPR_ARRAY_ACCESS,
     EXPR_INCREMENT,
-    EXPR_DECREMENT
+    EXPR_DECREMENT,
+    EXPR_INTERPOLATED  // Add this line for interpolated strings
 } ExprType;
 
 // Binary expression
@@ -126,6 +127,13 @@ typedef struct
     Expr *index;
 } ArrayAccessExpr;
 
+// Interpolated string expression
+typedef struct
+{
+    Expr **parts;
+    int part_count;
+} InterpolExpr;
+
 // Generic expression structure
 struct Expr
 {
@@ -142,6 +150,7 @@ struct Expr
         ArrayExpr array;
         ArrayAccessExpr array_access;
         Expr *operand; // For increment/decrement
+        InterpolExpr interpol;  // Add this line for interpolated strings
     } as;
 
     Type *expr_type; // Type of the expression after type checking
@@ -278,6 +287,7 @@ Type *ast_create_function_type(Type *return_type, Type **param_types, int param_
 int ast_type_equals(Type *a, Type *b);
 const char *ast_type_to_string(Type *type);
 void ast_free_type(Type *type);
+void ast_free_token(Token *token);
 
 // Expression functions
 Expr *ast_create_binary_expr(Expr *left, TokenType operator, Expr * right);

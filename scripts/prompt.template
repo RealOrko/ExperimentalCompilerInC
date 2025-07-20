@@ -33,4 +33,4 @@ log/hello-world-output.log:
 ${HELLO_WORLD_OUTPUT}
 
 QUESTION:
-How do I fix the compiler errors? 
+How do I fix the issues in the logs?

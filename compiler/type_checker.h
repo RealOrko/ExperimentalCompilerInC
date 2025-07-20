@@ -5,6 +5,5 @@
 #include "symbol_table.h"
 
 int type_check_module(Module *module, SymbolTable *table);
-Type *type_check_expr(Expr *expr, SymbolTable *table);
 
 #endif

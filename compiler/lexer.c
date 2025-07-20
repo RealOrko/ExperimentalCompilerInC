@@ -79,15 +79,26 @@ int lexer_match(Lexer *lexer, char expected)
 
 Token lexer_make_token(Lexer *lexer, TokenType type)
 {
+    int length = (int)(lexer->current - lexer->start);
+    char *dup_start = strndup(lexer->start, length);
+    if (dup_start == NULL) {
+        DEBUG_ERROR("Out of memory duplicating lexeme");
+        exit(1);
+    }
     Token token;
-    token_init(&token, type, lexer->start, (int)(lexer->current - lexer->start), lexer->line);
+    token_init(&token, type, dup_start, length, lexer->line);
     return token;
 }
 
 Token lexer_error_token(Lexer *lexer, const char *message)
 {
+    char *dup_message = strdup(message);
+    if (dup_message == NULL) {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
     Token token;
-    token_init(&token, TOKEN_ERROR, message, (int)strlen(message), lexer->line);
+    token_init(&token, TOKEN_ERROR, dup_message, (int)strlen(dup_message), lexer->line);
     return token;
 }
 

@@ -3,6 +3,7 @@
         "type_checker.h": "c",
         "symbol_table.h": "c",
         "stdlib.h": "c",
-        "standard.h": "c"
+        "standard.h": "c",
+        "runtime.h": "c"
     }
 }

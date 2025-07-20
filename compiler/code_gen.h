@@ -17,8 +17,6 @@ typedef struct StringLiteral
     struct StringLiteral *next;
 } StringLiteral;
 
-static StringLiteral *string_literals = NULL;
-
 typedef struct
 {
     int label_count;
