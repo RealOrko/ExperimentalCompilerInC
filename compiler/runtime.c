@@ -72,6 +72,9 @@ char *rt_to_string_bool(int val)
 
 char *rt_to_string_string(const char *val)
 {
+    if (val == NULL) {
+        return strdup("(null)");
+    }
     return strdup(val);
 }
 

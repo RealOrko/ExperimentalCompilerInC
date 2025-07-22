@@ -40,5 +40,4 @@ ${HELLO_WORLD_OUTPUT}
 
 QUESTION:
 
-How do I fix the problems in the hello world app given the log output for 
-hello-world-output.log?
+How do I fix the memory leak observed in log/hello-world-output.log? 
