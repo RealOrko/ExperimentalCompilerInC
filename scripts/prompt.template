@@ -40,4 +40,5 @@ ${HELLO_WORLD_OUTPUT}
 
 QUESTION:
 
-The problem is in the gcc-output.log. Can you explain how to fix it? 
+How do I fix the problems in the hello world app given the log output for 
+hello-world-output.log?
