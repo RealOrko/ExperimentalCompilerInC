@@ -1,11 +1,6 @@
-/**
- * code_gen.c
- * Implementation of the code generator with fixes for string handling
- */
-
 #include "code_gen.h"
 #include "debug.h"
-#include "parser.h" // For sub-parsing in interpolation
+#include "parser.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -13,7 +8,6 @@ static StringLiteral *string_literals = NULL;
 
 static void pre_build_symbols(CodeGen *gen, Stmt *stmt);
 
-// Initialize the function context stack
 void code_gen_init_function_stack(CodeGen *gen)
 {
     gen->function_stack_capacity = 8;
@@ -21,14 +15,12 @@ void code_gen_init_function_stack(CodeGen *gen)
     gen->function_stack = malloc(gen->function_stack_capacity * sizeof(char *));
     if (gen->function_stack == NULL)
     {
-        DEBUG_ERROR("Out of memory initializing function stack");
         exit(1);
     }
 }
 
 void code_gen_push_function_context(CodeGen *gen)
 {
-    // Resize if needed
     if (gen->function_stack_size >= gen->function_stack_capacity)
     {
         gen->function_stack_capacity *= 2;
@@ -36,18 +28,14 @@ void code_gen_push_function_context(CodeGen *gen)
                                       gen->function_stack_capacity * sizeof(char *));
         if (gen->function_stack == NULL)
         {
-            DEBUG_ERROR("Out of memory expanding function stack");
             exit(1);
         }
     }
-
-    // Store current function (even if NULL)
     if (gen->current_function != NULL)
     {
         gen->function_stack[gen->function_stack_size] = strdup(gen->current_function);
         if (gen->function_stack[gen->function_stack_size] == NULL)
         {
-            DEBUG_ERROR("Failed to duplicate function name");
             exit(1);
         }
     }
@@ -56,33 +44,21 @@ void code_gen_push_function_context(CodeGen *gen)
         gen->function_stack[gen->function_stack_size] = NULL;
     }
     gen->function_stack_size++;
-
-    DEBUG_VERBOSE("Pushed function context '%s', stack size now %d",
-                  gen->current_function ? gen->current_function : "NULL", gen->function_stack_size);
 }
 
 void code_gen_pop_function_context(CodeGen *gen)
 {
     if (gen->function_stack_size <= 0)
     {
-        DEBUG_WARNING("Attempt to pop empty function stack");
         return;
     }
-
-    // Free current function name if set
     if (gen->current_function != NULL)
     {
         free(gen->current_function);
     }
-
-    // Pop and restore
     gen->function_stack_size--;
     gen->current_function = gen->function_stack[gen->function_stack_size];
-    // Remove the popped entry to avoid double-free
     gen->function_stack[gen->function_stack_size] = NULL;
-
-    DEBUG_VERBOSE("Popped function context, restored to '%s', stack size now %d",
-                  gen->current_function ? gen->current_function : "NULL", gen->function_stack_size);
 }
 
 void code_gen_free_function_stack(CodeGen *gen)
@@ -91,8 +67,6 @@ void code_gen_free_function_stack(CodeGen *gen)
     {
         return;
     }
-
-    // Free all stacked function names
     for (int i = 0; i < gen->function_stack_size; i++)
     {
         if (gen->function_stack[i] != NULL)
@@ -100,7 +74,6 @@ void code_gen_free_function_stack(CodeGen *gen)
             free(gen->function_stack[i]);
         }
     }
-
     free(gen->function_stack);
     gen->function_stack = NULL;
     gen->function_stack_size = 0;
@@ -114,17 +87,11 @@ void code_gen_init(CodeGen *gen, SymbolTable *symbol_table, const char *output_f
     gen->output = fopen(output_file, "w");
     gen->current_function = NULL;
     gen->current_return_type = NULL;
-
-    // Initialize function context stack
     code_gen_init_function_stack(gen);
-
     if (gen->output == NULL)
     {
-        DEBUG_ERROR("Could not open output file '%s'", output_file);
         exit(1);
     }
-
-    // Initialize string literals table
     string_literals = NULL;
 }
 
@@ -134,18 +101,12 @@ void code_gen_cleanup(CodeGen *gen)
     {
         fclose(gen->output);
     }
-
-    // Free current function name if set
     if (gen->current_function != NULL)
     {
         free(gen->current_function);
         gen->current_function = NULL;
     }
-
-    // Free function context stack
     code_gen_free_function_stack(gen);
-
-    // Free string literals
     StringLiteral *current = string_literals;
     while (current != NULL)
     {
@@ -169,79 +130,64 @@ int code_gen_add_string_literal(CodeGen *gen, const char *string)
 {
     if (string == NULL)
     {
-        DEBUG_ERROR("Null string passed to add_string_literal");
         return -1;
     }
-
     int label = code_gen_new_label(gen);
-
     StringLiteral *literal = malloc(sizeof(StringLiteral));
     if (literal == NULL)
     {
-        DEBUG_ERROR("Out of memory");
         exit(1);
     }
-
     literal->string = strdup(string);
     if (literal->string == NULL)
     {
-        DEBUG_ERROR("Out of memory");
         free(literal);
         exit(1);
     }
-
     literal->label = label;
     literal->next = string_literals;
     string_literals = literal;
-
     return label;
 }
 
 void code_gen_string_literal(CodeGen *gen, const char *string, int label)
 {
     fprintf(gen->output, "str_%d db ", label);
-
     if (*string == '\0')
     {
         fprintf(gen->output, "0\n");
         return;
     }
-
     const unsigned char *p = (const unsigned char *)string;
     int first = 1;
-
     while (*p)
     {
         if (!first)
             fprintf(gen->output, ", ");
         first = 0;
-
         switch (*p)
         {
         case '\n':
             fprintf(gen->output, "10");
-            break; // Newline
+            break;
         case '\t':
             fprintf(gen->output, "9");
-            break; // Tab
+            break;
         case '\\':
             fprintf(gen->output, "92");
-            break; // Backslash
+            break;
         default:
             fprintf(gen->output, "'%c'", *p);
         }
         p++;
     }
-
-    fprintf(gen->output, ", 0\n"); // Null terminator
+    fprintf(gen->output, ", 0\n");
 }
 
 void code_gen_data_section(CodeGen *gen)
 {
     fprintf(gen->output, "section .data\n");
     fprintf(gen->output, "empty_str db 0\n");
-
-    // Generate string literals
     StringLiteral *current = string_literals;
     while (current != NULL)
     {
@@ -251,7 +197,6 @@ void code_gen_data_section(CodeGen *gen)
         }
         current = current->next;
     }
-
     fprintf(gen->output, "\n");
 }
 
@@ -259,16 +204,12 @@ void code_gen_text_section(CodeGen *gen)
 {
     fprintf(gen->output, "section .text\n");
     fprintf(gen->output, "    global main\n\n");
-
-    // Existing externs
     fprintf(gen->output, "    extern rt_str_concat\n");
     fprintf(gen->output, "    extern rt_print_long\n");
     fprintf(gen->output, "    extern rt_print_double\n");
     fprintf(gen->output, "    extern rt_print_char\n");
     fprintf(gen->output, "    extern rt_print_string\n");
     fprintf(gen->output, "    extern rt_print_bool\n");
-
-    // New externs for ops
     fprintf(gen->output, "    extern rt_add_long\n");
     fprintf(gen->output, "    extern rt_sub_long\n");
     fprintf(gen->output, "    extern rt_mul_long\n");
@@ -280,7 +221,6 @@ void code_gen_text_section(CodeGen *gen)
     fprintf(gen->output, "    extern rt_le_long\n");
     fprintf(gen->output, "    extern rt_gt_long\n");
     fprintf(gen->output, "    extern rt_ge_long\n");
-
     fprintf(gen->output, "    extern rt_add_double\n");
     fprintf(gen->output, "    extern rt_sub_double\n");
     fprintf(gen->output, "    extern rt_mul_double\n");
@@ -291,15 +231,11 @@ void code_gen_text_section(CodeGen *gen)
     fprintf(gen->output, "    extern rt_le_double\n");
     fprintf(gen->output, "    extern rt_gt_double\n");
     fprintf(gen->output, "    extern rt_ge_double\n");
-
     fprintf(gen->output, "    extern rt_neg_long\n");
     fprintf(gen->output, "    extern rt_neg_double\n");
     fprintf(gen->output, "    extern rt_not_bool\n");
-
     fprintf(gen->output, "    extern rt_post_inc_long\n");
     fprintf(gen->output, "    extern rt_post_dec_long\n");
-
-    // New externs for to_string and free
     fprintf(gen->output, "    extern rt_to_string_long\n");
     fprintf(gen->output, "    extern rt_to_string_double\n");
     fprintf(gen->output, "    extern rt_to_string_char\n");
@@ -313,79 +249,49 @@ void code_gen_prologue(CodeGen *gen, const char *function_name)
     fprintf(gen->output, "%s:\n", function_name);
     fprintf(gen->output, "    push rbp\n");
     fprintf(gen->output, "    mov rbp, rsp\n");
-
-    // Dynamically calculate stack space needed
-    int stack_space = 72; // Base allocation (adjusted for alignment)
+    int stack_space = 72;
     if (strcmp(function_name, "main") == 0)
-        stack_space = 136; // More space for main function (adjusted)
+        stack_space = 136;
     fprintf(gen->output, "    sub rsp, %d\n", stack_space);
 }
 
 void code_gen_epilogue(CodeGen *gen)
 {
-    // This function is now a no-op
-    (void)gen; // Avoid unused parameter warning
+    (void)gen;
 }
 
 static int code_gen_get_var_offset(CodeGen *gen, Token name)
 {
-    // Extract variable name for comparison
     char var_name[256];
     int name_len = name.length < 255 ? name.length : 255;
     strncpy(var_name, name.start, name_len);
     var_name[name_len] = '\0';
-
-    // Debug output to see what variable we're trying to access
-    DEBUG_VERBOSE("Looking up variable '%s' in function '%s'",
-                  var_name, gen->current_function ? gen->current_function : "global");
-
-    // Use the symbol table to get the variable's offset
     Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, name);
-
     if (symbol == NULL)
     {
-        // For debugging, print the variable we're looking for
-        char temp[256];
-        int name_len = name.length < 255 ? name.length : 255;
-        strncpy(temp, name.start, name_len);
-        temp[name_len] = '\0';
-        DEBUG_ERROR("Symbol not found in get_symbol_offset: '%s'", temp);
         return -1;
     }
-
-    DEBUG_VERBOSE("Found symbol '%s' with offset %d", var_name, symbol->offset);
     return symbol->offset;
 }
 
 void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
 {
-    DEBUG_VERBOSE("Generating binary expression in function '%s' with operator %d",
-                  gen->current_function ? gen->current_function : "global", expr->operator);
-
-    // Generate left operand (result in rax)
     code_gen_expression(gen, expr->left);
-    // Save left ptr in rbx (callee-saved, but we manage)
     fprintf(gen->output, "    mov rbx, rax\n");
-
-    // Generate right operand (result in rax)
     code_gen_expression(gen, expr->right);
-    // Save right ptr in rcx
     fprintf(gen->output, "    mov rcx, rax\n");
-
     Type *left_type = expr->left->expr_type;
     if (left_type == NULL)
     {
-        DEBUG_ERROR("No type");
         exit(1);
-    } // Add check
-
+    }
     switch (expr->operator)
     {
     case TOKEN_PLUS:
         if (left_type->kind == TYPE_STRING)
         {
-            fprintf(gen->output, "    mov rdi, rbx\n"); // left ptr as first arg
-            fprintf(gen->output, "    mov rsi, rcx\n"); // right ptr as second arg
+            fprintf(gen->output, "    mov rdi, rbx\n");
+            fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
             fprintf(gen->output, "    and r15, 15\n");
             fprintf(gen->output, "    sub rsp, r15\n");
@@ -415,7 +321,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported + type");
             exit(1);
         }
         break;
@@ -443,7 +348,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported - type");
             exit(1);
         }
         break;
@@ -471,7 +375,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported * type");
             exit(1);
         }
         break;
@@ -499,7 +402,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported / type");
             exit(1);
         }
         break;
@@ -516,7 +418,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported %% type");
             exit(1);
         }
         break;
@@ -543,7 +444,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported == type");
             exit(1);
         }
         break;
@@ -570,7 +470,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported != type");
             exit(1);
         }
         break;
@@ -597,7 +496,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported < type");
             exit(1);
         }
         break;
@@ -624,7 +522,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported <= type");
             exit(1);
         }
         break;
@@ -651,7 +548,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported > type");
             exit(1);
         }
         break;
@@ -678,7 +574,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported >= type");
             exit(1);
         }
         break;
@@ -712,23 +607,18 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
     }
     break;
     default:
-        DEBUG_ERROR("Unsupported binary operator\n");
         exit(1);
     }
 }
 
 void code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr)
 {
-    // Generate the operand
     code_gen_expression(gen, expr->operand);
-
     Type *op_type = expr->operand->expr_type;
     if (op_type == NULL)
     {
-        DEBUG_ERROR("No type");
         exit(1);
-    } // Add check
-
+    }
     switch (expr->operator)
     {
     case TOKEN_MINUS:
@@ -748,7 +638,6 @@ void code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr)
         }
         else
         {
-            DEBUG_ERROR("Unsupported - type");
             exit(1);
         }
         fprintf(gen->output, "    add rsp, r15\n");
@@ -762,7 +651,6 @@ void code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr)
         fprintf(gen->output, "    add rsp, r15\n");
         break;
     default:
-        DEBUG_ERROR("Unsupported unary operator\n");
         exit(1);
     }
 }
@@ -770,7 +658,6 @@ void code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr)
 void code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr)
 {
     TypeKind kind = expr->type->kind;
-
     switch (kind)
     {
     case TYPE_INT:
@@ -778,9 +665,6 @@ void code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr)
         fprintf(gen->output, "    mov rax, %ld\n", expr->value.int_value);
         break;
     case TYPE_DOUBLE:
-        // In x86-64, floating point values are typically in xmm0
-        // For simplicity, we'll handle doubles as integers
-        fprintf(gen->output, "    ; Double literals not fully implemented\n");
         fprintf(gen->output, "    mov rax, 0x%lx\n",
                 *(int64_t *)&expr->value.double_value);
         break;
@@ -789,15 +673,12 @@ void code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr)
         break;
     case TYPE_STRING:
     {
-        // Check if string value is NULL
         if (expr->value.string_value == NULL)
         {
-            fprintf(gen->output, "    ; Warning: NULL string literal\n");
             fprintf(gen->output, "    xor rax, rax\n");
         }
         else
         {
-            // Add the string to the string table and load its address
             int label = code_gen_add_string_literal(gen, expr->value.string_value);
             fprintf(gen->output, "    lea rax, [rel str_%d]\n", label);
             fprintf(gen->output, "    mov rdi, rax\n");
@@ -816,63 +697,44 @@ void code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr)
         fprintf(gen->output, "    xor rax, rax\n");
         break;
     default:
-        DEBUG_ERROR("Unsupported literal type\n");
         exit(1);
     }
 }
 
 void code_gen_variable_expression(CodeGen *gen, VariableExpr *expr)
 {
-    // Extract name for debugging
     char var_name[256];
     int name_len = expr->name.length < 255 ? expr->name.length : 255;
     strncpy(var_name, expr->name.start, name_len);
     var_name[name_len] = '\0';
-
-    DEBUG_VERBOSE("Accessing variable '%s' in function '%s'",
-                  var_name, gen->current_function ? gen->current_function : "global");
-
     int offset = code_gen_get_var_offset(gen, expr->name);
     if (offset == -1)
     {
-        DEBUG_ERROR("Undefined variable '%s'", var_name);
         exit(1);
     }
-
     fprintf(gen->output, "    mov rax, [rbp + %d]\n", offset);
 }
 
 void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
 {
-    // Extract name for debugging
     char var_name[256];
     int name_len = expr->name.length < 255 ? expr->name.length : 255;
     strncpy(var_name, expr->name.start, name_len);
     var_name[name_len] = '\0';
-
-    DEBUG_VERBOSE("Assigning to variable '%s' in function '%s'",
-                  var_name, gen->current_function ? gen->current_function : "global");
-
-    // Evaluate the value
     code_gen_expression(gen, expr->value);
-
-    // Lookup symbol to get offset and type
     Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, expr->name);
     if (symbol == NULL)
     {
-        DEBUG_ERROR("Undefined variable '%s'", var_name);
         exit(1);
     }
     int offset = symbol->offset;
-
-    // If it's a string, free the old value
     if (symbol->type && symbol->type->kind == TYPE_STRING)
     {
         int label = code_gen_new_label(gen);
         fprintf(gen->output, "    mov rdi, [rbp + %d]\n", offset);
         fprintf(gen->output, "    test rdi, rdi\n");
         fprintf(gen->output, "    jz .no_free_%d\n", label);
-        fprintf(gen->output, "    push rax\n"); // Save new value
+        fprintf(gen->output, "    push rax\n");
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
         fprintf(gen->output, "    sub rsp, r15\n");
@@ -881,7 +743,6 @@ void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
         fprintf(gen->output, "    pop rax\n");
         fprintf(gen->output, ".no_free_%d:\n", label);
     }
-
     fprintf(gen->output, "    mov [rbp + %d], rax\n", offset);
 }
 
@@ -893,7 +754,6 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
         fprintf(gen->output, "    lea rax, [rel empty_str]\n");
         return;
     }
-
     if (count == 1)
     {
         Expr *part = expr->parts[0];
@@ -901,7 +761,6 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
         code_gen_expression(gen, part);
         if (pt == NULL)
         {
-            DEBUG_ERROR("Type not set for single-part interpolated string");
             fprintf(gen->output, "    lea rax, [rel empty_str]\n");
             return;
         }
@@ -920,7 +779,6 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
                 to_str_func = "rt_to_string_double";
                 break;
             default:
-                DEBUG_ERROR("Unsupported type in single-part interpolated string");
                 exit(1);
             }
             fprintf(gen->output, "    mov rdi, rax\n");
@@ -932,16 +790,12 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
         }
         return;
     }
-
-    // Multi-part: build with concatenation, freeing intermediates
-    // Generate first part
     Expr *part = expr->parts[0];
     Type *pt = part->expr_type;
     code_gen_expression(gen, part);
     bool current_malloced = false;
     if (pt == NULL)
     {
-        DEBUG_ERROR("Type not set for interpolated part 0");
         fprintf(gen->output, "    lea rax, [rel empty_str]\n");
     }
     else if (pt->kind != TYPE_STRING)
@@ -959,7 +813,6 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
             to_str_func = "rt_to_string_double";
             break;
         default:
-            DEBUG_ERROR("Unsupported type in interpolated string");
             exit(1);
         }
         fprintf(gen->output, "    mov rdi, rax\n");
@@ -970,10 +823,7 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
         fprintf(gen->output, "    add rsp, r15\n");
         current_malloced = true;
     }
-    // Push first/current
     fprintf(gen->output, "    push rax\n");
-
-    // For each subsequent part
     for (int i = 1; i < count; i++)
     {
         part = expr->parts[i];
@@ -982,7 +832,6 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
         bool part_malloced = false;
         if (pt == NULL)
         {
-            DEBUG_ERROR("Type not set for interpolated part %d", i);
             fprintf(gen->output, "    lea rax, [rel empty_str]\n");
         }
         else if (pt->kind != TYPE_STRING)
@@ -1000,7 +849,6 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
                 to_str_func = "rt_to_string_double";
                 break;
             default:
-                DEBUG_ERROR("Unsupported type in interpolated string");
                 exit(1);
             }
             fprintf(gen->output, "    mov rdi, rax\n");
@@ -1011,10 +859,7 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
             fprintf(gen->output, "    add rsp, r15\n");
             part_malloced = true;
         }
-        // Push part str
         fprintf(gen->output, "    push rax\n");
-
-        // Concat: rdi = old current (rsp+8), rsi = part (rsp)
         fprintf(gen->output, "    mov rsi, [rsp]\n");
         fprintf(gen->output, "    mov rdi, [rsp + 8]\n");
         fprintf(gen->output, "    mov r15, rsp\n");
@@ -1022,8 +867,6 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
         fprintf(gen->output, "    sub rsp, r15\n");
         fprintf(gen->output, "    call rt_str_concat\n");
         fprintf(gen->output, "    add rsp, r15\n");
-
-        // Pop and free part if malloced
         fprintf(gen->output, "    pop rdi\n");
         if (part_malloced)
         {
@@ -1033,8 +876,6 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
             fprintf(gen->output, "    call free\n");
             fprintf(gen->output, "    add rsp, r15\n");
         }
-
-        // Pop and free old current if malloced
         fprintf(gen->output, "    pop rdi\n");
         if (current_malloced)
         {
@@ -1044,13 +885,9 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
             fprintf(gen->output, "    call free\n");
             fprintf(gen->output, "    add rsp, r15\n");
         }
-
-        // Push new current
         fprintf(gen->output, "    push rax\n");
-        current_malloced = true; // Concat always mallocs new string
+        current_malloced = true;
     }
-
-    // Pop final string to rax (leave unfreed)
     fprintf(gen->output, "    pop rax\n");
 }
 
@@ -1079,7 +916,6 @@ static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr)
             is_double = true;
             break;
         default:
-            DEBUG_ERROR("Unsupported type in interpolated print");
             exit(1);
         }
         bool needs_free = false;
@@ -1101,7 +937,7 @@ static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr)
             fprintf(gen->output, "    call %s\n", to_str_func);
             fprintf(gen->output, "    add rsp, r15\n");
             needs_free = true;
-            is_double = false; // Now it's a string
+            is_double = false;
             rt_func = "rt_print_string";
         }
         else
@@ -1140,42 +976,27 @@ static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr)
 void code_gen_call_expression(CodeGen *gen, Expr *expr)
 {
     CallExpr *call = &expr->as.call;
-    // Validate the number of arguments
     if (call->arg_count > 6)
     {
-        DEBUG_ERROR("Too many arguments (max 6 supported)");
         return;
     }
-
-    // Calculate function name
     const char *function_name = NULL;
-
-    // Handle variable functions
     if (call->callee->type == EXPR_VARIABLE)
     {
         VariableExpr *var = &call->callee->as.variable;
-        // Copy function name
-        char *name =
-
-            malloc(var->name.length + 1);
+        char *name = malloc(var->name.length + 1);
         if (name == NULL)
         {
-            DEBUG_ERROR("Out of memory");
             exit(1);
         }
-
         strncpy(name, var->name.start, var->name.length);
         name[var->name.length] = '\0';
         function_name = name;
     }
     else
     {
-        DEBUG_ERROR("Complex function calls not supported");
         exit(1);
     }
-
-    fprintf(gen->output, "    ; Call to %s with %d arguments\n", function_name, call->arg_count);
-
     if (strcmp(function_name, "print") == 0 && call->arg_count == 1)
     {
         Expr *arg = call->arguments[0];
@@ -1187,7 +1008,6 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
         }
         else
         {
-            // Normal print: evaluate arg and call runtime print based on type
             code_gen_expression(gen, arg);
             Type *arg_type = arg->expr_type;
             const char *rt_func = NULL;
@@ -1212,7 +1032,6 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
                 rt_func = "rt_print_bool";
                 break;
             default:
-                DEBUG_ERROR("Unsupported type for print");
                 break;
             }
             if (rt_func)
@@ -1249,15 +1068,9 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
             return;
         }
     }
-
-    // Normal function call (existing code for evaluating args and call)
-    // Evaluate arguments and move to registers in reverse order (x86-64 ABI)
     for (int i = call->arg_count - 1; i >= 0; i--)
     {
-        fprintf(gen->output, "    ; Evaluating argument %d\n", i);
         code_gen_expression(gen, call->arguments[i]);
-
-        // Use appropriate registers for the first 6 arguments
         switch (i)
         {
         case 0:
@@ -1279,39 +1092,26 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
             fprintf(gen->output, "    mov r9, rax\n");
             break;
         default:
-            // For >6 args (not supported yet), would push here
             break;
         }
     }
-
-    // Ensure stack is 16-byte aligned before call (ABI requirement)
-    fprintf(gen->output, "    ; Aligning stack for function call\n");
     fprintf(gen->output, "    mov r15, rsp\n");
     fprintf(gen->output, "    and r15, 15\n");
     fprintf(gen->output, "    sub rsp, r15\n");
-
-    // Call the function
     fprintf(gen->output, "    call %s\n", function_name);
-
-    // Restore stack alignment
     fprintf(gen->output, "    add rsp, r15\n");
-
     free((void *)function_name);
 }
 
 void code_gen_array_expression(CodeGen *gen, ArrayExpr *expr)
 {
-    // Arrays not implemented yet
-    (void)expr; // Suppress unused parameter warning
-    fprintf(gen->output, "    ; Arrays not fully implemented\n");
+    (void)expr;
     fprintf(gen->output, "    xor rax, rax\n");
 }
 
 void code_gen_array_access_expression(CodeGen *gen, ArrayAccessExpr *expr)
 {
-    // Array access not implemented yet
-    (void)expr; // Suppress unused parameter warning
-    fprintf(gen->output, "    ; Array access not fully implemented\n");
+    (void)expr;
     fprintf(gen->output, "    xor rax, rax\n");
 }
 
@@ -1319,18 +1119,14 @@ void code_gen_increment_expression(CodeGen *gen, Expr *expr)
 {
     if (expr->as.operand->type != EXPR_VARIABLE)
     {
-        fprintf(gen->output, "    ; Increment on non-variable not implemented\n");
         return;
     }
-
     Token name = expr->as.operand->as.variable.name;
     int offset = code_gen_get_var_offset(gen, name);
     if (offset == -1)
     {
-        fprintf(gen->output, "    ; Invalid variable for increment\n");
         return;
     }
-
     fprintf(gen->output, "    mov r15, rsp\n");
     fprintf(gen->output, "    and r15, 15\n");
     fprintf(gen->output, "    sub rsp, r15\n");
@@ -1343,18 +1139,14 @@ void code_gen_decrement_expression(CodeGen *gen, Expr *expr)
 {
     if (expr->as.operand->type != EXPR_VARIABLE)
     {
-        fprintf(gen->output, "    ; Decrement on non-variable not implemented\n");
         return;
     }
-
     Token name = expr->as.operand->as.variable.name;
     int offset = code_gen_get_var_offset(gen, name);
     if (offset == -1)
     {
-        fprintf(gen->output, "    ; Invalid variable for decrement\n");
         return;
     }
-
     fprintf(gen->output, "    mov r15, rsp\n");
     fprintf(gen->output, "    and r15, 15\n");
     fprintf(gen->output, "    sub rsp, r15\n");
@@ -1370,20 +1162,11 @@ void code_gen_expression(CodeGen *gen, Expr *expr)
         fprintf(gen->output, "    xor rax, rax\n");
         return;
     }
-
-    // Save the current function context
     code_gen_push_function_context(gen);
-
-    DEBUG_VERBOSE("Generating expression type %d in function context '%s'",
-                  expr->type, gen->current_function ? gen->current_function : "global");
-
     switch (expr->type)
     {
     case EXPR_BINARY:
-        DEBUG_VERBOSE("Binary expression with operator %d", expr->as.binary.operator);
         code_gen_binary_expression(gen, &expr->as.binary);
-
-        // Boolean conversion for comparison operators
         if (expr->expr_type && expr->expr_type->kind == TYPE_BOOL)
         {
             fprintf(gen->output, "    test rax, rax\n");
@@ -1392,94 +1175,66 @@ void code_gen_expression(CodeGen *gen, Expr *expr)
         }
         break;
     case EXPR_UNARY:
-        DEBUG_VERBOSE("Unary expression with operator %d", expr->as.unary.operator);
         code_gen_unary_expression(gen, &expr->as.unary);
         break;
     case EXPR_LITERAL:
-        if (expr->as.literal.type)
-        {
-            DEBUG_VERBOSE("Literal expression of type %s",
-                          ast_type_to_string(expr->as.literal.type));
-        }
         code_gen_literal_expression(gen, &expr->as.literal);
         break;
     case EXPR_VARIABLE:
-        DEBUG_VERBOSE("Variable expression");
         code_gen_variable_expression(gen, &expr->as.variable);
         break;
     case EXPR_ASSIGN:
-        DEBUG_VERBOSE("Assignment expression");
         code_gen_assign_expression(gen, &expr->as.assign);
         break;
     case EXPR_CALL:
-        DEBUG_VERBOSE("Call expression");
         code_gen_call_expression(gen, expr);
         break;
     case EXPR_ARRAY:
-        DEBUG_VERBOSE("Array expression");
         code_gen_array_expression(gen, &expr->as.array);
         break;
     case EXPR_ARRAY_ACCESS:
-        DEBUG_VERBOSE("Array access expression");
         code_gen_array_access_expression(gen, &expr->as.array_access);
         break;
     case EXPR_INCREMENT:
-        DEBUG_VERBOSE("Increment expression");
         code_gen_increment_expression(gen, expr);
         break;
     case EXPR_DECREMENT:
-        DEBUG_VERBOSE("Decrement expression");
         code_gen_decrement_expression(gen, expr);
         break;
     case EXPR_INTERPOLATED:
-        DEBUG_VERBOSE("Interpolated string expression");
         code_gen_interpolated_expression(gen, &expr->as.interpol);
         break;
     }
-
-    DEBUG_VERBOSE("Finished generating expression in function '%s'",
-                  gen->current_function ? gen->current_function : "global");
-
     code_gen_pop_function_context(gen);
 }
 
 void code_gen_expression_statement(CodeGen *gen, ExprStmt *stmt)
 {
     code_gen_expression(gen, stmt->expression);
-    // Result is discarded for expression statements
 }
 
 void code_gen_var_declaration(CodeGen *gen, VarDeclStmt *stmt)
 {
     symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->name, stmt->type, SYMBOL_LOCAL);
-    // If there's an initializer, evaluate it
     if (stmt->initializer != NULL)
     {
         code_gen_expression(gen, stmt->initializer);
     }
     else
     {
-        // Default initialization to 0
         fprintf(gen->output, "    xor rax, rax\n");
     }
-
-    // Get the variable offset from the symbol table
     int offset = code_gen_get_var_offset(gen, stmt->name);
-
-    // Store it in the variable's location
     fprintf(gen->output, "    mov [rbp + %d], rax\n", offset);
 }
 
 void code_gen_block(CodeGen *gen, BlockStmt *stmt)
 {
-    // Generate code for each statement in the block
     symbol_table_push_scope(gen->symbol_table);
     for (int i = 0; i < stmt->count; i++)
     {
         code_gen_statement(gen, stmt->statements[i]);
     }
-
-    // Free string locals in block scope
     Scope *scope = gen->symbol_table->current;
     Symbol *sym = scope->symbols;
     while (sym)
@@ -1538,24 +1293,19 @@ static void pre_build_symbols(CodeGen *gen, Stmt *stmt)
     case STMT_RETURN:
     case STMT_FUNCTION:
     case STMT_IMPORT:
-        // No locals to add
         break;
     }
 }
 
 void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
 {
-    DEBUG_VERBOSE("==== GENERATING FUNCTION '%.*s' ====", stmt->name.length, stmt->name.start);
-
     char *old_function = gen->current_function;
     Type *old_return_type = gen->current_return_type;
-
     if (stmt->name.length < 256)
     {
         gen->current_function = malloc(stmt->name.length + 1);
         if (gen->current_function == NULL)
         {
-            DEBUG_ERROR("Out of memory");
             exit(1);
         }
         strncpy(gen->current_function, stmt->name.start, stmt->name.length);
@@ -1563,51 +1313,37 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
     }
     else
     {
-        DEBUG_ERROR("Function name too long");
         exit(1);
     }
     gen->current_return_type = stmt->return_type;
-
     symbol_table_push_scope(gen->symbol_table);
     for (int i = 0; i < stmt->param_count; i++)
     {
         symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->params[i].name, stmt->params[i].type, SYMBOL_PARAM);
     }
-
-    // Pre-pass to compute max stack usage
     for (int i = 0; i < stmt->body_count; i++)
     {
         pre_build_symbols(gen, stmt->body[i]);
     }
-
-    // Compute aligned stack space (locals + padding for calls/alignments/pushes)
     int local_space = gen->symbol_table->current->next_local_offset;
-    int stack_space = local_space + 128; // Padding for calls, alignments, pushes
+    int stack_space = local_space + 128;
     stack_space = ((stack_space + 15) / 16) * 16;
     if (stack_space < 128)
         stack_space = 128;
-
-    // Generate prologue with computed space
     fprintf(gen->output, "%s:\n", gen->current_function);
     fprintf(gen->output, "    push rbp\n");
     fprintf(gen->output, "    mov rbp, rsp\n");
     fprintf(gen->output, "    sub rsp, %d\n", stack_space);
-
-    // Store parameters in their stack slots
     const char *param_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
     for (int i = 0; i < stmt->param_count && i < 6; i++)
     {
         int offset = symbol_table_get_symbol_offset(gen->symbol_table, stmt->params[i].name);
         fprintf(gen->output, "    mov [rbp + %d], %s\n", offset, param_regs[i]);
     }
-
-    // Generate body
     for (int i = 0; i < stmt->body_count; i++)
     {
         code_gen_statement(gen, stmt->body[i]);
     }
-
-    // Free string locals in function scope
     Scope *scope = gen->symbol_table->current;
     Symbol *sym = scope->symbols;
     while (sym)
@@ -1627,8 +1363,6 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
         }
         sym = sym->next;
     }
-
-    // Epilogue
     if (strcmp(gen->current_function, "main") == 0)
     {
         fprintf(gen->output, "main_return:\n");
@@ -1644,36 +1378,28 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
         fprintf(gen->output, "    pop rbp\n");
         fprintf(gen->output, "    ret\n");
     }
-
     symbol_table_pop_scope(gen->symbol_table);
     free(gen->current_function);
     gen->current_function = old_function;
     gen->current_return_type = old_return_type;
-
-    DEBUG_VERBOSE("==== COMPLETED FUNCTION '%.*s' (stack space: %d) ====", stmt->name.length, stmt->name.start, stack_space);
 }
 
 void code_gen_return_statement(CodeGen *gen, ReturnStmt *stmt)
 {
-    // Evaluate the return value if provided
     if (stmt->value != NULL)
     {
         code_gen_expression(gen, stmt->value);
     }
     else
     {
-        // Default return value is 0
         fprintf(gen->output, "    xor rax, rax\n");
     }
-
-    // Jump to the function's return label (special for main)
     if (gen->current_function && strcmp(gen->current_function, "main") == 0)
     {
         fprintf(gen->output, "    jmp main_return\n");
     }
     else
     {
-        // For other functions, jump to their specific return label
         fprintf(gen->output, "    jmp %s_return\n", gen->current_function);
     }
 }
@@ -1682,31 +1408,19 @@ void code_gen_if_statement(CodeGen *gen, IfStmt *stmt)
 {
     int else_label = code_gen_new_label(gen);
     int end_label = code_gen_new_label(gen);
-
-    // Generate condition
     code_gen_expression(gen, stmt->condition);
-
-    // Test condition
     fprintf(gen->output, "    test rax, rax\n");
     fprintf(gen->output, "    jz .L%d\n", else_label);
-
-    // Generate then branch
     code_gen_statement(gen, stmt->then_branch);
-
-    // Jump to end if there's an else branch
     if (stmt->else_branch != NULL)
     {
         fprintf(gen->output, "    jmp .L%d\n", end_label);
     }
-
-    // Generate else branch
     fprintf(gen->output, ".L%d:\n", else_label);
     if (stmt->else_branch != NULL)
     {
         code_gen_statement(gen, stmt->else_branch);
     }
-
-    // End label if there was an else branch
     if (stmt->else_branch != NULL)
     {
         fprintf(gen->output, ".L%d:\n", end_label);
@@ -1717,73 +1431,45 @@ void code_gen_while_statement(CodeGen *gen, WhileStmt *stmt)
 {
     int loop_start = code_gen_new_label(gen);
     int loop_end = code_gen_new_label(gen);
-
-    // Loop start label
-    fprintf(gen->output, ".L%d: ; Loop start\n", loop_start);
-
-    // Generate and check condition
+    fprintf(gen->output, ".L%d:\n", loop_start);
     code_gen_expression(gen, stmt->condition);
-
-    // If condition is false, jump to end
     fprintf(gen->output, "    test rax, rax\n");
-    fprintf(gen->output, "    jz .L%d ; Exit if condition is false\n", loop_end);
-
-    // Generate the entire loop body
+    fprintf(gen->output, "    jz .L%d\n", loop_end);
     if (stmt->body->type == STMT_BLOCK)
     {
-        code_gen_block(gen, &stmt->body->as.block); // Handle block statements
+        code_gen_block(gen, &stmt->body->as.block);
     }
     else
     {
-        code_gen_statement(gen, stmt->body); // Handle single statements
+        code_gen_statement(gen, stmt->body);
     }
-
-    // Jump back to start of loop
-    fprintf(gen->output, "    jmp .L%d ; Return to condition\n", loop_start);
-
-    // Loop end label
-    fprintf(gen->output, ".L%d: ; Loop end\n", loop_end);
+    fprintf(gen->output, "    jmp .L%d\n", loop_start);
+    fprintf(gen->output, ".L%d:\n", loop_end);
 }
 
 void code_gen_for_statement(CodeGen *gen, ForStmt *stmt)
 {
     int loop_start = code_gen_new_label(gen);
     int loop_end = code_gen_new_label(gen);
-
-    // Initializer (create a new scope)
     symbol_table_push_scope(gen->symbol_table);
     if (stmt->initializer != NULL)
     {
         code_gen_statement(gen, stmt->initializer);
     }
-
-    // Loop start label
-    fprintf(gen->output, ".L%d: ; Loop start\n", loop_start);
-
-    // Condition check (if present)
+    fprintf(gen->output, ".L%d:\n", loop_start);
     if (stmt->condition != NULL)
     {
         code_gen_expression(gen, stmt->condition);
         fprintf(gen->output, "    test rax, rax\n");
-        fprintf(gen->output, "    jz .L%d ; Exit if condition is false\n", loop_end);
+        fprintf(gen->output, "    jz .L%d\n", loop_end);
     }
-
-    // Generate loop body
     code_gen_statement(gen, stmt->body);
-
-    // Increment (if present)
     if (stmt->increment != NULL)
     {
         code_gen_expression(gen, stmt->increment);
     }
-
-    // Jump back to start of loop
-    fprintf(gen->output, "    jmp .L%d ; Return to condition\n", loop_start);
-
-    // Loop end label
-    fprintf(gen->output, ".L%d: ; Loop end\n", loop_end);
-
-    // Free string locals in for scope
+    fprintf(gen->output, "    jmp .L%d\n", loop_start);
+    fprintf(gen->output, ".L%d:\n", loop_end);
     Scope *scope = gen->symbol_table->current;
     Symbol *sym = scope->symbols;
     while (sym)
@@ -1803,8 +1489,6 @@ void code_gen_for_statement(CodeGen *gen, ForStmt *stmt)
         }
         sym = sym->next;
     }
-
-    // Pop the scope
     symbol_table_pop_scope(gen->symbol_table);
 }
 
@@ -1837,7 +1521,6 @@ void code_gen_statement(CodeGen *gen, Stmt *stmt)
         code_gen_for_statement(gen, &stmt->as.for_stmt);
         break;
     case STMT_IMPORT:
-        // Import statements are handled at an earlier stage
         break;
     }
 }
@@ -1849,20 +1532,11 @@ void code_gen_footer(CodeGen *gen)
 
 void code_gen_module(CodeGen *gen, Module *module)
 {
-    // Set up the assembly file
     code_gen_text_section(gen);
-
-    // DON'T generate _start function (entry point) -
-    // GCC's runtime will provide this
-
-    // Generate code for each statement in the module
     for (int i = 0; i < module->count; i++)
     {
         code_gen_statement(gen, module->statements[i]);
     }
-
-    // Generate data section (string literals, etc.)
     code_gen_data_section(gen);
-
     code_gen_footer(gen);
 }
