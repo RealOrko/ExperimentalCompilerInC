@@ -1,33 +1,50 @@
 Language Specification for Custom C Compiler
-This document outlines the language specification for a simple programming language designed to be compiled by a C-based compiler. The language supports basic constructs for functions, conditionals, loops, variables, and string interpolation, as demonstrated in the provided example code.
-1. Syntax Overview
-The language uses a concise, indentation-based syntax with => as a block delimiter, inspired by functional and scripting languages. It supports basic data types, functions, control flow, and string interpolation.
-2. Data Types
-The language supports the following primitive data types:
+This document outlines the specification for a simple programming language designed for a C-based compiler. The language features a clean, indentation-based syntax with => block delimiters, supporting functions, conditionals, loops, variables, and string interpolation.
+Table of Contents
 
-int: Integer values (e.g., 5, -10).
-bool: Boolean values (true, false).
-str: Strings for text data (e.g., "hello").
-double: Floating-point numbers (e.g., 3.14159).
-char: Single characters (e.g., 'A').
+Syntax Overview
+Data Types
+Variable Declarations
+Functions
+Control Flow
+String Interpolation
+Operators
+Built-in Functions
+Function Examples
+Main Function
+Example Program Output
+Implementation Notes
 
-3. Variable Declarations
-Variables are declared using the var keyword, followed by the variable name, type annotation, and optional initialization:
+Syntax Overview
+The language uses a concise syntax inspired by functional and scripting languages. Blocks are delimited by =>, and indentation is significant. It supports basic data types, control structures, and string interpolation for expressive programming.
+Data Types
+The language supports the following primitive types:
+
+int: Integer values (e.g., 5, -10)
+bool: Boolean values (true, false)
+str: Strings for text (e.g., "hello")
+double: Floating-point numbers (e.g., 3.14159)
+char: Single characters (e.g., 'A')
+
+Variable Declarations
+Variables are declared with the var keyword, a name, type annotation, and optional initialization:
 var name: type = value
 
 
 Example: var num: int = 5
-Variables can be reassigned to values of the same type: any = $"New value {num}".
+Variables can be reassigned to values of the same type:any = $"New value {num}"
 
-4. Functions
-Functions are defined using the fn keyword, followed by the function name, parameters with type annotations, return type, and body:
+
+
+Functions
+Functions are defined with the fn keyword, parameters, return type, and a body:
 fn name(param1: type1, param2: type2): return_type =>
   // body
 
 
-Parameters are declared with names and types: (n: int).
-The return type is specified after a colon: : int.
-The body is enclosed in => and uses return to yield a value.
+Parameters include names and types: (n: int)
+Return type follows a colon: : int
+Body uses => and return for output
 Example:fn factorial(n: int): int =>
   if n <= 1 =>
     return 1
@@ -35,9 +52,9 @@ Example:fn factorial(n: int): int =>
 
 
 
-5. Control Flow
-5.1 Conditionals
-Conditional statements use if, else, and => for block delimitation:
+Control Flow
+Conditionals
+Conditionals use if, else, and => for blocks:
 if condition =>
   // true branch
 else =>
@@ -51,7 +68,7 @@ else =>
 
 
 
-5.2 Loops
+Loops
 While Loop
 while condition =>
   // body
@@ -74,33 +91,33 @@ Example:for var j: int = 0; j < count; j++ =>
 
 
 
-6. String Interpolation
-Strings support interpolation using the $ prefix and {} for expressions:
+String Interpolation
+Strings support interpolation with a $ prefix and {} for expressions:
 $"text {expression}"
 
 
 Example: $"Factorial of {num} is {fact}"
-Interpolated expressions can include variables of any type (int, str, double, char, bool).
+Supports variables of any type (int, str, double, char, bool).
 
-7. Operators
+Operators
 
-Arithmetic: +, -, *, /, % (modulo).
-Comparison: ==, <=, >=, <, >.
-Logical: Not explicitly shown but assumed to include &&, ||, !.
-Assignment: =.
-Increment: ++ (used in for loops).
+Arithmetic: +, -, *, /, % (modulo)
+Comparison: ==, <=, >=, <, >
+Logical: &&, ||, ! (assumed)
+Assignment: =
+Increment: ++ (used in for loops)
 
-8. Built-in Functions
+Built-in Functions
 
-print: Outputs a string to the console.
+print: Outputs a string to the console
 Example: print("Hello, world!")
-Supports string interpolation: print($"Sum: {sum}").
+Supports interpolation: print($"Sum: {sum}")
 
 
 
-9. Function Examples
+Function Examples
 Factorial
-Recursive function to compute factorial:
+Computes the factorial of a number recursively:
 fn factorial(n: int): int =>
   if n <= 1 =>
     return 1
@@ -126,16 +143,16 @@ fn repeat_string(text: str, count: int): str =>
     result = result + text
   return result
 
-10. Main Function
-The main function serves as the entry point, with a return type of void:
+Main Function
+The main function is the program entry point with a void return type:
 fn main(): void =>
   // program logic
 
 
-Example usage includes variable declarations, function calls, loops, and printing.
+Includes variable declarations, function calls, loops, and printing.
 
-11. Example Program Output
-Running the provided program would produce output like:
+Example Program Output
+Running the example program produces:
 Factorial of 5 is 120
 7 is prime
 hello hello hello world!
@@ -150,12 +167,12 @@ This is a thing 3.14159
 This is a thing A
 This is a thing true
 
-12. Implementation Notes for C Compiler
+Implementation Notes
 
-Lexical Analysis: Tokenize keywords (fn, var, if, else, while, for, return), types (int, bool, str, double, char), operators, and identifiers.
-Parsing: Use a recursive descent parser to handle the => block structure and type annotations.
-Type Checking: Ensure type consistency for assignments, function calls, and returns.
-Code Generation: Map to C constructs (e.g., functions to C functions, str to char*, print to printf).
-String Interpolation: Implement a runtime function to handle $"..." by parsing {} expressions and converting them to strings.
+Lexical Analysis: Tokenize keywords (fn, var, if, else, while, for, return), types, operators, and identifiers.
+Parsing: Use recursive descent for => blocks and type annotations.
+Type Checking: Ensure type consistency for assignments, calls, and returns.
+Code Generation: Map to C constructs (e.g., str to char*, print to printf).
+String Interpolation: Implement a runtime function to parse {} expressions and convert to strings.
 
-This specification provides a foundation for building a C-based compiler for this language.
+This specification provides a clear foundation for implementing a C-based compiler for this language.
