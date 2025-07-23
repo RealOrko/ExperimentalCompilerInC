@@ -1,8 +1,3 @@
-/**
- * type_checker.c
- * Implementation of the type checker
- */
-
 #include "type_checker.h"
 #include "debug.h"
 #include "lexer.h"
@@ -145,7 +140,7 @@ static Type *type_check_interpolated(Expr *expr, SymbolTable *table)
 
 static Type *type_check_literal(Expr *expr, SymbolTable *table)
 {
-    (void)table; // Unused
+    (void)table;
     return ast_clone_type(expr->as.literal.type);
 }
 
@@ -302,11 +297,9 @@ Type *type_check_expr(Expr *expr, SymbolTable *table)
         t = type_check_call(expr, table);
         break;
     case EXPR_ARRAY:
-        // TODO: Implement if arrays are used
         t = ast_create_array_type(ast_create_primitive_type(TYPE_NIL));
         break;
     case EXPR_ARRAY_ACCESS:
-        // TODO: Implement if arrays are used
         t = ast_create_primitive_type(TYPE_NIL);
         break;
     case EXPR_INCREMENT:
@@ -352,7 +345,6 @@ static void type_check_var_decl(Stmt *stmt, SymbolTable *table, Type *return_typ
     {
         ast_free_type(init_type);
     }
-    // Add the variable to the current scope after checking initializer
     symbol_table_add_symbol_with_kind(table, stmt->as.var_decl.name,
                                       stmt->as.var_decl.type, SYMBOL_LOCAL);
 }
@@ -361,14 +353,12 @@ static void type_check_function(Stmt *stmt, SymbolTable *table)
 {
     symbol_table_push_scope(table);
     
-    // Add parameters to the new scope
     for (int i = 0; i < stmt->as.function.param_count; i++)
     {
         Parameter param = stmt->as.function.params[i];
         symbol_table_add_symbol_with_kind(table, param.name, param.type, SYMBOL_PARAM);
     }
     
-    // Set starting local offset after last parameter (avoids overlap)
     table->current->next_local_offset = table->current->next_param_offset;
     
     for (int i = 0; i < stmt->as.function.body_count; i++)
@@ -418,7 +408,6 @@ static void type_check_if(Stmt *stmt, SymbolTable *table, Type *return_type)
     {
         type_error("If condition must be boolean");
     }
-    // Do not free cond_type; owned by AST
     type_check_stmt(stmt->as.if_stmt.then_branch, table, return_type);
     if (stmt->as.if_stmt.else_branch)
     {
@@ -433,7 +422,6 @@ static void type_check_while(Stmt *stmt, SymbolTable *table, Type *return_type)
     {
         type_error("While condition must be boolean");
     }
-    // Do not free cond_type; owned by AST
     type_check_stmt(stmt->as.while_stmt.body, table, return_type);
 }
 
@@ -451,7 +439,6 @@ static void type_check_for(Stmt *stmt, SymbolTable *table, Type *return_type)
         {
             type_error("For condition must be boolean");
         }
-        // Do not free cond_type; owned by AST
     }
     if (stmt->as.for_stmt.increment)
     {
@@ -492,7 +479,6 @@ static void type_check_stmt(Stmt *stmt, SymbolTable *table, Type *return_type)
         type_check_for(stmt, table, return_type);
         break;
     case STMT_IMPORT:
-        // No type checking needed for imports (yet)
         break;
     }
 }
