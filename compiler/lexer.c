@@ -1,8 +1,3 @@
-/**
- * lexer.c
- * Implementation of the lexical analyzer
- */
-
 #include "lexer.h"
 #include "debug.h"
 #include <stdio.h>
@@ -10,7 +5,6 @@
 #include <string.h>
 #include <ctype.h>
 
-// Static buffer for error messages to avoid use-after-return
 static char error_buffer[128];
 
 void lexer_init(Lexer *lexer, const char *source, const char *filename)
@@ -19,13 +13,11 @@ void lexer_init(Lexer *lexer, const char *source, const char *filename)
     lexer->current = source;
     lexer->line = 1;
     lexer->filename = filename;
-
-    // Initialize indentation tracking
     lexer->indent_capacity = 8;
     lexer->indent_stack = malloc(sizeof(int) * lexer->indent_capacity);
     lexer->indent_size = 1;
-    lexer->indent_stack[0] = 0; // Base level has zero indentation
-    lexer->at_line_start = 1;   // Start at the beginning of a line
+    lexer->indent_stack[0] = 0;
+    lexer->at_line_start = 1;
 }
 
 void lexer_cleanup(Lexer *lexer)
@@ -72,7 +64,6 @@ int lexer_match(Lexer *lexer, char expected)
         return 0;
     if (*lexer->current != expected)
         return 0;
-
     lexer->current++;
     return 1;
 }
@@ -119,12 +110,10 @@ void lexer_skip_whitespace(Lexer *lexer)
         case '/':
             if (lexer_peek_next(lexer) == '/')
             {
-                // A comment goes until the end of the line
                 while (lexer_peek(lexer) != '\n' && !lexer_is_at_end(lexer))
                 {
                     lexer_advance(lexer);
                 }
-                // Now at newline, but don't consume it
             }
             else
             {
@@ -145,13 +134,11 @@ TokenType lexer_check_keyword(Lexer *lexer, int start, int length, const char *r
     {
         return type;
     }
-
     return TOKEN_IDENTIFIER;
 }
 
 TokenType lexer_identifier_type(Lexer *lexer)
 {
-    // Using a trie-like approach for keyword matching
     switch (lexer->start[0])
     {
     case 'b':
@@ -239,7 +226,6 @@ TokenType lexer_identifier_type(Lexer *lexer)
     case 'w':
         return lexer_check_keyword(lexer, 1, 4, "hile", TOKEN_WHILE);
     }
-
     return TOKEN_IDENTIFIER;
 }
 
@@ -249,11 +235,7 @@ Token lexer_scan_identifier(Lexer *lexer)
     {
         lexer_advance(lexer);
     }
-
-    // See if the identifier is a reserved word
     TokenType type = lexer_identifier_type(lexer);
-
-    // Special handling for boolean literals
     if (type == TOKEN_BOOL_LITERAL)
     {
         Token token = lexer_make_token(lexer, type);
@@ -267,58 +249,40 @@ Token lexer_scan_identifier(Lexer *lexer)
         }
         return token;
     }
-
     return lexer_make_token(lexer, type);
 }
 
 Token lexer_scan_number(Lexer *lexer)
 {
-    // Int part
     while (isdigit(lexer_peek(lexer)))
     {
         lexer_advance(lexer);
     }
-
-    // Check for a decimal part
     if (lexer_peek(lexer) == '.' && isdigit(lexer_peek_next(lexer)))
     {
-        // Consume the '.'
         lexer_advance(lexer);
-
-        // Consume the fractional part
         while (isdigit(lexer_peek(lexer)))
         {
             lexer_advance(lexer);
         }
-
-        // Check for double literal 'd' suffix
         if (lexer_peek(lexer) == 'd')
         {
             lexer_advance(lexer);
             Token token = lexer_make_token(lexer, TOKEN_DOUBLE_LITERAL);
-
-            // Convert the substring to a double
             char buffer[256];
-            int length = (int)(lexer->current - lexer->start - 1); // -1 to exclude the 'd'
+            int length = (int)(lexer->current - lexer->start - 1);
             if (length >= (int)sizeof(buffer))
             {
                 snprintf(error_buffer, sizeof(error_buffer), "Number literal too long");
                 return lexer_error_token(lexer, error_buffer);
             }
-
             strncpy(buffer, lexer->start, length);
             buffer[length] = '\0';
-
             double value = strtod(buffer, NULL);
             token_set_double_literal(&token, value);
-
             return token;
         }
-
-        // It's a double literal without the 'd' suffix
         Token token = lexer_make_token(lexer, TOKEN_DOUBLE_LITERAL);
-
-        // Convert the substring to a double
         char buffer[256];
         int length = (int)(lexer->current - lexer->start);
         if (length >= (int)sizeof(buffer))
@@ -326,44 +290,30 @@ Token lexer_scan_number(Lexer *lexer)
             snprintf(error_buffer, sizeof(error_buffer), "Number literal too long");
             return lexer_error_token(lexer, error_buffer);
         }
-
         strncpy(buffer, lexer->start, length);
         buffer[length] = '\0';
-
         double value = strtod(buffer, NULL);
         token_set_double_literal(&token, value);
-
         return token;
     }
-
-    // Check for long literal 'l' suffix
     if (lexer_peek(lexer) == 'l')
     {
         lexer_advance(lexer);
         Token token = lexer_make_token(lexer, TOKEN_LONG_LITERAL);
-
-        // Convert the substring to a long
         char buffer[256];
-        int length = (int)(lexer->current - lexer->start - 1); // -1 to exclude the 'l'
+        int length = (int)(lexer->current - lexer->start - 1);
         if (length >= (int)sizeof(buffer))
         {
             snprintf(error_buffer, sizeof(error_buffer), "Number literal too long");
             return lexer_error_token(lexer, error_buffer);
         }
-
         strncpy(buffer, lexer->start, length);
         buffer[length] = '\0';
-
         int64_t value = strtoll(buffer, NULL, 10);
         token_set_int_literal(&token, value);
-
         return token;
     }
-
-    // It's an int literal
     Token token = lexer_make_token(lexer, TOKEN_INT_LITERAL);
-
-    // Convert the substring to an int
     char buffer[256];
     int length = (int)(lexer->current - lexer->start);
     if (length >= (int)sizeof(buffer))
@@ -371,26 +321,15 @@ Token lexer_scan_number(Lexer *lexer)
         snprintf(error_buffer, sizeof(error_buffer), "Number literal too long");
         return lexer_error_token(lexer, error_buffer);
     }
-
     strncpy(buffer, lexer->start, length);
     buffer[length] = '\0';
-
     int64_t value = strtoll(buffer, NULL, 10);
     token_set_int_literal(&token, value);
-
     return token;
 }
 
-/**
- * String handling fix for lexer.c
- * This addresses the strdup issue in the scan_string function
- */
-
 Token lexer_scan_string(Lexer *lexer)
 {
-    // The opening quote is already consumed
-
-    // Allocate buffer for the string value (dynamically resized if needed)
     int buffer_size = 256;
     char *buffer = malloc(buffer_size);
     if (buffer == NULL)
@@ -398,20 +337,16 @@ Token lexer_scan_string(Lexer *lexer)
         snprintf(error_buffer, sizeof(error_buffer), "Memory allocation failed");
         return lexer_error_token(lexer, error_buffer);
     }
-
     int buffer_index = 0;
-
     while (lexer_peek(lexer) != '"' && !lexer_is_at_end(lexer))
     {
         if (lexer_peek(lexer) == '\n')
         {
             lexer->line++;
         }
-
-        // Handle escape sequences
         if (lexer_peek(lexer) == '\\')
         {
-            lexer_advance(lexer); // consume the backslash
+            lexer_advance(lexer);
             switch (lexer_peek(lexer))
             {
             case '\\':
@@ -439,10 +374,7 @@ Token lexer_scan_string(Lexer *lexer)
         {
             buffer[buffer_index++] = lexer_peek(lexer);
         }
-
         lexer_advance(lexer);
-
-        // Resize buffer if needed
         if (buffer_index >= buffer_size - 1)
         {
             buffer_size *= 2;
@@ -456,25 +388,15 @@ Token lexer_scan_string(Lexer *lexer)
             buffer = new_buffer;
         }
     }
-
-    // Make sure we found the closing quote
     if (lexer_is_at_end(lexer))
     {
         free(buffer);
         snprintf(error_buffer, sizeof(error_buffer), "Unterminated string");
         return lexer_error_token(lexer, error_buffer);
     }
-
-    // Consume the closing quote
     lexer_advance(lexer);
-
-    // Null-terminate the string
     buffer[buffer_index] = '\0';
-
-    // Create the token
     Token token = lexer_make_token(lexer, TOKEN_STRING_LITERAL);
-
-    // Create a copy of the string that will persist
     char *str_copy = malloc(buffer_index + 1);
     if (str_copy == NULL)
     {
@@ -482,24 +404,18 @@ Token lexer_scan_string(Lexer *lexer)
         snprintf(error_buffer, sizeof(error_buffer), "Memory allocation failed");
         return lexer_error_token(lexer, error_buffer);
     }
-
     strcpy(str_copy, buffer);
     token_set_string_literal(&token, str_copy);
-
     free(buffer);
     return token;
 }
 
 Token lexer_scan_char(Lexer *lexer)
 {
-    // The opening quote is already consumed
-
     char value = '\0';
-
-    // Handle escape sequences
     if (lexer_peek(lexer) == '\\')
     {
-        lexer_advance(lexer); // consume the backslash
+        lexer_advance(lexer);
         switch (lexer_peek(lexer))
         {
         case '\\':
@@ -531,35 +447,23 @@ Token lexer_scan_char(Lexer *lexer)
     {
         value = lexer_peek(lexer);
     }
-
-    lexer_advance(lexer); // consume the character
-
-    // Make sure we found the closing quote
+    lexer_advance(lexer);
     if (lexer_peek(lexer) != '\'')
     {
         snprintf(error_buffer, sizeof(error_buffer), "Unterminated character literal");
         return lexer_error_token(lexer, error_buffer);
     }
-
-    // Consume the closing quote
     lexer_advance(lexer);
-
-    // Create the token
     Token token = lexer_make_token(lexer, TOKEN_CHAR_LITERAL);
     token_set_char_literal(&token, value);
-
     return token;
 }
 
 Token lexer_scan_token(Lexer *lexer)
 {
-    // Log the start of token scanning
     DEBUG_VERBOSE("Line %d: Starting lexer_scan_token, at_line_start = %d", lexer->line, lexer->at_line_start);
-
-    // Handle indentation at the start of a line
     if (lexer->at_line_start)
     {
-        // Calculate indentation level
         int current_indent = 0;
         const char *indent_start = lexer->current;
         while (lexer_peek(lexer) == ' ' || lexer_peek(lexer) == '\t')
@@ -568,8 +472,6 @@ Token lexer_scan_token(Lexer *lexer)
             lexer_advance(lexer);
         }
         DEBUG_VERBOSE("Line %d: Calculated indent = %d", lexer->line, current_indent);
-
-        // Check if the line is just whitespace or a comment
         const char *temp = lexer->current;
         while (lexer_peek(lexer) == ' ' || lexer_peek(lexer) == '\t')
         {
@@ -589,10 +491,8 @@ Token lexer_scan_token(Lexer *lexer)
             int top = lexer->indent_stack[lexer->indent_size - 1];
             DEBUG_VERBOSE("Line %d: Top of indent_stack = %d, indent_size = %d",
                           lexer->line, top, lexer->indent_size);
-
             if (current_indent > top)
             {
-                // Push new indentation level and emit INDENT
                 if (lexer->indent_size >= lexer->indent_capacity)
                 {
                     lexer->indent_capacity *= 2;
@@ -614,12 +514,10 @@ Token lexer_scan_token(Lexer *lexer)
             }
             else if (current_indent < top)
             {
-                // Pop indentation level and emit DEDENT
                 lexer->indent_size--;
                 int new_top = lexer->indent_stack[lexer->indent_size - 1];
                 DEBUG_VERBOSE("Line %d: Popped indent level, new top = %d, indent_size = %d",
                               lexer->line, new_top, lexer->indent_size);
-
                 if (current_indent == new_top)
                 {
                     lexer->at_line_start = 0;
@@ -648,24 +546,16 @@ Token lexer_scan_token(Lexer *lexer)
             }
         }
     }
-
-    // Skip whitespace within the line
     DEBUG_VERBOSE("Line %d: Skipping whitespace within the line", lexer->line);
     lexer_skip_whitespace(lexer);
     lexer->start = lexer->current;
-
-    // Check for end of file
     if (lexer_is_at_end(lexer))
     {
         DEBUG_VERBOSE("Line %d: End of file reached", lexer->line);
         return lexer_make_token(lexer, TOKEN_EOF);
     }
-
-    // Scan the next character
     char c = lexer_advance(lexer);
     DEBUG_VERBOSE("Line %d: Scanning character '%c'", lexer->line, c);
-
-    // Handle newline
     if (c == '\n')
     {
         lexer->line++;
@@ -673,24 +563,18 @@ Token lexer_scan_token(Lexer *lexer)
         DEBUG_VERBOSE("Line %d: Emitting NEWLINE", lexer->line - 1);
         return lexer_make_token(lexer, TOKEN_NEWLINE);
     }
-
-    // Handle identifiers and keywords
     if (isalpha(c) || c == '_')
     {
         Token token = lexer_scan_identifier(lexer);
         DEBUG_VERBOSE("Line %d: Emitting identifier token type %d", lexer->line, token.type);
         return token;
     }
-
-    // Handle numbers
     if (isdigit(c))
     {
         Token token = lexer_scan_number(lexer);
         DEBUG_VERBOSE("Line %d: Emitting number token type %d", lexer->line, token.type);
         return token;
     }
-
-    // Handle operators and punctuation
     switch (c)
     {
     case '%':
@@ -770,22 +654,19 @@ Token lexer_scan_token(Lexer *lexer)
     case '$':
         if (lexer_peek(lexer) == '"')
         {
-            lexer_advance(lexer); // Consume '"'
+            lexer_advance(lexer);
             Token token = lexer_scan_string(lexer);
             token.type = TOKEN_INTERPOL_STRING;
             DEBUG_VERBOSE("Line %d: Emitting INTERPOL_STRING", lexer->line);
             return token;
         }
-        /* falls through */ // Intentional fallthrough to handle invalid '$'
     default:
         snprintf(error_buffer, sizeof(error_buffer), "Unexpected character '%c'", c);
         DEBUG_VERBOSE("Line %d: Error - %s", lexer->line, error_buffer);
         return lexer_error_token(lexer, error_buffer);
     }
-
     if (lexer_is_at_end(lexer))
     {
-        // Emit DEDENTs for remaining indents at EOF
         while (lexer->indent_size > 1)
         {
             lexer->indent_size--;

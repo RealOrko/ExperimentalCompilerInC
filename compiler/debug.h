@@ -1,28 +1,19 @@
-/**
- * debug.h
- * Debugging utilities for the compiler
- */
-
 #ifndef DEBUG_H
 #define DEBUG_H
 
 #include <stdio.h>
 #include <stdlib.h>
 
-// Debug levels
 #define DEBUG_LEVEL_NONE 0
 #define DEBUG_LEVEL_ERROR 1
 #define DEBUG_LEVEL_WARNING 2
 #define DEBUG_LEVEL_INFO 3
 #define DEBUG_LEVEL_VERBOSE 4
 
-// Current debug level (can be changed at runtime)
 extern int debug_level;
 
-// Initialize debugging
 void init_debug(int level);
 
-// Debug macros
 #define DEBUG_ERROR(fmt, ...)                                                           \
     if (debug_level >= DEBUG_LEVEL_ERROR)                                               \
     {                                                                                   \
@@ -63,7 +54,6 @@ void init_debug(int level);
         fprintf(stderr, fmt "\n", ##__VA_ARGS__);                 \
     }
 
-// Assert macro
 #define ASSERT(condition, fmt, ...)                                                      \
     if (!(condition))                                                                    \
     {                                                                                    \
@@ -71,4 +61,4 @@ void init_debug(int level);
         abort();                                                                         \
     }
 
-#endif // DEBUG_H
+#endif
