@@ -800,6 +800,7 @@ void code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr)
             // Add the string to the string table and load its address
             int label = code_gen_add_string_literal(gen, expr->value.string_value);
             fprintf(gen->output, "    lea rax, [rel str_%d]\n", label);
+            fprintf(gen->output, "    mov rdi, rax\n");
             fprintf(gen->output, "    mov r15, rsp\n");
             fprintf(gen->output, "    and r15, 15\n");
             fprintf(gen->output, "    sub rsp, r15\n");
