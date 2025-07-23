@@ -1,8 +1,3 @@
-/**
- * symbol_table.c
- * Implementation of the symbol table with stack offset tracking
- */
-
 #include "symbol_table.h"
 #include "debug.h"
 #include <stdlib.h>
@@ -11,7 +6,6 @@
 
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
-// New helper function to determine type size
 int get_type_size(Type *type)
 {
     switch (type->kind)
@@ -26,13 +20,12 @@ int get_type_size(Type *type)
     case TYPE_BOOL:
         return 1;
     case TYPE_STRING:
-        return 8; // Pointer size
+        return 8;
     default:
-        return 8; // Default to pointer size
+        return 8;
     }
 }
 
-// Helper to represent a token as a string safely
 static char *token_to_string(Token token)
 {
     static char buf[256];
@@ -42,7 +35,6 @@ static char *token_to_string(Token token)
     return buf;
 }
 
-// Print the entire symbol table state for debugging
 void symbol_table_print(SymbolTable *table, const char *where)
 {
     DEBUG_VERBOSE("==== SYMBOL TABLE DUMP (%s) ====", where);
@@ -91,7 +83,7 @@ SymbolTable *symbol_table_init()
     if (table == NULL)
     {
         DEBUG_ERROR("Out of memory creating symbol table");
-        return NULL; // Changed to return NULL for production
+        return NULL;
     }
     table->current = NULL;
     table->scopes = malloc(sizeof(Scope *) * 8);
@@ -104,7 +96,6 @@ SymbolTable *symbol_table_init()
     table->scopes_count = 0;
     table->scopes_capacity = 8;
 
-    // Start with a global scope
     symbol_table_push_scope(table);
     table->global_scope = table->current;
 
@@ -171,7 +162,6 @@ void symbol_table_push_scope(SymbolTable *table)
     table->scopes[table->scopes_count++] = scope;
 }
 
-// Initialize a function scope with proper offset tracking
 void symbol_table_begin_function_scope(SymbolTable *table)
 {
     symbol_table_push_scope(table);
@@ -190,7 +180,6 @@ void symbol_table_pop_scope(SymbolTable *table)
         table->current->next_local_offset = MAX(table->current->next_local_offset, to_free->next_local_offset);
         table->current->next_param_offset = MAX(table->current->next_param_offset, to_free->next_param_offset);
     }
-    // Do not free_scope(to_free); defer to cleanup
 }
 
 static int tokens_equal(Token a, Token b)
@@ -211,14 +200,12 @@ static int tokens_equal(Token a, Token b)
         return 0;
     }
 
-    // Check if the tokens have the same memory address
     if (a.start == b.start)
     {
         DEBUG_VERBOSE("Token address match at %p", (void *)a.start);
         return 1;
     }
 
-    // Memory compare
     int result = memcmp(a.start, b.start, a.length);
 
     char a_str[256], b_str[256];
@@ -242,9 +229,6 @@ static int tokens_equal(Token a, Token b)
     }
 }
 
-/**
- * Add a symbol to the symbol table with a specific kind
- */
 void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *type, SymbolKind kind)
 {
     if (table->current == NULL)
@@ -253,18 +237,14 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
         return;
     }
 
-    // Check if symbol already exists in current scope
     Symbol *existing = symbol_table_lookup_symbol_current(table, name);
     if (existing != NULL)
     {
-        // Symbol already exists, just update its type
         ast_free_type(existing->type);
-        existing->type = ast_clone_type(type); // Use clone instead of original
-        // Don't change the offset or kind of an existing symbol
+        existing->type = ast_clone_type(type);
         return;
     }
 
-    // Create new symbol
     Symbol *symbol = malloc(sizeof(Symbol));
     if (symbol == NULL)
     {
@@ -273,10 +253,9 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     }
 
     symbol->name = name;
-    symbol->type = ast_clone_type(type); // Use clone instead of original
+    symbol->type = ast_clone_type(type);
     symbol->kind = kind;
 
-    // Determine offset based on symbol kind
     if (kind == SYMBOL_PARAM)
     {
         symbol->offset = table->current->next_param_offset;
@@ -293,7 +272,6 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     }
     else
     {
-        // Globals don't have stack offsets
         symbol->offset = 0;
     }
 
@@ -308,14 +286,10 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     symbol->name.line = name.line;
     symbol->name.type = name.type;
 
-    // Add to current scope
     symbol->next = table->current->symbols;
     table->current->symbols = symbol;
 }
 
-/**
- * Add a symbol with default kind (local)
- */
 void symbol_table_add_symbol(SymbolTable *table, Token name, Type *type)
 {
     symbol_table_add_symbol_with_kind(table, name, type, SYMBOL_LOCAL);
@@ -347,7 +321,6 @@ Symbol *symbol_table_lookup_symbol(SymbolTable *table, Token name)
         return NULL;
     }
 
-    // Extract name as string for debugging and fallback matching
     char name_str[256];
     int name_len = name.length < 255 ? name.length : 255;
     strncpy(name_str, name.start, name_len);
@@ -366,7 +339,6 @@ Symbol *symbol_table_lookup_symbol(SymbolTable *table, Token name)
         Symbol *symbol = scope->symbols;
         while (symbol != NULL)
         {
-            // Get symbol name as string
             char sym_name[256];
             int sym_len = symbol->name.length < 255 ? symbol->name.length : 255;
             strncpy(sym_name, symbol->name.start, sym_len);
@@ -375,7 +347,6 @@ Symbol *symbol_table_lookup_symbol(SymbolTable *table, Token name)
             DEBUG_VERBOSE("    Symbol '%s' at address %p, length %d",
                           sym_name, (void *)symbol->name.start, symbol->name.length);
 
-            // Step 1: Try exact token comparison
             if (symbol->name.start == name.start && symbol->name.length == name.length)
             {
                 DEBUG_VERBOSE("Found symbol '%s' in scope level %d (direct pointer match)",
@@ -383,7 +354,6 @@ Symbol *symbol_table_lookup_symbol(SymbolTable *table, Token name)
                 return symbol;
             }
 
-            // Step 2: Try content comparison
             if (symbol->name.length == name.length &&
                 memcmp(symbol->name.start, name.start, name.length) == 0)
             {
@@ -392,7 +362,6 @@ Symbol *symbol_table_lookup_symbol(SymbolTable *table, Token name)
                 return symbol;
             }
 
-            // Step 3: Fall back to string comparison
             if (strcmp(sym_name, name_str) == 0)
             {
                 DEBUG_VERBOSE("Found symbol '%s' by string comparison in scope level %d",
@@ -411,16 +380,11 @@ Symbol *symbol_table_lookup_symbol(SymbolTable *table, Token name)
     return NULL;
 }
 
-/**
- * Get the stack offset for a symbol
- * Returns -1 if the symbol is not found
- */
 int symbol_table_get_symbol_offset(SymbolTable *table, Token name)
 {
     Symbol *symbol = symbol_table_lookup_symbol(table, name);
     if (symbol == NULL)
     {
-        // For debugging, print the variable we're looking for
         char temp[256];
         int name_len = name.length < 255 ? name.length : 255;
         strncpy(temp, name.start, name_len);
