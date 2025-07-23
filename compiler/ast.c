@@ -1,8 +1,3 @@
-/**
- * ast.c
- * Implementation of AST functions with memory safety improvements
- */
-
 #include "ast.h"
 #include "debug.h"
 #include <stdlib.h>
@@ -245,7 +240,7 @@ Type *ast_clone_type(Type *type)
     if (type == NULL)
         return NULL;
 
-    Type *clone = calloc(1, sizeof(Type)); // Zero-init
+    Type *clone = calloc(1, sizeof(Type));
     if (clone == NULL)
     {
         DEBUG_ERROR("Out of memory when cloning type");
@@ -253,7 +248,7 @@ Type *ast_clone_type(Type *type)
     }
 
     clone->kind = type->kind;
-    clone->should_free = 1; // Always freeable since newly allocated
+    clone->should_free = 1;
 
     switch (type->kind)
     {
@@ -265,7 +260,6 @@ Type *ast_clone_type(Type *type)
     case TYPE_BOOL:
     case TYPE_VOID:
     case TYPE_NIL:
-        // Primitives: no sub-data
         break;
 
     case TYPE_ARRAY:
@@ -306,7 +300,6 @@ void ast_mark_type_non_freeable(Type *type)
 
     type->should_free = 0;
 
-    // Also mark nested types
     if (type->kind == TYPE_ARRAY && type->as.array.element_type)
     {
         ast_mark_type_non_freeable(type->as.array.element_type);
@@ -326,20 +319,20 @@ void ast_mark_type_non_freeable(Type *type)
 
 Type *ast_create_primitive_type(TypeKind kind)
 {
-    Type *type = calloc(1, sizeof(Type)); // Zero-init
+    Type *type = calloc(1, sizeof(Type));
     if (type == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
     type->kind = kind;
-    type->should_free = 1; // Default to freeable
+    type->should_free = 1;
     return type;
 }
 
 Type *ast_create_array_type(Type *element_type)
 {
-    Type *type = calloc(1, sizeof(Type)); // Zero-init
+    Type *type = calloc(1, sizeof(Type));
     if (type == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -353,7 +346,7 @@ Type *ast_create_array_type(Type *element_type)
 
 Type *ast_create_function_type(Type *return_type, Type **param_types, int param_count)
 {
-    Type *type = calloc(1, sizeof(Type)); // Zero-init
+    Type *type = calloc(1, sizeof(Type));
     if (type == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -362,10 +355,8 @@ Type *ast_create_function_type(Type *return_type, Type **param_types, int param_
     type->kind = TYPE_FUNCTION;
     type->should_free = 1;
 
-    // Clone the return type
     type->as.function.return_type = ast_clone_type(return_type);
 
-    // Clone the parameter types
     type->as.function.param_count = param_count;
     if (param_count > 0)
     {
@@ -428,7 +419,7 @@ int ast_type_equals(Type *a, Type *b)
         {
             if (a->as.function.param_types[i] == NULL || b->as.function.param_types[i] == NULL)
             {
-                continue; // Skip NULL parameter types
+                continue;
             }
             if (!ast_type_equals(a->as.function.param_types[i], b->as.function.param_types[i]))
             {
@@ -524,7 +515,6 @@ void ast_free_type(Type *type)
     if (type == NULL)
         return;
 
-    // Skip freeing if marked as non-freeable
     if (!type->should_free)
         return;
 
@@ -576,8 +566,6 @@ void ast_free_token(Token *token)
     }
 }
 
-// Expression functions
-
 Expr *ast_create_binary_expr(Expr *left, TokenType operator, Expr *right)
 {
     Expr *expr = malloc(sizeof(Expr));
@@ -590,7 +578,7 @@ Expr *ast_create_binary_expr(Expr *left, TokenType operator, Expr *right)
     expr->as.binary.left = left;
     expr->as.binary.right = right;
     expr->as.binary.operator = operator;
-    expr->expr_type = NULL; // Will be set during type checking
+    expr->expr_type = NULL;
     return expr;
 }
 
@@ -605,7 +593,7 @@ Expr *ast_create_unary_expr(TokenType operator, Expr *operand)
     expr->type = EXPR_UNARY;
     expr->as.unary.operator = operator;
     expr->as.unary.operand = operand;
-    expr->expr_type = NULL; // Will be set during type checking
+    expr->expr_type = NULL;
     return expr;
 }
 
@@ -621,7 +609,7 @@ Expr *ast_create_literal_expr(LiteralValue value, Type *type, bool is_interpolat
     expr->as.literal.value = value;
     expr->as.literal.type = type;
     expr->as.literal.is_interpolated = is_interpolated;
-    expr->expr_type = ast_clone_type(type); // Clone to avoid double free
+    expr->expr_type = ast_clone_type(type);
     return expr;
 }
 
@@ -644,7 +632,7 @@ Expr *ast_create_variable_expr(Token name)
     expr->as.variable.name.length = name.length;
     expr->as.variable.name.line = name.line;
     expr->as.variable.name.type = name.type;
-    expr->expr_type = NULL; // Will be set during type checking
+    expr->expr_type = NULL;
     return expr;
 }
 
@@ -659,7 +647,7 @@ Expr *ast_create_assign_expr(Token name, Expr *value)
     expr->type = EXPR_ASSIGN;
     expr->as.assign.name = name;
     expr->as.assign.value = value;
-    expr->expr_type = NULL; // Will be set during type checking
+    expr->expr_type = NULL;
     return expr;
 }
 
@@ -675,7 +663,7 @@ Expr *ast_create_call_expr(Expr *callee, Expr **arguments, int arg_count)
     expr->as.call.callee = callee;
     expr->as.call.arguments = arguments;
     expr->as.call.arg_count = arg_count;
-    expr->expr_type = NULL; // Will be set during type checking
+    expr->expr_type = NULL;
     return expr;
 }
 
@@ -690,7 +678,7 @@ Expr *ast_create_array_expr(Expr **elements, int element_count)
     expr->type = EXPR_ARRAY;
     expr->as.array.elements = elements;
     expr->as.array.element_count = element_count;
-    expr->expr_type = NULL; // Will be set during type checking
+    expr->expr_type = NULL;
     return expr;
 }
 
@@ -705,7 +693,7 @@ Expr *ast_create_array_access_expr(Expr *array, Expr *index)
     expr->type = EXPR_ARRAY_ACCESS;
     expr->as.array_access.array = array;
     expr->as.array_access.index = index;
-    expr->expr_type = NULL; // Will be set during type checking
+    expr->expr_type = NULL;
     return expr;
 }
 
@@ -719,7 +707,7 @@ Expr *ast_create_increment_expr(Expr *operand)
     }
     expr->type = EXPR_INCREMENT;
     expr->as.operand = operand;
-    expr->expr_type = NULL; // Will be set during type checking
+    expr->expr_type = NULL;
     return expr;
 }
 
@@ -733,7 +721,7 @@ Expr *ast_create_decrement_expr(Expr *operand)
     }
     expr->type = EXPR_DECREMENT;
     expr->as.operand = operand;
-    expr->expr_type = NULL; // Will be set during type checking
+    expr->expr_type = NULL;
     return expr;
 }
 
@@ -781,7 +769,6 @@ void ast_free_expr(Expr *expr)
         break;
 
     case EXPR_LITERAL:
-        // Free string literal memory if applicable (fixes memory leak)
         if (expr->as.literal.type != NULL && expr->as.literal.type->kind == TYPE_STRING)
         {
             free((char *)expr->as.literal.value.string_value);
@@ -893,8 +880,6 @@ void ast_free_expr(Expr *expr)
     free(expr);
 }
 
-// Statement functions
-
 Stmt *ast_create_expr_stmt(Expr *expression)
 {
     Stmt *stmt = malloc(sizeof(Stmt));
@@ -971,7 +956,7 @@ Stmt *ast_create_function_stmt(Token name, Parameter *params, int param_count,
         new_params[i].name.length = params[i].name.length;
         new_params[i].name.line = params[i].name.line;
         new_params[i].name.type = params[i].name.type;
-        new_params[i].type = params[i].type; // Type is already cloned/owned
+        new_params[i].type = params[i].type;
     }
     stmt->as.function.params = new_params;
     stmt->as.function.param_count = param_count;
@@ -1233,8 +1218,6 @@ void ast_free_stmt(Stmt *stmt)
     free(stmt);
 }
 
-// Module functions
-
 void ast_init_module(Module *module, const char *filename)
 {
     if (module == NULL)
@@ -1284,7 +1267,7 @@ void ast_free_module(Module *module)
         {
             if (module->statements[i] != NULL)
             {
-                ast_free_stmt(module->statements[i]); // Use normal free (frees types)
+                ast_free_stmt(module->statements[i]);
                 module->statements[i] = NULL;
             }
         }

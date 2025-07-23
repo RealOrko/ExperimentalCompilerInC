@@ -1,8 +1,3 @@
-/**
- * ast.h
- * Abstract Syntax Tree node definitions
- */
-
 #ifndef AST_H
 #define AST_H
 
@@ -10,12 +5,10 @@
 #include <stddef.h>
 #include <stdbool.h>
 
-// Forward declarations for circular types
 typedef struct Expr Expr;
 typedef struct Stmt Stmt;
 typedef struct Type Type;
 
-// Type definitions
 typedef enum
 {
     TYPE_INT,
@@ -37,13 +30,11 @@ struct Type
 
     union
     {
-        // For array types
         struct
         {
             Type *element_type;
         } array;
 
-        // For function types
         struct
         {
             Type *return_type;
@@ -53,7 +44,6 @@ struct Type
     } as;
 };
 
-// Expression types
 typedef enum
 {
     EXPR_BINARY,
@@ -66,10 +56,9 @@ typedef enum
     EXPR_ARRAY_ACCESS,
     EXPR_INCREMENT,
     EXPR_DECREMENT,
-    EXPR_INTERPOLATED  // Add this line for interpolated strings
+    EXPR_INTERPOLATED
 } ExprType;
 
-// Binary expression
 typedef struct
 {
     Expr *left;
@@ -77,14 +66,12 @@ typedef struct
     TokenType operator;
 } BinaryExpr;
 
-// Unary expression
 typedef struct
 {
     Expr *operand;
     TokenType operator;
 } UnaryExpr;
 
-// Literal expression
 typedef struct
 {
     LiteralValue value;
@@ -92,20 +79,17 @@ typedef struct
     bool is_interpolated;
 } LiteralExpr;
 
-// Variable expression
 typedef struct
 {
     Token name;
 } VariableExpr;
 
-// Assignment expression
 typedef struct
 {
     Token name;
     Expr *value;
 } AssignExpr;
 
-// Function call expression
 typedef struct
 {
     Expr *callee;
@@ -113,28 +97,24 @@ typedef struct
     int arg_count;
 } CallExpr;
 
-// Array expression
 typedef struct
 {
     Expr **elements;
     int element_count;
 } ArrayExpr;
 
-// Array access expression
 typedef struct
 {
     Expr *array;
     Expr *index;
 } ArrayAccessExpr;
 
-// Interpolated string expression
 typedef struct
 {
     Expr **parts;
     int part_count;
 } InterpolExpr;
 
-// Generic expression structure
 struct Expr
 {
     ExprType type;
@@ -149,14 +129,13 @@ struct Expr
         CallExpr call;
         ArrayExpr array;
         ArrayAccessExpr array_access;
-        Expr *operand; // For increment/decrement
-        InterpolExpr interpol;  // Add this line for interpolated strings
+        Expr *operand;
+        InterpolExpr interpol;
     } as;
 
-    Type *expr_type; // Type of the expression after type checking
+    Type *expr_type;
 };
 
-// Statement types
 typedef enum
 {
     STMT_EXPR,
@@ -170,13 +149,11 @@ typedef enum
     STMT_IMPORT
 } StmtType;
 
-// Expression statement
 typedef struct
 {
     Expr *expression;
 } ExprStmt;
 
-// Variable declaration
 typedef struct
 {
     Token name;
@@ -184,14 +161,12 @@ typedef struct
     Expr *initializer;
 } VarDeclStmt;
 
-// Function parameter
 typedef struct
 {
     Token name;
     Type *type;
 } Parameter;
 
-// Function declaration
 typedef struct
 {
     Token name;
@@ -202,21 +177,18 @@ typedef struct
     int body_count;
 } FunctionStmt;
 
-// Return statement
 typedef struct
 {
     Token keyword;
     Expr *value;
 } ReturnStmt;
 
-// Block statement
 typedef struct
 {
     Stmt **statements;
     int count;
 } BlockStmt;
 
-// If statement
 typedef struct
 {
     Expr *condition;
@@ -224,14 +196,12 @@ typedef struct
     Stmt *else_branch;
 } IfStmt;
 
-// While statement
 typedef struct
 {
     Expr *condition;
     Stmt *body;
 } WhileStmt;
 
-// For statement
 typedef struct
 {
     Stmt *initializer;
@@ -240,13 +210,11 @@ typedef struct
     Stmt *body;
 } ForStmt;
 
-// Import statement
 typedef struct
 {
     Token module_name;
 } ImportStmt;
 
-// Generic statement structure
 struct Stmt
 {
     StmtType type;
@@ -265,7 +233,6 @@ struct Stmt
     } as;
 };
 
-// AST module
 typedef struct
 {
     Stmt **statements;
@@ -274,11 +241,9 @@ typedef struct
     const char *filename;
 } Module;
 
-// Debug
 void ast_print_stmt(Stmt *stmt, int indent_level);
 void ast_print_expr(Expr *expr, int indent_level);
 
-// Type functions
 Type *ast_clone_type(Type *type);
 void ast_mark_type_non_freeable(Type *type);
 Type *ast_create_primitive_type(TypeKind kind);
@@ -289,7 +254,6 @@ const char *ast_type_to_string(Type *type);
 void ast_free_type(Type *type);
 void ast_free_token(Token *token);
 
-// Expression functions
 Expr *ast_create_binary_expr(Expr *left, TokenType operator, Expr * right);
 Expr *ast_create_unary_expr(TokenType operator, Expr * operand);
 Expr *ast_create_literal_expr(LiteralValue value, Type *type, bool is_interpolated);
@@ -300,11 +264,10 @@ Expr *ast_create_array_expr(Expr **elements, int element_count);
 Expr *ast_create_array_access_expr(Expr *array, Expr *index);
 Expr *ast_create_increment_expr(Expr *operand);
 Expr *ast_create_decrement_expr(Expr *operand);
-Expr *ast_create_interpolated_expr(Expr **parts, int part_count); // <-- Add this line
+Expr *ast_create_interpolated_expr(Expr **parts, int part_count);
 Expr *ast_create_comparison_expr(Expr *left, Expr *right, TokenType comparison_type);
 void ast_free_expr(Expr *expr);
 
-// Statement functions
 Stmt *ast_create_expr_stmt(Expr *expression);
 Stmt *ast_create_var_decl_stmt(Token name, Type *type, Expr *initializer);
 Stmt *ast_create_function_stmt(Token name, Parameter *params, int param_count,
@@ -317,9 +280,8 @@ Stmt *ast_create_for_stmt(Stmt *initializer, Expr *condition, Expr *increment, S
 Stmt *ast_create_import_stmt(Token module_name);
 void ast_free_stmt(Stmt *stmt);
 
-// Module functions
 void ast_init_module(Module *module, const char *filename);
 void ast_module_add_statement(Module *module, Stmt *stmt);
 void ast_free_module(Module *module);
 
-#endif // AST_H
+#endif
