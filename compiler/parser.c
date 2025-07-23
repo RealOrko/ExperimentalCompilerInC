@@ -1,60 +1,37 @@
-/**
- * parser.c
- * Implementation of the parser
- */
-
 #include "parser.h"
 #include "debug.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-// Helper function to log parser state
-static void log_parser_state(Parser *parser)
-{
-    DEBUG_VERBOSE("Current token: %s, Previous token: %s",
-                  token_type_to_string(parser->current.type),
-                  token_type_to_string(parser->previous.type));
-}
-
-// Check if we've reached the end of the file
 int parser_is_at_end(Parser *parser)
 {
     return parser->current.type == TOKEN_EOF;
 }
 
-// Function to skip over any newlines
 void skip_newlines(Parser *parser)
 {
-    // Skip newlines but capture INDENT/DEDENT tokens
     while (parser_match(parser, TOKEN_NEWLINE))
     {
-        DEBUG_VERBOSE("Skipping NEWLINE");
-        // Check for INDENT/DEDENT after newline
         if (parser_check(parser, TOKEN_INDENT) || parser_check(parser, TOKEN_DEDENT))
         {
-            // Don't skip INDENT/DEDENT - let the caller handle it
             break;
         }
     }
 }
 
-// Helper for detecting function boundaries
 int is_at_function_boundary(Parser *parser)
 {
     if (parser_check(parser, TOKEN_DEDENT))
     {
-        DEBUG_VERBOSE("At function boundary due to DEDENT");
         return 1;
     }
     if (parser_check(parser, TOKEN_FN))
     {
-        DEBUG_VERBOSE("At function boundary due to FN token");
         return 1;
     }
     if (parser_check(parser, TOKEN_EOF))
     {
-        DEBUG_VERBOSE("At function boundary due to EOF");
         return 1;
     }
     return 0;
@@ -62,45 +39,35 @@ int is_at_function_boundary(Parser *parser)
 
 Stmt *parser_indented_block(Parser *parser)
 {
-    DEBUG_VERBOSE("Entering parse_indented_block");
     if (!parser_check(parser, TOKEN_INDENT))
     {
         parser_error(parser, "Expected indented block");
         return NULL;
     }
-    parser_advance(parser); // Consume INDENT
-    DEBUG_VERBOSE("Consumed INDENT, entering block with indent_stack top %d",
-                  parser->lexer->indent_stack[parser->lexer->indent_size - 1]);
+    parser_advance(parser);
 
     int current_indent = parser->lexer->indent_stack[parser->lexer->indent_size - 1];
     Stmt **statements = NULL;
     int count = 0;
     int capacity = 0;
 
-    // REMOVED: symbol_table_push_scope(parser->symbol_table);
-
     while (!parser_is_at_end(parser) &&
            parser->lexer->indent_stack[parser->lexer->indent_size - 1] >= current_indent)
     {
         while (parser_match(parser, TOKEN_NEWLINE))
         {
-            DEBUG_VERBOSE("Skipping NEWLINE in block");
         }
 
         if (parser_check(parser, TOKEN_DEDENT))
         {
-            DEBUG_VERBOSE("Found DEDENT in block");
             break;
         }
 
         if (parser_check(parser, TOKEN_EOF))
         {
-            DEBUG_VERBOSE("Found EOF in block");
             break;
         }
 
-        DEBUG_VERBOSE("Parsing statement in block, current indent level = %d",
-                      parser->lexer->indent_stack[parser->lexer->indent_size - 1]);
         Stmt *stmt = parser_declaration(parser);
         if (stmt == NULL)
         {
@@ -113,71 +80,57 @@ Stmt *parser_indented_block(Parser *parser)
             statements = realloc(statements, sizeof(Stmt *) * capacity);
             if (statements == NULL)
             {
-                DEBUG_ERROR("Out of memory");
                 exit(1);
             }
         }
         statements[count++] = stmt;
-        DEBUG_VERBOSE("Added statement %d to block, type = %d", count - 1, stmt->type);
     }
 
-    // Consume DEDENT if present
     if (parser_check(parser, TOKEN_DEDENT))
     {
         parser_advance(parser);
-        DEBUG_VERBOSE("Consumed DEDENT, exiting block");
     }
     else if (parser->lexer->indent_stack[parser->lexer->indent_size - 1] < current_indent)
     {
         parser_error(parser, "Expected dedent to end block");
     }
 
-    // REMOVED: symbol_table_pop_scope(parser->symbol_table);
-
-    DEBUG_VERBOSE("Exiting parse_indented_block with %d statements", count);
     return ast_create_block_stmt(statements, count);
 }
 
 Expr *parser_multi_line_expression(Parser *parser)
 {
-    DEBUG_VERBOSE("Entering parse_multi_line_expression");
     Expr *expr = parser_expression(parser);
 
     while (parser_match(parser, TOKEN_NEWLINE))
     {
-        DEBUG_VERBOSE("Continuing expression across newline");
         Expr *right = parser_expression(parser);
         expr = ast_create_binary_expr(expr, TOKEN_PLUS, right);
     }
 
-    DEBUG_VERBOSE("Exiting parse_multi_line_expression");
     return expr;
 }
 
-// Skip all newlines and check if we're at the end
 int skip_newlines_and_check_end(Parser *parser)
 {
     while (parser_match(parser, TOKEN_NEWLINE))
     {
-        DEBUG_VERBOSE("Skipping NEWLINE in skip_newlines_and_check_end");
     }
     return parser_is_at_end(parser);
 }
 
 void parser_init(Parser *parser, Lexer *lexer)
 {
-    DEBUG_VERBOSE("Initializing parser");
     parser->lexer = lexer;
     parser->had_error = 0;
     parser->panic_mode = 0;
     parser->symbol_table = symbol_table_init();
 
-    // Initialize tokens to avoid uninit reads
-    parser->previous.type = TOKEN_ERROR; // Safe invalid type
+    parser->previous.type = TOKEN_ERROR;
     parser->previous.start = NULL;
     parser->previous.length = 0;
     parser->previous.line = 0;
-    parser->current = parser->previous; // Copy to current
+    parser->current = parser->previous;
 
     parser_advance(parser);
     parser->interp_sources = NULL;
@@ -187,7 +140,6 @@ void parser_init(Parser *parser, Lexer *lexer)
 
 void parser_cleanup(Parser *parser)
 {
-    DEBUG_VERBOSE("Cleaning up parser");
     symbol_table_cleanup(parser->symbol_table);
     lexer_cleanup(parser->lexer);
     for (int i = 0; i < parser->interp_count; i++)
@@ -195,7 +147,6 @@ void parser_cleanup(Parser *parser)
         free(parser->interp_sources[i]);
     }
     free(parser->interp_sources);
-    // Free final tokens
     if (parser->previous.start != NULL)
     {
         free((void *)parser->previous.start);
@@ -233,7 +184,6 @@ void parser_error_at(Parser *parser, Token *token, const char *message)
     }
     else if (token->type == TOKEN_ERROR)
     {
-        // Nothing
     }
     else
     {
@@ -242,12 +192,10 @@ void parser_error_at(Parser *parser, Token *token, const char *message)
     fprintf(stderr, ": %s\n", message);
 
     parser->lexer->indent_size = 1;
-    DEBUG_VERBOSE("Error reported: %s", message);
 }
 
 void parser_advance(Parser *parser)
 {
-    // Free the old previous token's start (discarded after consumption)
     if (parser->previous.start != NULL)
     {
         free((void *)parser->previous.start);
@@ -263,7 +211,6 @@ void parser_advance(Parser *parser)
             break;
         parser_error_at_current(parser, parser->current.start);
     }
-    DEBUG_VERBOSE("Advanced to token: %s", token_type_to_string(parser->current.type));
 }
 
 void parser_consume(Parser *parser, TokenType type, const char *message)
@@ -286,13 +233,11 @@ int parser_match(Parser *parser, TokenType type)
     if (!parser_check(parser, type))
         return 0;
     parser_advance(parser);
-    DEBUG_VERBOSE("Matched token: %s", token_type_to_string(type));
     return 1;
 }
 
 static void synchronize(Parser *parser)
 {
-    DEBUG_VERBOSE("Synchronizing parser after error");
     parser->panic_mode = 0;
 
     while (!parser_is_at_end(parser))
@@ -309,12 +254,12 @@ static void synchronize(Parser *parser)
         case TOKEN_WHILE:
         case TOKEN_RETURN:
         case TOKEN_IMPORT:
-            return; // Found a new statement, stop synchronizing
+            return;
         case TOKEN_NEWLINE:
-            parser_advance(parser); // Skip newlines and unknown tokens
+            parser_advance(parser);
             break;
         default:
-            parser_advance(parser); // Skip other tokens
+            parser_advance(parser);
             break;
         }
     }
@@ -322,7 +267,6 @@ static void synchronize(Parser *parser)
 
 Type *parser_type(Parser *parser)
 {
-    DEBUG_VERBOSE("Parsing type");
     if (parser_match(parser, TOKEN_INT))
         return ast_create_primitive_type(TYPE_INT);
     if (parser_match(parser, TOKEN_LONG))
@@ -344,14 +288,12 @@ Type *parser_type(Parser *parser)
 
 Expr *parser_expression(Parser *parser)
 {
-    DEBUG_VERBOSE("Entering parse_expression");
     Expr *result = parser_assignment(parser);
     if (result == NULL)
     {
         parser_error_at_current(parser, "Expected expression");
-        parser_advance(parser); // Advance after error to prevent looping
+        parser_advance(parser);
     }
-    DEBUG_VERBOSE("Exiting parse_expression");
     return result;
 }
 
@@ -361,7 +303,6 @@ Expr *parser_assignment(Parser *parser)
 
     if (parser_match(parser, TOKEN_EQUAL))
     {
-        DEBUG_VERBOSE("Parsing assignment");
         Expr *value = parser_assignment(parser);
         if (expr->type == EXPR_VARIABLE)
         {
@@ -369,7 +310,6 @@ Expr *parser_assignment(Parser *parser)
             char *new_start = strndup(name.start, name.length);
             if (new_start == NULL)
             {
-                DEBUG_ERROR("Out of memory duplicating token string");
                 exit(1);
             }
             ast_free_expr(expr);
@@ -501,54 +441,46 @@ Expr *parser_primary(Parser *parser)
     {
         LiteralValue value;
         value.int_value = parser->previous.literal.int_value;
-        DEBUG_VERBOSE("Parsed integer literal: %d", (int)value.int_value);
         return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_INT), false);
     }
     if (parser_match(parser, TOKEN_LONG_LITERAL))
     {
         LiteralValue value;
         value.int_value = parser->previous.literal.int_value;
-        DEBUG_VERBOSE("Parsed long literal: %ld", value.int_value);
         return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_LONG), false);
     }
     if (parser_match(parser, TOKEN_DOUBLE_LITERAL))
     {
         LiteralValue value;
         value.double_value = parser->previous.literal.double_value;
-        DEBUG_VERBOSE("Parsed double literal: %f", value.double_value);
         return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_DOUBLE), false);
     }
     if (parser_match(parser, TOKEN_CHAR_LITERAL))
     {
         LiteralValue value;
         value.char_value = parser->previous.literal.char_value;
-        DEBUG_VERBOSE("Parsed char literal: %c", value.char_value);
         return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_CHAR), false);
     }
     if (parser_match(parser, TOKEN_STRING_LITERAL))
     {
         LiteralValue value;
         value.string_value = parser->previous.literal.string_value;
-        DEBUG_VERBOSE("Parsed string literal: %s", value.string_value);
         return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_STRING), false);
     }
     if (parser_match(parser, TOKEN_BOOL_LITERAL))
     {
         LiteralValue value;
         value.bool_value = parser->previous.literal.bool_value;
-        DEBUG_VERBOSE("Parsed bool literal: %s", value.bool_value ? "true" : "false");
         return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_BOOL), false);
     }
     if (parser_match(parser, TOKEN_NIL))
     {
         LiteralValue value;
         value.int_value = 0;
-        DEBUG_VERBOSE("Parsed nil");
         return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_NIL), false);
     }
     if (parser_match(parser, TOKEN_IDENTIFIER))
     {
-        DEBUG_VERBOSE("Parsed variable: %.*s", parser->previous.length, parser->previous.start);
         return ast_create_variable_expr(parser->previous);
     }
     if (parser_match(parser, TOKEN_LEFT_PAREN))
@@ -561,7 +493,6 @@ Expr *parser_primary(Parser *parser)
     if (parser_match(parser, TOKEN_INTERPOL_STRING))
     {
         const char *content = parser->previous.literal.string_value;
-        DEBUG_VERBOSE("Parsing interpolated string: %s", content);
 
         Expr **parts = NULL;
         int capacity = 0;
@@ -574,7 +505,6 @@ Expr *parser_primary(Parser *parser)
         {
             if (*p == '{')
             {
-                // Add previous string segment if any
                 if (p > segment_start)
                 {
                     int len = p - segment_start;
@@ -593,14 +523,13 @@ Expr *parser_primary(Parser *parser)
                     parts[count++] = seg_expr;
                 }
 
-                p++; // Skip '{'
+                p++;
                 const char *expr_start = p;
                 while (*p && *p != '}')
                     p++;
                 if (!*p)
                 {
                     parser_error_at_current(parser, "Unterminated interpolated expression");
-                    // Cleanup partial parts
                     for (int j = 0; j < count; j++)
                         ast_free_expr(parts[j]);
                     free(parts);
@@ -612,19 +541,16 @@ Expr *parser_primary(Parser *parser)
                 strncpy(expr_src, expr_start, expr_len);
                 expr_src[expr_len] = '\0';
 
-                // Sub-parser for the expression
                 Lexer sub_lexer;
                 lexer_init(&sub_lexer, expr_src, "interpolated");
                 Parser sub_parser;
                 parser_init(&sub_parser, &sub_lexer);
-                SymbolTable *unused_table = sub_parser.symbol_table; // Save unused table created by init
-                sub_parser.symbol_table = parser->symbol_table;      // Share symbol table
+                SymbolTable *unused_table = sub_parser.symbol_table;
+                sub_parser.symbol_table = parser->symbol_table;
 
-                // Free the unused table immediately
                 symbol_table_cleanup(unused_table);
 
                 Expr *inner = parser_expression(&sub_parser);
-                // Manually free sub_parser's remaining token strings (fixes leak)
                 if (sub_parser.previous.start != NULL)
                 {
                     free((void *)sub_parser.previous.start);
@@ -640,8 +566,7 @@ Expr *parser_primary(Parser *parser)
                     parser_error_at_current(parser, "Invalid expression in interpolation");
                     ast_free_expr(inner);
                     free(expr_src);
-                    lexer_cleanup(&sub_lexer); // Manual cleanup
-                    // Cleanup partial parts
+                    lexer_cleanup(&sub_lexer);
                     for (int j = 0; j < count; j++)
                         ast_free_expr(parts[j]);
                     free(parts);
@@ -656,22 +581,20 @@ Expr *parser_primary(Parser *parser)
                 }
                 parts[count++] = inner;
 
-                // Add to parser's interp_sources
                 if (parser->interp_count >= parser->interp_capacity)
                 {
                     parser->interp_capacity = parser->interp_capacity ? parser->interp_capacity * 2 : 8;
                     parser->interp_sources = realloc(parser->interp_sources, sizeof(char *) * parser->interp_capacity);
                     if (parser->interp_sources == NULL)
                     {
-                        DEBUG_ERROR("Out of memory");
                         exit(1);
                     }
                 }
                 parser->interp_sources[parser->interp_count++] = expr_src;
 
-                lexer_cleanup(&sub_lexer); // Manual cleanup
+                lexer_cleanup(&sub_lexer);
 
-                p++; // Skip '}'
+                p++;
                 segment_start = p;
             }
             else
@@ -680,7 +603,6 @@ Expr *parser_primary(Parser *parser)
             }
         }
 
-        // Add final string segment if any
         if (p > segment_start)
         {
             int len = p - segment_start;
@@ -699,7 +621,7 @@ Expr *parser_primary(Parser *parser)
             parts[count++] = seg_expr;
         }
 
-        free((char *)content); // Free original content after parsing
+        free((char *)content);
 
         return ast_create_interpolated_expr(parts, count);
     }
@@ -712,7 +634,6 @@ Expr *parser_primary(Parser *parser)
 
 Expr *parser_call(Parser *parser, Expr *callee)
 {
-    DEBUG_VERBOSE("Parsing function call");
     Expr **arguments = NULL;
     int arg_count = 0;
     int capacity = 0;
@@ -732,7 +653,6 @@ Expr *parser_call(Parser *parser, Expr *callee)
                 arguments = realloc(arguments, sizeof(Expr *) * capacity);
                 if (arguments == NULL)
                 {
-                    DEBUG_ERROR("Out of memory");
                     exit(1);
                 }
             }
@@ -741,13 +661,11 @@ Expr *parser_call(Parser *parser, Expr *callee)
     }
 
     parser_consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after arguments");
-    DEBUG_VERBOSE("Parsed call with %d arguments", arg_count);
     return ast_create_call_expr(callee, arguments, arg_count);
 }
 
 Expr *parser_array_access(Parser *parser, Expr *array)
 {
-    DEBUG_VERBOSE("Parsing array access");
     Expr *index = parser_expression(parser);
     parser_consume(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after index");
     return ast_create_array_access_expr(array, index);
@@ -755,10 +673,8 @@ Expr *parser_array_access(Parser *parser, Expr *array)
 
 Stmt *parser_statement(Parser *parser)
 {
-    log_parser_state(parser);
     while (parser_match(parser, TOKEN_NEWLINE))
     {
-        DEBUG_VERBOSE("Skipping NEWLINE before statement");
     }
 
     if (parser_is_at_end(parser))
@@ -769,45 +685,36 @@ Stmt *parser_statement(Parser *parser)
 
     if (parser_match(parser, TOKEN_VAR))
     {
-        DEBUG_VERBOSE("Parsing var declaration");
         return parser_var_declaration(parser);
     }
     if (parser_match(parser, TOKEN_IF))
     {
-        DEBUG_VERBOSE("Parsing if statement");
         return parser_if_statement(parser);
     }
     if (parser_match(parser, TOKEN_WHILE))
     {
-        DEBUG_VERBOSE("Parsing while statement");
         return parser_while_statement(parser);
     }
     if (parser_match(parser, TOKEN_FOR))
     {
-        DEBUG_VERBOSE("Parsing for statement");
         return parser_for_statement(parser);
     }
     if (parser_match(parser, TOKEN_RETURN))
     {
-        DEBUG_VERBOSE("Parsing return statement");
         return parser_return_statement(parser);
     }
     if (parser_match(parser, TOKEN_LEFT_BRACE))
     {
-        DEBUG_VERBOSE("Parsing block statement");
         return parser_block_statement(parser);
     }
 
-    DEBUG_VERBOSE("Parsing expression statement");
     return parser_expression_statement(parser);
 }
 
 Stmt *parser_declaration(Parser *parser)
 {
-    log_parser_state(parser);
     while (parser_match(parser, TOKEN_NEWLINE))
     {
-        DEBUG_VERBOSE("Skipping NEWLINE before declaration");
     }
 
     if (parser_is_at_end(parser))
@@ -818,17 +725,14 @@ Stmt *parser_declaration(Parser *parser)
 
     if (parser_match(parser, TOKEN_VAR))
     {
-        DEBUG_VERBOSE("Parsing var declaration");
         return parser_var_declaration(parser);
     }
     if (parser_match(parser, TOKEN_FN))
     {
-        DEBUG_VERBOSE("Parsing function declaration");
         return parser_function_declaration(parser);
     }
     if (parser_match(parser, TOKEN_IMPORT))
     {
-        DEBUG_VERBOSE("Parsing import statement");
         return parser_import_statement(parser);
     }
 
@@ -868,7 +772,6 @@ Stmt *parser_var_declaration(Parser *parser)
     Expr *initializer = NULL;
     if (parser_match(parser, TOKEN_EQUAL))
     {
-        DEBUG_VERBOSE("Parsing initializer for variable %.*s", name.length, name.start);
         initializer = parser_expression(parser);
     }
 
@@ -877,7 +780,6 @@ Stmt *parser_var_declaration(Parser *parser)
         parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' or newline after variable declaration");
     }
 
-    DEBUG_VERBOSE("Declared variable %.*s", name.length, name.start);
     Stmt *decl = ast_create_var_decl_stmt(name, type, initializer);
     free((void *)name.start);
     return decl;
@@ -909,9 +811,7 @@ Stmt *parser_function_declaration(Parser *parser)
             return NULL;
         }
     }
-    DEBUG_VERBOSE("Declaring function %.*s", name.length, name.start);
 
-    // Parameter parsing (unchanged)
     Parameter *params = NULL;
     int param_count = 0;
     int param_capacity = 0;
@@ -959,31 +859,27 @@ Stmt *parser_function_declaration(Parser *parser)
                     params = realloc(params, sizeof(Parameter) * param_capacity);
                     if (params == NULL)
                     {
-                        DEBUG_ERROR("Out of memory");
                         exit(1);
                     }
                 }
                 params[param_count].name = param_name;
                 params[param_count].type = param_type;
                 param_count++;
-                DEBUG_VERBOSE("Added parameter %d: %.*s", param_count, param_name.length, param_name.start);
             } while (parser_match(parser, TOKEN_COMMA));
         }
         parser_consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after parameters");
     }
-    DEBUG_VERBOSE("Function %.*s has %d parameters", name.length, name.start, param_count);
 
     Type *return_type = ast_create_primitive_type(TYPE_VOID);
     if (parser_match(parser, TOKEN_COLON))
     {
-        ast_free_type(return_type); // Free default if overridden
+        ast_free_type(return_type);
         return_type = parser_type(parser);
     }
 
     Type **param_types = malloc(sizeof(Type *) * param_count);
     if (param_types == NULL && param_count > 0)
     {
-        DEBUG_ERROR("Out of memory");
         exit(1);
     }
     for (int i = 0; i < param_count; i++)
@@ -991,33 +887,29 @@ Stmt *parser_function_declaration(Parser *parser)
         param_types[i] = params[i].type;
     }
     Type *function_type = ast_create_function_type(return_type, param_types, param_count);
-    free(param_types); // Free temp array after cloning in function_type
+    free(param_types);
 
     symbol_table_add_symbol(parser->symbol_table, name, function_type);
-    ast_free_type(function_type); // Free after adding (cloned in symbol table)
+    ast_free_type(function_type);
 
     parser_consume(parser, TOKEN_ARROW, "Expected '=>' before function body");
     skip_newlines(parser);
 
-    DEBUG_VERBOSE("Parsing function body for %.*s", name.length, name.start);
     Stmt *body = parser_indented_block(parser);
     if (body == NULL)
     {
-        body = ast_create_block_stmt(NULL, 0); // Empty block as fallback
+        body = ast_create_block_stmt(NULL, 0);
     }
 
-    // Extract statements from block and free the block struct (without freeing array)
     Stmt **stmts = body->as.block.statements;
     int stmt_count = body->as.block.count;
-    body->as.block.statements = NULL; // Prevent array free in ast_free_stmt
+    body->as.block.statements = NULL;
     ast_free_stmt(body);
-
-    DEBUG_VERBOSE("Finished parsing function body");
 
     Stmt *func_stmt = ast_create_function_stmt(name, params, param_count, return_type,
                                                stmts, stmt_count);
 
-    free((void *)name.start); // Free the name string after creating the function statement
+    free((void *)name.start);
     for (int i = 0; i < param_count; i++)
     {
         free((void *)params[i].name.start);
@@ -1049,7 +941,6 @@ Stmt *parser_return_statement(Parser *parser)
     }
     else if (parser_match(parser, TOKEN_SEMICOLON))
     {
-        // Semicolon consumed
     }
 
     return ast_create_return_stmt(keyword, value);
@@ -1075,7 +966,6 @@ Stmt *parser_if_statement(Parser *parser)
             Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
             if (block_stmts == NULL)
             {
-                DEBUG_ERROR("Out of memory");
                 exit(1);
             }
             block_stmts[0] = then_branch;
@@ -1103,7 +993,6 @@ Stmt *parser_if_statement(Parser *parser)
                 Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
                 if (block_stmts == NULL)
                 {
-                    DEBUG_ERROR("Out of memory");
                     exit(1);
                 }
                 block_stmts[0] = else_branch;
@@ -1136,7 +1025,6 @@ Stmt *parser_while_statement(Parser *parser)
             Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
             if (block_stmts == NULL)
             {
-                DEBUG_ERROR("Out of memory");
                 exit(1);
             }
             block_stmts[0] = body;
@@ -1223,7 +1111,6 @@ Stmt *parser_for_statement(Parser *parser)
             Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
             if (block_stmts == NULL)
             {
-                DEBUG_ERROR("Out of memory");
                 exit(1);
             }
             block_stmts[0] = body;
@@ -1241,14 +1128,12 @@ Stmt *parser_block_statement(Parser *parser)
     int count = 0;
     int capacity = 0;
 
-    DEBUG_VERBOSE("Pushing new scope for block statement");
     symbol_table_push_scope(parser->symbol_table);
 
     while (!parser_is_at_end(parser))
     {
         while (parser_match(parser, TOKEN_NEWLINE))
         {
-            DEBUG_VERBOSE("Skipping NEWLINE in block statement");
         }
         if (parser_is_at_end(parser) || parser_check(parser, TOKEN_DEDENT))
             break;
@@ -1263,14 +1148,12 @@ Stmt *parser_block_statement(Parser *parser)
             statements = realloc(statements, sizeof(Stmt *) * capacity);
             if (statements == NULL)
             {
-                DEBUG_ERROR("Out of memory");
                 exit(1);
             }
         }
         statements[count++] = stmt;
     }
 
-    DEBUG_VERBOSE("Popping scope for block statement");
     symbol_table_pop_scope(parser->symbol_table);
 
     return ast_create_block_stmt(statements, count);
@@ -1286,7 +1169,6 @@ Stmt *parser_expression_statement(Parser *parser)
     }
     else if (parser_match(parser, TOKEN_SEMICOLON))
     {
-        // Semicolon consumed
     }
 
     return ast_create_expr_stmt(expr);
@@ -1318,7 +1200,6 @@ Stmt *parser_import_statement(Parser *parser)
             return NULL;
         }
     }
-    DEBUG_VERBOSE("Parsed import: %.*s", module_name.length, module_name.start);
 
     parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after import statement");
     Stmt *import_stmt = ast_create_import_stmt(module_name);
@@ -1328,7 +1209,6 @@ Stmt *parser_import_statement(Parser *parser)
 
 Module *parser_execute(Parser *parser, const char *filename)
 {
-    DEBUG_VERBOSE("Starting parse for file: %s", filename);
     Module *module = malloc(sizeof(Module));
     ast_init_module(module, filename);
 
@@ -1336,16 +1216,13 @@ Module *parser_execute(Parser *parser, const char *filename)
     {
         while (parser_match(parser, TOKEN_NEWLINE))
         {
-            DEBUG_VERBOSE("Skipping NEWLINE in main loop");
         }
         if (parser_is_at_end(parser))
             break;
 
-        log_parser_state(parser);
         Stmt *stmt = parser_declaration(parser);
         if (stmt != NULL)
         {
-            DEBUG_VERBOSE("Added statement of type %d to module", stmt->type);
         }
         ast_module_add_statement(module, stmt);
         ast_print_stmt(stmt, 0);
@@ -1363,6 +1240,5 @@ Module *parser_execute(Parser *parser, const char *filename)
         return NULL;
     }
 
-    DEBUG_VERBOSE("Parsing completed successfully");
     return module;
 }
