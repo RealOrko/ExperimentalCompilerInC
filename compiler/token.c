@@ -1,8 +1,3 @@
-/**
- * token.c
- * Implementation of token functions
- */
-
 #include "token.h"
 #include "debug.h"
 #include <stdio.h>
@@ -15,7 +10,6 @@ void token_init(Token *token, TokenType type, const char *start, int length, int
     token->start = start;
     token->length = length;
     token->line = line;
-    // Initialize the union to 0
     token->literal.int_value = 0;
 }
 
@@ -47,7 +41,7 @@ void token_set_bool_literal(Token *token, int value)
 const char *token_type_to_string(TokenType type)
 {
     if (type < 0 || type >= TOKEN_ERROR)
-    { // Assuming TOKEN_ERROR is the last valid
+    {
         DEBUG_ERROR("Invalid TokenType: %d", type);
         return "INVALID";
     }
@@ -182,7 +176,6 @@ void token_print(Token *token)
     printf("Token { type: %s, lexeme: '%s', line: %d",
            token_type_to_string(token->type), text, token->line);
 
-    // Print literal value based on token type
     switch (token->type)
     {
     case TOKEN_INT_LITERAL:
@@ -205,7 +198,6 @@ void token_print(Token *token)
         printf(", value: %s", token->literal.bool_value ? "true" : "false");
         break;
     default:
-        // No literal value to print
         break;
     }
 
