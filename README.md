@@ -1,94 +1,161 @@
-# Three-Stage Compiler for a Statically Typed Language
+Language Specification for Custom C Compiler
+This document outlines the language specification for a simple programming language designed to be compiled by a C-based compiler. The language supports basic constructs for functions, conditionals, loops, variables, and string interpolation, as demonstrated in the provided example code.
+1. Syntax Overview
+The language uses a concise, indentation-based syntax with => as a block delimiter, inspired by functional and scripting languages. It supports basic data types, functions, control flow, and string interpolation.
+2. Data Types
+The language supports the following primitive data types:
 
-This is a production-ready three-stage compiler for a statically typed language implemented in C. The compiler supports a variety of language features including variable declarations, functions, control flow statements, and more.
+int: Integer values (e.g., 5, -10).
+bool: Boolean values (true, false).
+str: Strings for text data (e.g., "hello").
+double: Floating-point numbers (e.g., 3.14159).
+char: Single characters (e.g., 'A').
 
-## Language Features
+3. Variable Declarations
+Variables are declared using the var keyword, followed by the variable name, type annotation, and optional initialization:
+var name: type = value
 
-The language supports the following features:
 
-- **Variables**: Declaration and initialization with types (`int`, `long`, `double`, `char`, `str`, `bool`)
-- **Expressions**: Arithmetic, comparison, logical operations
-- **Control Flow**: `if`, `while`, `for` statements
-- **Functions**: Definition, parameters, return values
-- **Imports**: Importing functions from other files
-- **String Operations**: String concatenation
+Example: var num: int = 5
+Variables can be reassigned to values of the same type: any = $"New value {num}".
 
-## Compiler Architecture
+4. Functions
+Functions are defined using the fn keyword, followed by the function name, parameters with type annotations, return type, and body:
+fn name(param1: type1, param2: type2): return_type =>
+  // body
 
-The compiler is structured in three stages:
 
-1. **Lexical Analysis**: Implemented in `lexer.c`, converts source code into tokens.
-2. **Parsing**: Implemented in `parser.c`, converts tokens into an Abstract Syntax Tree (AST).
-3. **Code Generation**: Implemented in `code_gen.c`, converts the AST into x86-64 assembly code.
+Parameters are declared with names and types: (n: int).
+The return type is specified after a colon: : int.
+The body is enclosed in => and uses return to yield a value.
+Example:fn factorial(n: int): int =>
+  if n <= 1 =>
+    return 1
+  return n * factorial(n - 1)
 
-Additionally, the compiler performs type checking implemented in `type_checker.c` between parsing and code generation.
 
-## Building the Compiler
 
-To build the compiler, simply run:
+5. Control Flow
+5.1 Conditionals
+Conditional statements use if, else, and => for block delimitation:
+if condition =>
+  // true branch
+else =>
+  // false branch
 
-```
-make
-```
 
-This will compile all source files and create an executable called `compiler`.
+Example:if is_prime(7) =>
+  print("7 is prime")
+else =>
+  print("7 is not prime")
 
-## Usage
 
-```
-./compiler <source_file> [-o <output_file>] [-v]
-```
 
-Options:
-- `-o <output_file>`: Specify the output assembly file (default: source_file.o)
-- `-v`: Verbose mode, prints additional information during compilation
+5.2 Loops
+While Loop
+while condition =>
+  // body
 
-## Example
 
-Here's an example program in the language:
+Example:while i * i <= num =>
+  if num % i == 0 =>
+    return false
+  i = i + 1
 
-```
-fn add(x:int, y:int):int => 
-   return x + y;
 
-fn main(argv:str[], argc:int):int =>
-   var a:int = 5;
-   var b:int = 10;
-   var result:int = add(a, b);
-   
-   print("The sum is: ");
-   print(result);
-   print("\n");
-   
-   return 0;
-```
 
-To compile and run this program:
+For Loop
+for var name: type = start; condition; increment =>
+  // body
 
-```
-./compiler example.sn -v
-```
 
-## Project Structure
+Example:for var j: int = 0; j < count; j++ =>
+  result = result + text
 
-- `token.h/c`: Token definitions and operations
-- `lexer.h/c`: Lexical analyzer
-- `ast.h/c`: Abstract Syntax Tree definitions
-- `parser.h/c`: Parser implementation
-- `symbol_table.h/c`: Symbol table for tracking variables and functions
-- `type_checker.h/c`: Type checking implementation
-- `code_gen.h/c`: Code generator implementation
-- `compiler.h/c`: Main compiler module
-- `main.c`: Entry point
 
-## Limitations and Future Work
 
-- Array implementation is limited
-- No support for complex data structures or classes
-- Limited optimization
-- Basic error reporting
-- Limited standard library
+6. String Interpolation
+Strings support interpolation using the $ prefix and {} for expressions:
+$"text {expression}"
 
-## License
 
-This compiler is provided as-is with no warranty.
+Example: $"Factorial of {num} is {fact}"
+Interpolated expressions can include variables of any type (int, str, double, char, bool).
+
+7. Operators
+
+Arithmetic: +, -, *, /, % (modulo).
+Comparison: ==, <=, >=, <, >.
+Logical: Not explicitly shown but assumed to include &&, ||, !.
+Assignment: =.
+Increment: ++ (used in for loops).
+
+8. Built-in Functions
+
+print: Outputs a string to the console.
+Example: print("Hello, world!")
+Supports string interpolation: print($"Sum: {sum}").
+
+
+
+9. Function Examples
+Factorial
+Recursive function to compute factorial:
+fn factorial(n: int): int =>
+  if n <= 1 =>
+    return 1
+  return n * factorial(n - 1)
+
+Is Prime
+Checks if a number is prime:
+fn is_prime(num: int): bool =>
+  if num <= 1 =>
+    return false
+  var i: int = 2
+  while i * i <= num =>
+    if num % i == 0 =>
+      return false
+    i = i + 1
+  return true
+
+Repeat String
+Repeats a string a specified number of times:
+fn repeat_string(text: str, count: int): str =>
+  var result: str = ""
+  for var j: int = 0; j < count; j++ =>
+    result = result + text
+  return result
+
+10. Main Function
+The main function serves as the entry point, with a return type of void:
+fn main(): void =>
+  // program logic
+
+
+Example usage includes variable declarations, function calls, loops, and printing.
+
+11. Example Program Output
+Running the provided program would produce output like:
+Factorial of 5 is 120
+7 is prime
+hello hello hello world!
+Sum 1 to 10: 55
+Pi approx: 3.14159
+Char: A
+Flag: true
+This is a thing 5
+This is a thing 120
+This is a thing 55
+This is a thing 3.14159
+This is a thing A
+This is a thing true
+
+12. Implementation Notes for C Compiler
+
+Lexical Analysis: Tokenize keywords (fn, var, if, else, while, for, return), types (int, bool, str, double, char), operators, and identifiers.
+Parsing: Use a recursive descent parser to handle the => block structure and type annotations.
+Type Checking: Ensure type consistency for assignments, function calls, and returns.
+Code Generation: Map to C constructs (e.g., functions to C functions, str to char*, print to printf).
+String Interpolation: Implement a runtime function to handle $"..." by parsing {} expressions and converting them to strings.
+
+This specification provides a foundation for building a C-based compiler for this language.
