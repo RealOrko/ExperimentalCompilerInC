@@ -300,3 +300,27 @@ long rt_post_dec_long(long *p)
     }
     return (*p)--;
 }
+
+int rt_eq_string(const char *a, const char *b) {
+    return strcmp(a, b) == 0;
+}
+
+int rt_ne_string(const char *a, const char *b) {
+    return strcmp(a, b) != 0;
+}
+
+int rt_lt_string(const char *a, const char *b) {
+    return strcmp(a, b) < 0;
+}
+
+int rt_le_string(const char *a, const char *b) {
+    return strcmp(a, b) <= 0;
+}
+
+int rt_gt_string(const char *a, const char *b) {
+    return strcmp(a, b) > 0;
+}
+
+int rt_ge_string(const char *a, const char *b) {
+    return strcmp(a, b) >= 0;
+}
