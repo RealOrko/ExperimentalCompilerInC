@@ -16,6 +16,8 @@ fn is_prime(num: int): bool =>
 fn repeat_string(text: str, count: int): str =>
   var result: str = ""
   for var j: int = 0; j < count; j++ =>
+    print($"j={j}\n")
+    print($"count={count}\n")
     result = result + text
   return result
 

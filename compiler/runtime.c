@@ -118,7 +118,6 @@ void rt_print_string(const char *s)
 {
     if (s == NULL)
     {
-        fprintf(stderr, "rt_print_string: NULL string\n");
         printf("(null)");
     }
     else

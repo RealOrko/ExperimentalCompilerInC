@@ -1068,32 +1068,17 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
             return;
         }
     }
-    for (int i = call->arg_count - 1; i >= 0; i--)
+    // Evaluate arguments left to right and push to stack
+    for (int i = 0; i < call->arg_count; i++)
     {
         code_gen_expression(gen, call->arguments[i]);
-        switch (i)
-        {
-        case 0:
-            fprintf(gen->output, "    mov rdi, rax\n");
-            break;
-        case 1:
-            fprintf(gen->output, "    mov rsi, rax\n");
-            break;
-        case 2:
-            fprintf(gen->output, "    mov rdx, rax\n");
-            break;
-        case 3:
-            fprintf(gen->output, "    mov rcx, rax\n");
-            break;
-        case 4:
-            fprintf(gen->output, "    mov r8, rax\n");
-            break;
-        case 5:
-            fprintf(gen->output, "    mov r9, rax\n");
-            break;
-        default:
-            break;
-        }
+        fprintf(gen->output, "    push rax\n");
+    }
+    // Pop into registers right to left
+    const char *param_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
+    for (int i = call->arg_count - 1; i >= 0; i--)
+    {
+        fprintf(gen->output, "    pop %s\n", param_regs[i]);
     }
     fprintf(gen->output, "    mov r15, rsp\n");
     fprintf(gen->output, "    and r15, 15\n");
