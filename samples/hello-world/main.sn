@@ -24,8 +24,8 @@ fn is_prime(num: int): bool =>
 fn repeat_string(text: str, count: int): str =>
   var result: str = ""
   for var j: int = 0; j < count; j++ =>
-    print($"repeat_string: j={j}\n\n")
-    print($"repeat_string: count={count}\n\n")
+    print($"repeat_string: j={j}\n")
+    print($"repeat_string: count={count}\n")
     result = result + text
   return result
 
@@ -57,22 +57,22 @@ fn main(): void =>
   var flag: bool = true
   print($"Flag: {flag}\n")
 
-  var any: str = $"This is a thing {num}"
+  var any: str = $"This is a thing {num}\n"
   print(any)
 
-  any = $"This is a thing {fact}"
+  any = $"This is a thing {fact}\n"
   print(any)
 
-  any = $"This is a thing {sum}"
+  any = $"This is a thing {sum}\n"
   print(any)
 
-  any = $"This is a thing {pi_approx}"
+  any = $"This is a thing {pi_approx}\n"
   print(any)
 
-  any = $"This is a thing {ch}"
+  any = $"This is a thing {ch}\n"
   print(any)
 
-  any = $"This is a thing {flag}"
+  any = $"This is a thing {flag}\n"
   print(any)
 
   print("Complete main method ... \n")

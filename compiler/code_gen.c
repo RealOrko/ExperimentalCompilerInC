@@ -282,6 +282,10 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
     case TOKEN_PLUS:
         if (left_type->kind == TYPE_STRING)
         {
+            if (free_right)
+            {
+                fprintf(gen->output, "    mov r12, rcx\n");
+            }
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov rsi, rcx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
@@ -289,7 +293,6 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             fprintf(gen->output, "    sub rsp, r15\n");
             fprintf(gen->output, "    call rt_str_concat\n");
             fprintf(gen->output, "    add rsp, r15\n");
-            // Free inputs if they are temps
             if (free_left)
             {
                 fprintf(gen->output, "    mov rdi, rbx\n");
@@ -301,7 +304,7 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
             }
             if (free_right)
             {
-                fprintf(gen->output, "    mov rdi, rcx\n");
+                fprintf(gen->output, "    mov rdi, r12\n");
                 fprintf(gen->output, "    mov r15, rsp\n");
                 fprintf(gen->output, "    and r15, 15\n");
                 fprintf(gen->output, "    sub rsp, r15\n");
@@ -838,7 +841,6 @@ static const char* get_to_str_func(TypeKind kind, bool* is_double) {
 void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
     int count = expr->part_count;
     if (count == 0) {
-        // Empty interpolated string -> duplicate empty string (malloc'd)
         fprintf(gen->output, "    lea rdi, [rel empty_str]\n");
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
@@ -848,7 +850,6 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
         return;
     }
 
-    // Generate code for first part and convert to string
     code_gen_expression(gen, expr->parts[0]);
     Type *pt = expr->parts[0]->expr_type;
     bool is_double;
@@ -863,10 +864,8 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
     }
     fprintf(gen->output, "    call %s\n", to_str_func);
     fprintf(gen->output, "    add rsp, r15\n");
-    // rbx = accumulated string (always malloc'd after conversion)
     fprintf(gen->output, "    mov rbx, rax\n");
 
-    // For each subsequent part: convert to string, concat, free intermediates
     for (int i = 1; i < count; i++) {
         code_gen_expression(gen, expr->parts[i]);
         pt = expr->parts[i]->expr_type;
@@ -881,10 +880,9 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
         }
         fprintf(gen->output, "    call %s\n", to_str_func);
         fprintf(gen->output, "    add rsp, r15\n");
-        // rcx = part string (malloc'd)
         fprintf(gen->output, "    mov rcx, rax\n");
 
-        // Concat: rdi = accum (rbx), rsi = part (rcx)
+        fprintf(gen->output, "    mov r12, rcx\n");
         fprintf(gen->output, "    mov rdi, rbx\n");
         fprintf(gen->output, "    mov rsi, rcx\n");
         fprintf(gen->output, "    mov r15, rsp\n");
@@ -893,7 +891,6 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
         fprintf(gen->output, "    call rt_str_concat\n");
         fprintf(gen->output, "    add rsp, r15\n");
 
-        // Free old accum (rbx, always malloc'd)
         fprintf(gen->output, "    mov rdi, rbx\n");
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
@@ -901,19 +898,16 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
         fprintf(gen->output, "    call free\n");
         fprintf(gen->output, "    add rsp, r15\n");
 
-        // Free part (rcx, always malloc'd after conversion)
-        fprintf(gen->output, "    mov rdi, rcx\n");
+        fprintf(gen->output, "    mov rdi, r12\n");
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
         fprintf(gen->output, "    sub rsp, r15\n");
         fprintf(gen->output, "    call free\n");
         fprintf(gen->output, "    add rsp, r15\n");
 
-        // Update accum
         fprintf(gen->output, "    mov rbx, rax\n");
     }
 
-    // Result in rax
     fprintf(gen->output, "    mov rax, rbx\n");
 }
 
