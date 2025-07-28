@@ -141,10 +141,10 @@ void symbol_table_push_scope(SymbolTable *table)
     }
 
     scope->symbols = NULL;
-    scope->enclosing = table->current;
-    scope->next_local_offset = table->current ? table->current->next_local_offset : LOCAL_BASE_OFFSET;
-    scope->next_param_offset = table->current ? table->current->next_param_offset : PARAM_BASE_OFFSET;
-
+    Scope *enclosing = table->current;
+    scope->enclosing = enclosing;
+    scope->next_local_offset = enclosing ? enclosing->next_local_offset : LOCAL_BASE_OFFSET;
+    scope->next_param_offset = enclosing ? enclosing->next_param_offset : PARAM_BASE_OFFSET;
     table->current = scope;
 
     if (table->scopes_count >= table->scopes_capacity)

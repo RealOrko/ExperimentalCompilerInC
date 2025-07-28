@@ -1196,61 +1196,116 @@ void code_gen_expression_statement(CodeGen *gen, ExprStmt *stmt)
     code_gen_expression(gen, stmt->expression);
 }
 
-void code_gen_var_declaration(CodeGen *gen, VarDeclStmt *stmt)
-{
+void code_gen_var_declaration(CodeGen *gen, VarDeclStmt *stmt) {
     symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->name, stmt->type, SYMBOL_LOCAL);
-    if (stmt->initializer != NULL)
-    {
+    if (stmt->initializer != NULL) {
         code_gen_expression(gen, stmt->initializer);
-    }
-    else
-    {
+    } else {
         fprintf(gen->output, "    xor rax, rax\n");
     }
     int offset = code_gen_get_var_offset(gen, stmt->name);
     fprintf(gen->output, "    mov [rbp + %d], rax\n", offset);
 }
 
-void code_gen_block(CodeGen *gen, BlockStmt *stmt)
-{
+void code_gen_block(CodeGen *gen, BlockStmt *stmt) {
     symbol_table_push_scope(gen->symbol_table);
-    for (int i = 0; i < stmt->count; i++)
-    {
+    for (int i = 0; i < stmt->count; i++) {
         code_gen_statement(gen, stmt->statements[i]);
     }
-    // Frees are now in epilogue
+    Scope *scope = gen->symbol_table->current;
+    Symbol *sym = scope->symbols;
+    int label_base = code_gen_new_label(gen);
+    int free_idx = 0;
+    while (sym) {
+        if (sym->type && sym->type->kind == TYPE_STRING && sym->kind == SYMBOL_LOCAL) {
+            int label = label_base + free_idx++;
+            fprintf(gen->output, "    mov rdi, [rbp + %d]\n", sym->offset);
+            fprintf(gen->output, "    test rdi, rdi\n");
+            fprintf(gen->output, "    jz .no_free_%d\n", label);
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call free\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+            fprintf(gen->output, ".no_free_%d:\n", label);
+        }
+        sym = sym->next;
+    }
     symbol_table_pop_scope(gen->symbol_table);
 }
 
-void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
-{
+static void pre_compute_stack_usage(CodeGen *gen, Stmt *stmt) {
+    if (stmt == NULL) return;
+
+    switch (stmt->type) {
+    case STMT_VAR_DECL: {
+        int type_size = get_type_size(stmt->as.var_decl.type);
+        int aligned_size = ((type_size + OFFSET_ALIGNMENT - 1) / OFFSET_ALIGNMENT) * OFFSET_ALIGNMENT;
+        gen->symbol_table->current->next_local_offset += aligned_size;
+        break;
+    }
+    case STMT_BLOCK: {
+        int save = gen->symbol_table->current->next_local_offset;
+        for (int i = 0; i < stmt->as.block.count; i++) {
+            pre_compute_stack_usage(gen, stmt->as.block.statements[i]);
+        }
+        gen->symbol_table->current->next_local_offset = MAX(save, gen->symbol_table->current->next_local_offset);
+        break;
+    }
+    case STMT_IF: {
+        int save = gen->symbol_table->current->next_local_offset;
+        pre_compute_stack_usage(gen, stmt->as.if_stmt.then_branch);
+        int then_max = gen->symbol_table->current->next_local_offset;
+        gen->symbol_table->current->next_local_offset = save;
+        if (stmt->as.if_stmt.else_branch) {
+            pre_compute_stack_usage(gen, stmt->as.if_stmt.else_branch);
+        }
+        int else_max = gen->symbol_table->current->next_local_offset;
+        gen->symbol_table->current->next_local_offset = MAX(save, MAX(then_max, else_max));
+        break;
+    }
+    case STMT_WHILE: {
+        pre_compute_stack_usage(gen, stmt->as.while_stmt.body);
+        break;
+    }
+    case STMT_FOR: {
+        int save = gen->symbol_table->current->next_local_offset;
+        if (stmt->as.for_stmt.initializer) {
+            pre_compute_stack_usage(gen, stmt->as.for_stmt.initializer);
+        }
+        pre_compute_stack_usage(gen, stmt->as.for_stmt.body);
+        gen->symbol_table->current->next_local_offset = MAX(save, gen->symbol_table->current->next_local_offset);
+        break;
+    }
+    default:
+        break;
+    }
+}
+
+void code_gen_function(CodeGen *gen, FunctionStmt *stmt) {
     char *old_function = gen->current_function;
     Type *old_return_type = gen->current_return_type;
-    if (stmt->name.length < 256)
-    {
+    if (stmt->name.length < 256) {
         gen->current_function = malloc(stmt->name.length + 1);
-        if (gen->current_function == NULL)
-        {
+        if (gen->current_function == NULL) {
             exit(1);
         }
         strncpy(gen->current_function, stmt->name.start, stmt->name.length);
         gen->current_function[stmt->name.length] = '\0';
-    }
-    else
-    {
+    } else {
         exit(1);
     }
     gen->current_return_type = stmt->return_type;
     symbol_table_push_scope(gen->symbol_table);
-    for (int i = 0; i < stmt->param_count; i++)
-    {
+    for (int i = 0; i < stmt->param_count; i++) {
         symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->params[i].name, stmt->params[i].type, SYMBOL_PARAM);
     }
-    for (int i = 0; i < stmt->body_count; i++)
-    {
-        pre_build_symbols(gen, stmt->body[i]);
+    for (int i = 0; i < stmt->body_count; i++) {
+        pre_compute_stack_usage(gen, stmt->body[i]);
     }
     int locals_size = gen->symbol_table->current->next_local_offset - LOCAL_BASE_OFFSET;
+    // Reset next_local_offset to the base value after pre-computation to avoid double-counting sizes during actual code generation.
+    gen->symbol_table->current->next_local_offset = LOCAL_BASE_OFFSET;
     int saved_size = CALLEE_SAVED_SPACE;
     int stack_space = locals_size + saved_size;
     stack_space = ((stack_space + 15) / 16) * 16;
@@ -1259,42 +1314,32 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
     fprintf(gen->output, "    push rbp\n");
     fprintf(gen->output, "    mov rbp, rsp\n");
     fprintf(gen->output, "    sub rsp, %d\n", stack_space);
-    // Save callee-saved registers
     fprintf(gen->output, "    mov [rbp - 8], rbx\n");
     fprintf(gen->output, "    mov [rbp - 16], r15\n");
     const char *param_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-    for (int i = 0; i < stmt->param_count && i < 6; i++)
-    {
+    for (int i = 0; i < stmt->param_count && i < 6; i++) {
         int offset = symbol_table_get_symbol_offset(gen->symbol_table, stmt->params[i].name);
         fprintf(gen->output, "    mov [rbp + %d], %s\n", offset, param_regs[i]);
     }
-    for (int i = 0; i < stmt->body_count; i++)
-    {
+    for (int i = 0; i < stmt->body_count; i++) {
         code_gen_statement(gen, stmt->body[i]);
     }
-    // Epilogue with frees
-    if (strcmp(gen->current_function, "main") == 0)
-    {
+    if (strcmp(gen->current_function, "main") == 0) {
         fprintf(gen->output, "main_return:\n");
-    }
-    else
-    {
+    } else {
         fprintf(gen->output, "%s_return:\n", gen->current_function);
     }
-    // Free local strings in reverse order
     Scope *scope = gen->symbol_table->current;
     Symbol *sym = scope->symbols;
-    while (sym)
-    {
-        if (sym->type && sym->type->kind == TYPE_STRING && sym->kind == SYMBOL_LOCAL)
-        {
-            int label = code_gen_new_label(gen);
+    int label_base = code_gen_new_label(gen);
+    int free_idx = 0;
+    while (sym) {
+        if (sym->type && sym->type->kind == TYPE_STRING && sym->kind == SYMBOL_LOCAL) {
+            int label = label_base + free_idx++;
             fprintf(gen->output, "    mov rdi, [rbp + %d]\n", sym->offset);
             fprintf(gen->output, "    test rdi, rdi\n");
             fprintf(gen->output, "    jz .no_free_%d\n", label);
-            if (gen->current_return_type && gen->current_return_type->kind == TYPE_STRING)
-            {
-                // Skip if this is the returned value
+            if (gen->current_return_type && gen->current_return_type->kind == TYPE_STRING) {
                 fprintf(gen->output, "    cmp rdi, rax\n");
                 fprintf(gen->output, "    je .no_free_%d\n", label);
             }
@@ -1307,7 +1352,6 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
         }
         sym = sym->next;
     }
-    // Restore callee-saved registers
     fprintf(gen->output, "    mov rbx, [rbp - 8]\n");
     fprintf(gen->output, "    mov r15, [rbp - 16]\n");
     fprintf(gen->output, "    mov rsp, rbp\n");
@@ -1382,30 +1426,44 @@ void code_gen_while_statement(CodeGen *gen, WhileStmt *stmt)
     fprintf(gen->output, ".L%d:\n", loop_end);
 }
 
-void code_gen_for_statement(CodeGen *gen, ForStmt *stmt)
-{
+void code_gen_for_statement(CodeGen *gen, ForStmt *stmt) {
     int loop_start = code_gen_new_label(gen);
     int loop_end = code_gen_new_label(gen);
     symbol_table_push_scope(gen->symbol_table);
-    if (stmt->initializer != NULL)
-    {
+    if (stmt->initializer != NULL) {
         code_gen_statement(gen, stmt->initializer);
     }
     fprintf(gen->output, ".L%d:\n", loop_start);
-    if (stmt->condition != NULL)
-    {
+    if (stmt->condition != NULL) {
         code_gen_expression(gen, stmt->condition);
         fprintf(gen->output, "    test rax, rax\n");
         fprintf(gen->output, "    jz .L%d\n", loop_end);
     }
     code_gen_statement(gen, stmt->body);
-    if (stmt->increment != NULL)
-    {
+    if (stmt->increment != NULL) {
         code_gen_expression(gen, stmt->increment);
     }
     fprintf(gen->output, "    jmp .L%d\n", loop_start);
     fprintf(gen->output, ".L%d:\n", loop_end);
-    // Frees are now in epilogue
+    Scope *scope = gen->symbol_table->current;
+    Symbol *sym = scope->symbols;
+    int label_base = code_gen_new_label(gen);
+    int free_idx = 0;
+    while (sym) {
+        if (sym->type && sym->type->kind == TYPE_STRING && sym->kind == SYMBOL_LOCAL) {
+            int label = label_base + free_idx++;
+            fprintf(gen->output, "    mov rdi, [rbp + %d]\n", sym->offset);
+            fprintf(gen->output, "    test rdi, rdi\n");
+            fprintf(gen->output, "    jz .no_free_%d\n", label);
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call free\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+            fprintf(gen->output, ".no_free_%d:\n", label);
+        }
+        sym = sym->next;
+    }
     symbol_table_pop_scope(gen->symbol_table);
 }
 
