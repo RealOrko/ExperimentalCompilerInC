@@ -817,104 +817,114 @@ void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
     fprintf(gen->output, "    mov [rbp + %d], rax\n", offset);
 }
 
-void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
-{
+static const char* get_to_str_func(TypeKind kind, bool* is_double) {
+    *is_double = false;
+    switch (kind) {
+        case TYPE_STRING: return "rt_to_string_string";
+        case TYPE_INT:
+        case TYPE_LONG:
+        case TYPE_CHAR:
+        case TYPE_BOOL: return "rt_to_string_long";
+        case TYPE_DOUBLE:
+            *is_double = true;
+            return "rt_to_string_double";
+        default:
+            // Invalid type in interpolation (should be caught in type checker)
+            exit(1);
+            return NULL;
+    }
+}
+
+void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
     int count = expr->part_count;
-    if (count == 0)
-    {
-        fprintf(gen->output, "    lea rax, [rel empty_str]\n");
+    if (count == 0) {
+        // Empty interpolated string -> duplicate empty string (malloc'd)
+        fprintf(gen->output, "    lea rdi, [rel empty_str]\n");
+        fprintf(gen->output, "    mov r15, rsp\n");
+        fprintf(gen->output, "    and r15, 15\n");
+        fprintf(gen->output, "    sub rsp, r15\n");
+        fprintf(gen->output, "    call rt_to_string_string\n");
+        fprintf(gen->output, "    add rsp, r15\n");
         return;
     }
-    if (count == 1)
-    {
-        Expr *part = expr->parts[0];
-        Type *pt = part->expr_type;
-        code_gen_expression(gen, part);
-        if (pt == NULL)
-        {
-            fprintf(gen->output, "    lea rax, [rel empty_str]\n");
-            return;
-        }
-        if (pt->kind != TYPE_STRING)
-        {
-            const char *to_str_func = NULL;
-            switch (pt->kind)
-            {
-            case TYPE_INT:
-            case TYPE_LONG:
-            case TYPE_CHAR:
-            case TYPE_BOOL:
-                to_str_func = "rt_to_string_long";
-                break;
-            case TYPE_DOUBLE:
-                to_str_func = "rt_to_string_double";
-                break;
-            default:
-                exit(1);
-            }
+
+    // Generate code for first part and convert to string
+    code_gen_expression(gen, expr->parts[0]);
+    Type *pt = expr->parts[0]->expr_type;
+    bool is_double;
+    const char* to_str_func = get_to_str_func(pt->kind, &is_double);
+    fprintf(gen->output, "    mov r15, rsp\n");
+    fprintf(gen->output, "    and r15, 15\n");
+    fprintf(gen->output, "    sub rsp, r15\n");
+    if (is_double) {
+        fprintf(gen->output, "    movq xmm0, rax\n");
+    } else {
+        fprintf(gen->output, "    mov rdi, rax\n");
+    }
+    fprintf(gen->output, "    call %s\n", to_str_func);
+    fprintf(gen->output, "    add rsp, r15\n");
+    // rbx = accumulated string (always malloc'd after conversion)
+    fprintf(gen->output, "    mov rbx, rax\n");
+
+    // For each subsequent part: convert to string, concat, free intermediates
+    for (int i = 1; i < count; i++) {
+        code_gen_expression(gen, expr->parts[i]);
+        pt = expr->parts[i]->expr_type;
+        to_str_func = get_to_str_func(pt->kind, &is_double);
+        fprintf(gen->output, "    mov r15, rsp\n");
+        fprintf(gen->output, "    and r15, 15\n");
+        fprintf(gen->output, "    sub rsp, r15\n");
+        if (is_double) {
+            fprintf(gen->output, "    movq xmm0, rax\n");
+        } else {
             fprintf(gen->output, "    mov rdi, rax\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call %s\n", to_str_func);
-            fprintf(gen->output, "    add rsp, r15\n");
         }
-        return;
-    }
-    Expr *part = expr->parts[0];
-    Type *pt = part->expr_type;
-    code_gen_expression(gen, part);
-    bool current_malloced = (pt->kind != TYPE_STRING) || (part->type != EXPR_VARIABLE);
-    fprintf(gen->output, "    push rax\n");
-    for (int i = 1; i < count; i++)
-    {
-        part = expr->parts[i];
-        pt = part->expr_type;
-        code_gen_expression(gen, part);
-        bool part_malloced = (pt->kind != TYPE_STRING) || (part->type != EXPR_VARIABLE);
-        fprintf(gen->output, "    push rax\n");
-        fprintf(gen->output, "    mov rsi, [rsp]\n");
-        fprintf(gen->output, "    mov rdi, [rsp + 8]\n");
+        fprintf(gen->output, "    call %s\n", to_str_func);
+        fprintf(gen->output, "    add rsp, r15\n");
+        // rcx = part string (malloc'd)
+        fprintf(gen->output, "    mov rcx, rax\n");
+
+        // Concat: rdi = accum (rbx), rsi = part (rcx)
+        fprintf(gen->output, "    mov rdi, rbx\n");
+        fprintf(gen->output, "    mov rsi, rcx\n");
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
         fprintf(gen->output, "    sub rsp, r15\n");
         fprintf(gen->output, "    call rt_str_concat\n");
         fprintf(gen->output, "    add rsp, r15\n");
-        fprintf(gen->output, "    pop rdi\n");
-        if (part_malloced)
-        {
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call free\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        fprintf(gen->output, "    pop rdi\n");
-        if (current_malloced)
-        {
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call free\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        fprintf(gen->output, "    push rax\n");
-        current_malloced = true;
+
+        // Free old accum (rbx, always malloc'd)
+        fprintf(gen->output, "    mov rdi, rbx\n");
+        fprintf(gen->output, "    mov r15, rsp\n");
+        fprintf(gen->output, "    and r15, 15\n");
+        fprintf(gen->output, "    sub rsp, r15\n");
+        fprintf(gen->output, "    call free\n");
+        fprintf(gen->output, "    add rsp, r15\n");
+
+        // Free part (rcx, always malloc'd after conversion)
+        fprintf(gen->output, "    mov rdi, rcx\n");
+        fprintf(gen->output, "    mov r15, rsp\n");
+        fprintf(gen->output, "    and r15, 15\n");
+        fprintf(gen->output, "    sub rsp, r15\n");
+        fprintf(gen->output, "    call free\n");
+        fprintf(gen->output, "    add rsp, r15\n");
+
+        // Update accum
+        fprintf(gen->output, "    mov rbx, rax\n");
     }
-    fprintf(gen->output, "    pop rax\n");
+
+    // Result in rax
+    fprintf(gen->output, "    mov rax, rbx\n");
 }
 
-static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr)
-{
-    for (int i = 0; i < expr->part_count; i++)
-    {
+static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr) {
+    for (int i = 0; i < expr->part_count; i++) {
         Expr *part = expr->parts[i];
         Type *pt = part->expr_type;
         code_gen_expression(gen, part);
         const char *rt_func = NULL;
         bool is_double = false;
-        switch (pt->kind)
-        {
+        switch (pt->kind) {
         case TYPE_STRING:
             rt_func = "rt_print_string";
             break;
@@ -931,27 +941,24 @@ static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr)
         default:
             exit(1);
         }
-        bool needs_free = (pt->kind != TYPE_STRING) || (part->type != EXPR_VARIABLE);
-        if (needs_free && !is_double)
-        {
-            // For non-double non-var, it's malloced (even literals are dup'ed)
+        // Corrected: Free only if string and not a simple variable load (temps are malloc'd)
+        bool needs_free = (pt->kind == TYPE_STRING) && (part->type != EXPR_VARIABLE);
+        if (needs_free && !is_double) {
+            // Preserve rax in rbx for later free (non-double strings)
             fprintf(gen->output, "    mov rbx, rax\n");
         }
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
         fprintf(gen->output, "    sub rsp, r15\n");
-        if (is_double)
-        {
+        if (is_double) {
             fprintf(gen->output, "    movq xmm0, rax\n");
-        }
-        else
-        {
+        } else {
             fprintf(gen->output, "    mov rdi, rax\n");
         }
         fprintf(gen->output, "    call %s\n", rt_func);
         fprintf(gen->output, "    add rsp, r15\n");
-        if (needs_free && !is_double)
-        {
+        if (needs_free && !is_double) {
+            // Free the temp string
             fprintf(gen->output, "    mov rdi, rbx\n");
             fprintf(gen->output, "    mov r15, rsp\n");
             fprintf(gen->output, "    and r15, 15\n");

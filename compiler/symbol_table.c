@@ -4,8 +4,6 @@
 #include <string.h>
 #include <stdio.h>
 
-#define MAX(a, b) ((a) > (b) ? (a) : (b))
-
 int get_type_size(Type *type)
 {
     switch (type->kind)

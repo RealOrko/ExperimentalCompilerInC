@@ -1,52 +1,61 @@
 fn factorial(n: int): int =>
+  print($"factorial: n={n}\n")
   if n <= 1 =>
+    print($"factorial: n <= 1 returning 1\n")
     return 1
-  return n * factorial(n - 1)
+  var j: int = n * factorial(n - 1)
+  print($"factorial: j={j}\n")
+  return j
 
 fn is_prime(num: int): bool =>
   if num <= 1 =>
+    print($"is_prime: num={num}\n")
     return false
   var i: int = 2
+  print($"is_prime: i={i}\n")
   while i * i <= num =>
     if num % i == 0 =>
+      print($"is_prime: num % i == 0, returning false\n")
       return false
     i = i + 1
+    print($"is_prime: i={i} (after increment)\n")
   return true
 
 fn repeat_string(text: str, count: int): str =>
   var result: str = ""
   for var j: int = 0; j < count; j++ =>
-    print($"j={j}\n")
-    print($"count={count}\n")
+    print($"repeat_string: j={j}\n\n")
+    print($"repeat_string: count={count}\n\n")
     result = result + text
   return result
 
 fn main(): void =>
+  print("Starting main method ... \n")
   var num: int = 5
   var fact: int = factorial(num)
-  print($"Factorial of {num} is {fact}")
+  print($"Factorial of {num} is {fact}\n")
 
   if is_prime(7) =>
-    print("7 is prime")
+    print("7 is prime\n")
   else =>
-    print("7 is not prime")
+    print("7 is not prime\n")
 
   var repeated: str = repeat_string("hello ", 3)
-  print(repeated + "world!")
+  print(repeated + "world!\n")
 
   var sum: int = 0
   for var k: int = 1; k <= 10; k++ =>
     sum = sum + k
-  print($"Sum 1 to 10: {sum}")
+  print($"Sum 1 to 10: {sum}\n")
 
   var pi_approx: double = 3.14159
-  print($"Pi approx: {pi_approx}")
+  print($"Pi approx: {pi_approx}\n")
 
   var ch: char = 'A'
-  print($"Char: {ch}")
+  print($"Char: {ch}\n")
 
   var flag: bool = true
-  print($"Flag: {flag}")
+  print($"Flag: {flag}\n")
 
   var any: str = $"This is a thing {num}"
   print(any)
@@ -65,3 +74,5 @@ fn main(): void =>
 
   any = $"This is a thing {flag}"
   print(any)
+
+  print("Complete main method ... \n")

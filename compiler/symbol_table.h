@@ -4,9 +4,11 @@
 #include "token.h"
 #include "ast.h"
 
-#define PARAM_BASE_OFFSET 16
-#define LOCAL_BASE_OFFSET 16
 #define OFFSET_ALIGNMENT 8
+#define LOCAL_BASE_OFFSET 8   // Start locals at [RBP - 8]
+#define PARAM_BASE_OFFSET 16  // Start params at [RBP + 16]
+
+#define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 typedef struct Type Type;
 
