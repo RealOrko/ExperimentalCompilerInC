@@ -1250,15 +1250,18 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
     {
         pre_build_symbols(gen, stmt->body[i]);
     }
-    int local_space = gen->symbol_table->current->next_local_offset;
-    int stack_space = local_space + 128;
+    int locals_size = gen->symbol_table->current->next_local_offset - LOCAL_BASE_OFFSET;
+    int saved_size = CALLEE_SAVED_SPACE;
+    int stack_space = locals_size + saved_size;
     stack_space = ((stack_space + 15) / 16) * 16;
-    if (stack_space < 128)
-        stack_space = 128;
+    if (stack_space < 128) stack_space = 128;
     fprintf(gen->output, "%s:\n", gen->current_function);
     fprintf(gen->output, "    push rbp\n");
     fprintf(gen->output, "    mov rbp, rsp\n");
     fprintf(gen->output, "    sub rsp, %d\n", stack_space);
+    // Save callee-saved registers
+    fprintf(gen->output, "    mov [rbp - 8], rbx\n");
+    fprintf(gen->output, "    mov [rbp - 16], r15\n");
     const char *param_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
     for (int i = 0; i < stmt->param_count && i < 6; i++)
     {
@@ -1304,6 +1307,9 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
         }
         sym = sym->next;
     }
+    // Restore callee-saved registers
+    fprintf(gen->output, "    mov rbx, [rbp - 8]\n");
+    fprintf(gen->output, "    mov r15, [rbp - 16]\n");
     fprintf(gen->output, "    mov rsp, rbp\n");
     fprintf(gen->output, "    pop rbp\n");
     fprintf(gen->output, "    ret\n");

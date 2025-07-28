@@ -5,9 +5,9 @@
 #include "ast.h"
 
 #define OFFSET_ALIGNMENT 8
-#define LOCAL_BASE_OFFSET 8   // Start locals at [RBP - 8]
-#define PARAM_BASE_OFFSET 16  // Start params at [RBP + 16]
-
+#define CALLEE_SAVED_SPACE 16  
+#define LOCAL_BASE_OFFSET (8 + CALLEE_SAVED_SPACE)  
+#define PARAM_BASE_OFFSET 16  
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 typedef struct Type Type;
