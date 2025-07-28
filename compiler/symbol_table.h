@@ -7,7 +7,7 @@
 #define OFFSET_ALIGNMENT 8
 #define CALLEE_SAVED_SPACE 16  
 #define LOCAL_BASE_OFFSET (8 + CALLEE_SAVED_SPACE)  
-#define PARAM_BASE_OFFSET 16  
+#define PARAM_BASE_OFFSET LOCAL_BASE_OFFSET
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 typedef struct Type Type;
@@ -43,6 +43,8 @@ typedef struct {
     int scopes_count;
     int scopes_capacity;
 } SymbolTable;
+
+int get_type_size(Type *type);
 
 void symbol_table_print(SymbolTable *table, const char *where);
 

@@ -256,7 +256,7 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
 
     if (kind == SYMBOL_PARAM)
     {
-        symbol->offset = table->current->next_param_offset;
+        symbol->offset = -table->current->next_param_offset;
         int type_size = get_type_size(type);
         int aligned_size = ((type_size + OFFSET_ALIGNMENT - 1) / OFFSET_ALIGNMENT) * OFFSET_ALIGNMENT;
         table->current->next_param_offset += aligned_size;

@@ -660,6 +660,7 @@ Token lexer_scan_token(Lexer *lexer)
             DEBUG_VERBOSE("Line %d: Emitting INTERPOL_STRING", lexer->line);
             return token;
         }
+        /* intentional fallthrough */
     default:
         snprintf(error_buffer, sizeof(error_buffer), "Unexpected character '%c'", c);
         DEBUG_VERBOSE("Line %d: Error - %s", lexer->line, error_buffer);
