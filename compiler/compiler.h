@@ -22,6 +22,5 @@ typedef struct
 void compiler_init(CompilerOptions *options, int argc, char **argv);
 void compiler_cleanup(CompilerOptions *options);
 int compiler_parse_args(int argc, char **argv, CompilerOptions *options);
-char *compiler_read_file(Arena *arena, const char *path);
 
 #endif

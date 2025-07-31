@@ -11,6 +11,7 @@ void compiler_init(CompilerOptions *options, int argc, char **argv)
     {
         return;
     }
+    
     arena_init(&options->arena, 1024);
     options->source_file = NULL;
     options->output_file = NULL;

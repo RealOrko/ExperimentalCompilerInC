@@ -11,7 +11,6 @@ int main(int argc, char **argv)
     Module *module = NULL;
 
     compiler_init(&options, argc, argv);
-
     init_debug(options.log_level);
 
     options.source = compiler_read_file(&options.arena, options.source_file);
