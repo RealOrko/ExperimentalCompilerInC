@@ -111,9 +111,7 @@ int main(int argc, char **argv)
 
     CodeGen gen;
     code_gen_init(&gen, parser.symbol_table, options.output_file);
-
     code_gen_module(&gen, module);
-
     code_gen_cleanup(&gen);
 
     if (module != NULL)
@@ -126,7 +124,6 @@ int main(int argc, char **argv)
     SymbolTable *table = parser.symbol_table;
     parser.symbol_table = NULL;
     symbol_table_cleanup(table);
-
     parser_cleanup(&parser);
     compiler_cleanup(&options);
 
