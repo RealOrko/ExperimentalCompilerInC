@@ -8,7 +8,6 @@
 int main(int argc, char **argv)
 {
     CompilerOptions options;
-    char *source = NULL;
     Module *module = NULL;
 
     compiler_init(&options);
@@ -21,14 +20,14 @@ int main(int argc, char **argv)
 
     init_debug(options.log_level);
 
-    source = compiler_read_file(&options.arena, options.source_file);
-    if (source == NULL)
+    options.source = compiler_read_file(&options.arena, options.source_file);
+    if (options.source == NULL)
     {
         compiler_cleanup(&options);
         return 1;
     }
 
-    lexer_init(&options.lexer, source, options.source_file);
+    lexer_init(&options.lexer, options.source, options.source_file);
     parser_init(&options.parser, &options.lexer);
 
     module = parser_execute(&options.parser, options.source_file);

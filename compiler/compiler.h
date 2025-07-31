@@ -14,6 +14,7 @@ typedef struct
     Parser parser;
     char *source_file;
     char *output_file;
+    char *source;
     int verbose;
     int log_level;
 } CompilerOptions;
