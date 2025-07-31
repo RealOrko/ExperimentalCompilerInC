@@ -1,4 +1,3 @@
-// compiler.h
 #ifndef COMPILER_H
 #define COMPILER_H
 
@@ -11,6 +10,8 @@
 typedef struct
 {
     Arena arena;
+    Lexer lexer;
+    Parser parser;
     char *source_file;
     char *output_file;
     int verbose;

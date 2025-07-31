@@ -28,16 +28,13 @@ int main(int argc, char **argv)
         return 1;
     }
 
-    Lexer lexer;
-    lexer_init(&lexer, source, options.source_file);
+    lexer_init(&options.lexer, source, options.source_file);
+    parser_init(&options.parser, &options.lexer);
 
-    Parser parser;
-    parser_init(&parser, &lexer);
-
-    module = parser_execute(&parser, options.source_file);
+    module = parser_execute(&options.parser, options.source_file);
     if (module == NULL)
     {
-        parser_cleanup(&parser);
+        parser_cleanup(&options.parser);
         compiler_cleanup(&options);
         return 1;
     }
@@ -60,7 +57,7 @@ int main(int argc, char **argv)
     Type *print_type = ast_create_function_type(void_type, param_types, 1);
     ast_free_type(void_type);
 
-    symbol_table_add_symbol(parser.symbol_table, print_token, print_type);
+    symbol_table_add_symbol(options.parser.symbol_table, print_token, print_type);
     ast_free_type(print_type);
     free(param_types);
     ast_free_type(placeholder_type);
@@ -83,12 +80,12 @@ int main(int argc, char **argv)
     Type *to_string_type = ast_create_function_type(string_type, param_types, 1);
     ast_free_type(string_type);
 
-    symbol_table_add_symbol(parser.symbol_table, to_string_token, to_string_type);
+    symbol_table_add_symbol(options.parser.symbol_table, to_string_token, to_string_type);
     ast_free_type(to_string_type);
     free(param_types);
     ast_free_type(placeholder_type);
 
-    int type_check_success = type_check_module(module, parser.symbol_table);
+    int type_check_success = type_check_module(module, options.parser.symbol_table);
 
     if (!type_check_success)
     {
@@ -99,18 +96,18 @@ int main(int argc, char **argv)
             module = NULL;
         }
 
-        SymbolTable *table = parser.symbol_table;
-        parser.symbol_table = NULL;
+        SymbolTable *table = options.parser.symbol_table;
+        options.parser.symbol_table = NULL;
         symbol_table_cleanup(table);
 
-        parser_cleanup(&parser);
+        parser_cleanup(&options.parser);
         compiler_cleanup(&options);
 
         return 1;
     }
 
     CodeGen gen;
-    code_gen_init(&gen, parser.symbol_table, options.output_file);
+    code_gen_init(&gen, options.parser.symbol_table, options.output_file);
     code_gen_module(&gen, module);
     code_gen_cleanup(&gen);
 
@@ -121,10 +118,10 @@ int main(int argc, char **argv)
         module = NULL;
     }
 
-    SymbolTable *table = parser.symbol_table;
-    parser.symbol_table = NULL;
+    SymbolTable *table = options.parser.symbol_table;
+    options.parser.symbol_table = NULL;
     symbol_table_cleanup(table);
-    parser_cleanup(&parser);
+    parser_cleanup(&options.parser);
     compiler_cleanup(&options);
 
     return 0;
