@@ -1,3 +1,4 @@
+// compiler.c
 #include "compiler.h"
 #include "debug.h"
 #include <stdlib.h>
@@ -11,6 +12,7 @@ void compiler_init(CompilerOptions *options)
     {
         return;
     }
+    arena_init(&options->arena, 1024);
     options->source_file = NULL;
     options->output_file = NULL;
     options->verbose = 0;
@@ -24,17 +26,9 @@ void compiler_cleanup(CompilerOptions *options)
         return;
     }
 
-    if (options->source_file != NULL)
-    {
-        free(options->source_file);
-        options->source_file = NULL;
-    }
-
-    if (options->output_file != NULL)
-    {
-        free(options->output_file);
-        options->output_file = NULL;
-    }
+    arena_free(&options->arena);
+    options->source_file = NULL;
+    options->output_file = NULL;
 }
 
 int compiler_parse_args(int argc, char **argv, CompilerOptions *options)
@@ -48,47 +42,31 @@ int compiler_parse_args(int argc, char **argv, CompilerOptions *options)
         return 0;
     }
 
-    options->source_file = malloc(strlen(argv[1]) + 1);
-    if (options->source_file == NULL)
-    {
-        return 0;
-    }
-    strcpy(options->source_file, argv[1]);
+    options->source_file = arena_strdup(&options->arena, argv[1]);
 
     char *dot = strrchr(options->source_file, '.');
     if (dot != NULL)
     {
-        int base_len = dot - options->source_file;
-        options->output_file = malloc(base_len + 3);
-        if (options->output_file == NULL)
-        {
-            return 0;
-        }
-        strncpy(options->output_file, options->source_file, base_len);
-        strcpy(options->output_file + base_len, ".s");
+        size_t base_len = dot - options->source_file;
+        char *out = arena_alloc(&options->arena, base_len + 3);
+        strncpy(out, options->source_file, base_len);
+        strcpy(out + base_len, ".s");
+        options->output_file = out;
     }
     else
     {
-        options->output_file = malloc(strlen(options->source_file) + 3);
-        if (options->output_file == NULL)
-        {
-            return 0;
-        }
-        strcpy(options->output_file, options->source_file);
-        strcat(options->output_file, ".o");
+        size_t len = strlen(options->source_file);
+        char *out = arena_alloc(&options->arena, len + 3);
+        strcpy(out, options->source_file);
+        strcat(out, ".o");
+        options->output_file = out;
     }
 
     for (int i = 2; i < argc; i++)
     {
         if (strcmp(argv[i], "-o") == 0 && i + 1 < argc)
         {
-            free(options->output_file);
-            options->output_file = malloc(strlen(argv[++i]) + 1);
-            if (options->output_file == NULL)
-            {
-                return 0;
-            }
-            strcpy(options->output_file, argv[i]);
+            options->output_file = arena_strdup(&options->arena, argv[++i]);
         }
         else if (strcmp(argv[i], "-v") == 0)
         {
@@ -115,7 +93,7 @@ int compiler_parse_args(int argc, char **argv, CompilerOptions *options)
     return 1;
 }
 
-char *compiler_read_file(const char *path)
+char *compiler_read_file(Arena *arena, const char *path)
 {
     if (path == NULL)
     {
@@ -147,17 +125,11 @@ char *compiler_read_file(const char *path)
         return NULL;
     }
 
-    char *buffer = malloc(size + 1);
-    if (buffer == NULL)
-    {
-        fclose(file);
-        return NULL;
-    }
+    char *buffer = arena_alloc(arena, size + 1);
 
     size_t bytes_read = fread(buffer, 1, size, file);
     if (bytes_read < (size_t)size)
     {
-        free(buffer);
         fclose(file);
         return NULL;
     }

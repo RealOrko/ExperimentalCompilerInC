@@ -21,7 +21,7 @@ int main(int argc, char **argv)
 
     init_debug(options.log_level);
 
-    source = compiler_read_file(options.source_file);
+    source = compiler_read_file(&options.arena, options.source_file);
     if (source == NULL)
     {
         compiler_cleanup(&options);
@@ -37,7 +37,6 @@ int main(int argc, char **argv)
     module = parser_execute(&parser, options.source_file);
     if (module == NULL)
     {
-        free(source);
         parser_cleanup(&parser);
         compiler_cleanup(&options);
         return 1;
@@ -105,7 +104,6 @@ int main(int argc, char **argv)
         symbol_table_cleanup(table);
 
         parser_cleanup(&parser);
-        free(source);
         compiler_cleanup(&options);
 
         return 1;
@@ -130,7 +128,6 @@ int main(int argc, char **argv)
     symbol_table_cleanup(table);
 
     parser_cleanup(&parser);
-    free(source);
     compiler_cleanup(&options);
 
     return 0;
