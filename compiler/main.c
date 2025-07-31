@@ -10,13 +10,7 @@ int main(int argc, char **argv)
     CompilerOptions options;
     Module *module = NULL;
 
-    compiler_init(&options);
-
-    if (!compiler_parse_args(argc, argv, &options))
-    {
-        compiler_cleanup(&options);
-        return 1;
-    }
+    compiler_init(&options, argc, argv);
 
     init_debug(options.log_level);
 

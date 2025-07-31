@@ -1,4 +1,3 @@
-// compiler.c
 #include "compiler.h"
 #include "debug.h"
 #include <stdlib.h>
@@ -6,7 +5,7 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-void compiler_init(CompilerOptions *options)
+void compiler_init(CompilerOptions *options, int argc, char **argv)
 {
     if (options == NULL)
     {
@@ -17,6 +16,11 @@ void compiler_init(CompilerOptions *options)
     options->output_file = NULL;
     options->verbose = 0;
     options->log_level = DEBUG_LEVEL_ERROR;
+
+    if (!compiler_parse_args(argc, argv, options))
+    {
+        return;
+    }
 }
 
 void compiler_cleanup(CompilerOptions *options)
