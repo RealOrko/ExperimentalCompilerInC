@@ -7,29 +7,37 @@
 
 void compiler_init(CompilerOptions *options, int argc, char **argv)
 {
-    if (options == NULL)
-    {
+    if (!options) {
+        DEBUG_ERROR("CompilerOptions is NULL");
         exit(1);
     }
-    
-    arena_init(&options->arena, 1024);
+
+    // Initialize arena with a reasonable default size
+    arena_init(&options->arena, 4096);
     options->source_file = NULL;
     options->output_file = NULL;
     options->source = NULL;
     options->verbose = 0;
     options->log_level = DEBUG_LEVEL_ERROR;
 
-    if (!compiler_parse_args(argc, argv, options))
-    {
+    // Initialize debug level
+    init_debug(options->log_level);
+
+    if (!compiler_parse_args(argc, argv, options)) {
+        compiler_cleanup(options);
         exit(1);
     }
 
-    if (options->source_file != NULL)
-    {
+    if (options->source_file) {
         options->source = compiler_read_file(&options->arena, options->source_file);
-    }
-    if (options->source == NULL)
-    {
+        if (!options->source) {
+            DEBUG_ERROR("Failed to read source file: %s", options->source_file);
+            compiler_cleanup(options);
+            exit(1);
+        }
+    } else {
+        DEBUG_ERROR("No source file specified");
+        compiler_cleanup(options);
         exit(1);
     }
 
@@ -39,72 +47,78 @@ void compiler_init(CompilerOptions *options, int argc, char **argv)
 
 void compiler_cleanup(CompilerOptions *options)
 {
-    if (options == NULL)
-    {
+    if (!options) {
         return;
     }
 
+    // Clean up parser and lexer first
     parser_cleanup(&options->parser);
     lexer_cleanup(&options->lexer);
+    
+    // Free all arena memory in one go
     arena_free(&options->arena);
+    
+    // Reset fields to avoid use-after-free
+    options->source_file = NULL;
+    options->output_file = NULL;
+    options->source = NULL;
 }
 
 int compiler_parse_args(int argc, char **argv, CompilerOptions *options)
 {
-    if (argc < 2)
-    {
-        fprintf(stderr, "Usage: %s <source_file> [-o <output_file>] [-v] [-l <level>]\n", argv[0]);
-        fprintf(stderr, "  -o <output_file>   Specify output file (default is source_file.o)\n");
-        fprintf(stderr, "  -v                 Verbose mode\n");
-        fprintf(stderr, "  -l <level>         Set log level (0=none, 1=error, 2=warning, 3=info, 4=verbose)\n");
+    if (argc < 2) {
+        DEBUG_ERROR(
+            "Usage: %s <source_file> [-o <output_file>] [-v] [-l <level>]\n"
+            "  -o <output_file>   Specify output file (default is source_file.s)\n"
+            "  -v                 Verbose mode\n"
+            "  -l <level>         Set log level (0=none, 1=error, 2=warning, 3=info, 4=verbose)",
+            argv[0]);
         return 0;
     }
 
+    // Allocate source_file using arena
     options->source_file = arena_strdup(&options->arena, argv[1]);
-
-    char *dot = strrchr(options->source_file, '.');
-    if (dot != NULL)
-    {
-        size_t base_len = dot - options->source_file;
-        char *out = arena_alloc(&options->arena, base_len + 3);
-        strncpy(out, options->source_file, base_len);
-        strcpy(out + base_len, ".s");
-        options->output_file = out;
-    }
-    else
-    {
-        size_t len = strlen(options->source_file);
-        char *out = arena_alloc(&options->arena, len + 3);
-        strcpy(out, options->source_file);
-        strcat(out, ".o");
-        options->output_file = out;
+    if (!options->source_file) {
+        DEBUG_ERROR("Failed to allocate memory for source file path");
+        return 0;
     }
 
-    for (int i = 2; i < argc; i++)
-    {
-        if (strcmp(argv[i], "-o") == 0 && i + 1 < argc)
-        {
+    // Generate default output file name
+    const char *dot = strrchr(options->source_file, '.');
+    size_t base_len = dot ? (size_t)(dot - options->source_file) : strlen(options->source_file);
+    size_t out_len = base_len + 3; // ".s" + null terminator
+    char *out = arena_alloc(&options->arena, out_len);
+    if (!out) {
+        DEBUG_ERROR("Failed to allocate memory for output file path");
+        return 0;
+    }
+    
+    strncpy(out, options->source_file, base_len);
+    strcpy(out + base_len, ".s");
+    options->output_file = out;
+
+    // Parse additional arguments
+    for (int i = 2; i < argc; i++) {
+        if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) {
             options->output_file = arena_strdup(&options->arena, argv[++i]);
-        }
-        else if (strcmp(argv[i], "-v") == 0)
-        {
+            if (!options->output_file) {
+                DEBUG_ERROR("Failed to allocate memory for output file path");
+                return 0;
+            }
+        } else if (strcmp(argv[i], "-v") == 0) {
             options->verbose = 1;
-        }
-        else if (strcmp(argv[i], "-l") == 0 && i + 1 < argc)
-        {
+        } else if (strcmp(argv[i], "-l") == 0 && i + 1 < argc) {
             i++;
             int log_level = atoi(argv[i]);
-
-            if (log_level < DEBUG_LEVEL_NONE || log_level > DEBUG_LEVEL_VERBOSE)
-            {
+            if (log_level < DEBUG_LEVEL_NONE || log_level > DEBUG_LEVEL_VERBOSE) {
+                DEBUG_ERROR("Invalid log level: %s", argv[i]);
+                return 0;
             }
-            else
-            {
-                options->log_level = log_level;
-            }
-        }
-        else
-        {
+            options->log_level = log_level;
+            init_debug(log_level); // Update debug level if changed
+        } else {
+            DEBUG_ERROR("Unknown option: %s", argv[i]);
+            return 0;
         }
     }
 
@@ -113,47 +127,54 @@ int compiler_parse_args(int argc, char **argv, CompilerOptions *options)
 
 char *compiler_read_file(Arena *arena, const char *path)
 {
-    if (path == NULL)
-    {
+    if (!path || !arena) {
+        DEBUG_ERROR("Invalid arguments: path=%p, arena=%p", (void*)path, (void*)arena);
         return NULL;
     }
 
     FILE *file = fopen(path, "rb");
-    if (file == NULL)
-    {
+    if (!file) {
+        DEBUG_ERROR("Failed to open file: %s", path);
         return NULL;
     }
 
-    if (fseek(file, 0, SEEK_END) != 0)
-    {
+    // Get file size
+    if (fseek(file, 0, SEEK_END) != 0) {
+        DEBUG_ERROR("Failed to seek to end of file: %s", path);
         fclose(file);
         return NULL;
     }
 
     long size = ftell(file);
-    if (size < 0)
-    {
+    if (size < 0) {
+        DEBUG_ERROR("Failed to get file size: %s", path);
         fclose(file);
         return NULL;
     }
 
-    if (fseek(file, 0, SEEK_SET) != 0)
-    {
+    if (fseek(file, 0, SEEK_SET) != 0) {
+        DEBUG_ERROR("Failed to seek to start of file: %s", path);
         fclose(file);
         return NULL;
     }
 
-    char *buffer = arena_alloc(arena, size + 1);
+    // Allocate buffer with arena
+    char *buffer = arena_alloc(arena, (size_t)size + 1);
+    if (!buffer) {
+        DEBUG_ERROR("Failed to allocate memory for file contents: %s", path);
+        fclose(file);
+        return NULL;
+    }
 
-    size_t bytes_read = fread(buffer, 1, size, file);
-    if (bytes_read < (size_t)size)
-    {
+    // Read file contents
+    size_t bytes_read = fread(buffer, 1, (size_t)size, file);
+    if (bytes_read < (size_t)size) {
+        DEBUG_ERROR("Failed to read file contents: %s", path);
         fclose(file);
         return NULL;
     }
 
     buffer[size] = '\0';
-
     fclose(file);
     return buffer;
 }
