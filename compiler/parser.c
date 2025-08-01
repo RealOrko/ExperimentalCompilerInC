@@ -81,7 +81,7 @@ Stmt *parser_indented_block(Parser *parser)
             {
                 exit(1);
             }
-            if (statements != NULL)
+            if (statements != NULL && count > 0)
             {
                 memcpy(new_statements, statements, sizeof(Stmt *) * count);
             }
@@ -503,11 +503,16 @@ Expr *parser_primary(Parser *parser)
                     if (count >= capacity)
                     {
                         capacity = capacity == 0 ? 8 : capacity * 2;
-                        parts = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
-                        if (count > 0)
+                        Expr **new_parts = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
+                        if (new_parts == NULL)
                         {
-                            memcpy(parts, parts, sizeof(Expr *) * count);
+                            exit(1);
                         }
+                        if (parts != NULL && count > 0)
+                        {
+                            memcpy(new_parts, parts, sizeof(Expr *) * count);
+                        }
+                        parts = new_parts;
                     }
                     parts[count++] = seg_expr;
                 }
@@ -543,26 +548,32 @@ Expr *parser_primary(Parser *parser)
                 if (count >= capacity)
                 {
                     capacity = capacity == 0 ? 8 : capacity * 2;
-                    parts = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
-                    if (count > 0)
+                    Expr **new_parts = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
+                    if (new_parts == NULL)
                     {
-                        memcpy(parts, parts, sizeof(Expr *) * count);
+                        exit(1);
                     }
+                    if (parts != NULL && count > 0)
+                    {
+                        memcpy(new_parts, parts, sizeof(Expr *) * count);
+                    }
+                    parts = new_parts;
                 }
                 parts[count++] = inner;
 
                 if (parser->interp_count >= parser->interp_capacity)
                 {
                     parser->interp_capacity = parser->interp_capacity ? parser->interp_capacity * 2 : 8;
-                    parser->interp_sources = arena_alloc(parser->arena, sizeof(char *) * parser->interp_capacity);
-                    if (parser->interp_sources == NULL)
+                    char **new_interp_sources = arena_alloc(parser->arena, sizeof(char *) * parser->interp_capacity);
+                    if (new_interp_sources == NULL)
                     {
                         exit(1);
                     }
-                    if (parser->interp_count > 0)
+                    if (parser->interp_sources != NULL && parser->interp_count > 0)
                     {
-                        memcpy(parser->interp_sources, parser->interp_sources, sizeof(char *) * parser->interp_count);
+                        memcpy(new_interp_sources, parser->interp_sources, sizeof(char *) * parser->interp_count);
                     }
+                    parser->interp_sources = new_interp_sources;
                 }
                 parser->interp_sources[parser->interp_count++] = expr_src;
 
@@ -586,11 +597,16 @@ Expr *parser_primary(Parser *parser)
             if (count >= capacity)
             {
                 capacity = capacity == 0 ? 8 : capacity * 2;
-                parts = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
-                if (count > 0)
+                Expr **new_parts = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
+                if (new_parts == NULL)
                 {
-                    memcpy(parts, parts, sizeof(Expr *) * count);
+                    exit(1);
                 }
+                if (parts != NULL && count > 0)
+                {
+                    memcpy(new_parts, parts, sizeof(Expr *) * count);
+                }
+                parts = new_parts;
             }
             parts[count++] = seg_expr;
         }
@@ -622,15 +638,16 @@ Expr *parser_call(Parser *parser, Expr *callee)
             if (arg_count >= capacity)
             {
                 capacity = capacity == 0 ? 8 : capacity * 2;
-                arguments = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
-                if (arguments == NULL)
+                Expr **new_arguments = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
+                if (new_arguments == NULL)
                 {
                     exit(1);
                 }
-                if (arg_count > 0)
+                if (arguments != NULL && arg_count > 0)
                 {
-                    memcpy(arguments, arguments, sizeof(Expr *) * arg_count);
+                    memcpy(new_arguments, arguments, sizeof(Expr *) * arg_count);
                 }
+                arguments = new_arguments;
             }
             arguments[arg_count++] = arg;
         } while (parser_match(parser, TOKEN_COMMA));
@@ -830,15 +847,16 @@ Stmt *parser_function_declaration(Parser *parser)
                 if (param_count >= param_capacity)
                 {
                     param_capacity = param_capacity == 0 ? 8 : param_capacity * 2;
-                    params = arena_alloc(parser->arena, sizeof(Parameter) * param_capacity);
-                    if (params == NULL)
+                    Parameter *new_params = arena_alloc(parser->arena, sizeof(Parameter) * param_capacity);
+                    if (new_params == NULL)
                     {
                         exit(1);
                     }
-                    if (param_count > 0)
+                    if (params != NULL && param_count > 0)
                     {
-                        memcpy(params, params, sizeof(Parameter) * param_count);
+                        memcpy(new_params, params, sizeof(Parameter) * param_count);
                     }
+                    params = new_params;
                 }
                 params[param_count].name = param_name;
                 params[param_count].type = param_type;
@@ -1108,15 +1126,16 @@ Stmt *parser_block_statement(Parser *parser)
         if (count >= capacity)
         {
             capacity = capacity == 0 ? 8 : capacity * 2;
-            statements = arena_alloc(parser->arena, sizeof(Stmt *) * capacity);
-            if (statements == NULL)
+            Stmt **new_statements = arena_alloc(parser->arena, sizeof(Stmt *) * capacity);
+            if (new_statements == NULL)
             {
                 exit(1);
             }
-            if (count > 0)
+            if (statements != NULL && count > 0)
             {
-                memcpy(statements, statements, sizeof(Stmt *) * count);
+                memcpy(new_statements, statements, sizeof(Stmt *) * count);
             }
+            statements = new_statements;
         }
         statements[count++] = stmt;
     }
