@@ -751,7 +751,7 @@ Stmt *ast_create_var_decl_stmt(Arena *arena, Token name, Type *type, Expr *initi
     stmt->as.var_decl.name.length = name.length;
     stmt->as.var_decl.name.line = name.line;
     stmt->as.var_decl.name.type = name.type;
-    stmt->as.var_decl.name.filename = name.filename;
+    stmt->as.var_decl.name.filename = name.filename;  // Added for location reporting.
     stmt->as.var_decl.type = type;
     stmt->as.var_decl.initializer = initializer;
     stmt->token = ast_clone_token(arena, loc_token);
@@ -779,8 +779,8 @@ Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int 
     stmt->as.function.name.length = name.length;
     stmt->as.function.name.line = name.line;
     stmt->as.function.name.type = name.type;
-    stmt->as.function.name.filename = name.filename;
-    
+    stmt->as.function.name.filename = name.filename;  // Added for location reporting.
+
     Parameter *new_params = arena_alloc(arena, sizeof(Parameter) * param_count);
     if (new_params == NULL && param_count > 0)
     {
@@ -799,7 +799,7 @@ Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int 
         new_params[i].name.length = params[i].name.length;
         new_params[i].name.line = params[i].name.line;
         new_params[i].name.type = params[i].name.type;
-        new_params[i].name.filename = params[i].name.filename;
+        new_params[i].name.filename = params[i].name.filename;  // Added for location reporting.
         new_params[i].type = params[i].type;
     }
     stmt->as.function.params = new_params;
@@ -807,6 +807,26 @@ Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int 
     stmt->as.function.return_type = return_type;
     stmt->as.function.body = body;
     stmt->as.function.body_count = body_count;
+    stmt->token = ast_clone_token(arena, loc_token);
+    return stmt;
+}
+
+Stmt *ast_create_return_stmt(Arena *arena, Token keyword, Expr *value, const Token *loc_token)
+{
+    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
+    if (stmt == NULL)
+    {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
+    memset(stmt, 0, sizeof(Stmt));
+    stmt->type = STMT_RETURN;
+    stmt->as.return_stmt.keyword.start = keyword.start;
+    stmt->as.return_stmt.keyword.length = keyword.length;
+    stmt->as.return_stmt.keyword.line = keyword.line;
+    stmt->as.return_stmt.keyword.type = keyword.type;
+    stmt->as.return_stmt.keyword.filename = keyword.filename;  // Added for location reporting.
+    stmt->as.return_stmt.value = value;
     stmt->token = ast_clone_token(arena, loc_token);
     return stmt;
 }
@@ -824,21 +844,6 @@ Stmt *ast_create_block_stmt(Arena *arena, Stmt **statements, int count, const To
     stmt->as.block.statements = statements;
     stmt->as.block.count = count;
     stmt->token = ast_clone_token(arena, loc_token);
-    return stmt;
-}
-
-Stmt *ast_create_block_stmt(Arena *arena, Stmt **statements, int count)
-{
-    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
-    if (stmt == NULL)
-    {
-        DEBUG_ERROR("Out of memory");
-        exit(1);
-    }
-    memset(stmt, 0, sizeof(Stmt));
-    stmt->type = STMT_BLOCK;
-    stmt->as.block.statements = statements;
-    stmt->as.block.count = count;
     return stmt;
 }
 
@@ -913,6 +918,7 @@ Stmt *ast_create_import_stmt(Arena *arena, Token module_name, const Token *loc_t
     stmt->as.import.module_name.length = module_name.length;
     stmt->as.import.module_name.line = module_name.line;
     stmt->as.import.module_name.type = module_name.type;
+    stmt->as.import.module_name.filename = module_name.filename;
     stmt->token = ast_clone_token(arena, loc_token);
     return stmt;
 }

@@ -99,7 +99,7 @@ Stmt *parser_indented_block(Parser *parser)
         parser_error(parser, "Expected dedent to end block");
     }
 
-    return ast_create_block_stmt(parser->arena, statements, count);
+    return ast_create_block_stmt(parser->arena, statements, count, NULL);
 }
 
 Expr *parser_multi_line_expression(Parser *parser)
@@ -108,8 +108,9 @@ Expr *parser_multi_line_expression(Parser *parser)
 
     while (parser_match(parser, TOKEN_NEWLINE))
     {
+        Token op_token = parser->previous;
         Expr *right = parser_expression(parser);
-        expr = ast_create_binary_expr(parser->arena, expr, TOKEN_PLUS, right);
+        expr = ast_create_binary_expr(parser->arena, expr, TOKEN_PLUS, right, &op_token);
     }
 
     return expr;
@@ -291,6 +292,7 @@ Expr *parser_assignment(Parser *parser)
 
     if (parser_match(parser, TOKEN_EQUAL))
     {
+        Token equals = parser->previous;
         Expr *value = parser_assignment(parser);
         if (expr->type == EXPR_VARIABLE)
         {
@@ -301,7 +303,7 @@ Expr *parser_assignment(Parser *parser)
                 exit(1);
             }
             name.start = new_start;
-            return ast_create_assign_expr(parser->arena, name, value);
+            return ast_create_assign_expr(parser->arena, name, value, &equals);
         }
         parser_error(parser, "Invalid assignment target");
     }
@@ -313,9 +315,10 @@ Expr *parser_logical_or(Parser *parser)
     Expr *expr = parser_logical_and(parser);
     while (parser_match(parser, TOKEN_OR))
     {
-        TokenType operator = parser->previous.type;
+        Token op = parser->previous;
+        TokenType operator = op.type;
         Expr *right = parser_logical_and(parser);
-        expr = ast_create_binary_expr(parser->arena, expr, operator, right);
+        expr = ast_create_binary_expr(parser->arena, expr, operator, right, &op);
     }
     return expr;
 }
@@ -325,9 +328,10 @@ Expr *parser_logical_and(Parser *parser)
     Expr *expr = parser_equality(parser);
     while (parser_match(parser, TOKEN_AND))
     {
-        TokenType operator = parser->previous.type;
+        Token op = parser->previous;
+        TokenType operator = op.type;
         Expr *right = parser_equality(parser);
-        expr = ast_create_binary_expr(parser->arena, expr, operator, right);
+        expr = ast_create_binary_expr(parser->arena, expr, operator, right, &op);
     }
     return expr;
 }
@@ -337,9 +341,10 @@ Expr *parser_equality(Parser *parser)
     Expr *expr = parser_comparison(parser);
     while (parser_match(parser, TOKEN_BANG_EQUAL) || parser_match(parser, TOKEN_EQUAL_EQUAL))
     {
-        TokenType operator = parser->previous.type;
+        Token op = parser->previous;
+        TokenType operator = op.type;
         Expr *right = parser_comparison(parser);
-        expr = ast_create_binary_expr(parser->arena, expr, operator, right);
+        expr = ast_create_binary_expr(parser->arena, expr, operator, right, &op);
     }
     return expr;
 }
@@ -350,9 +355,10 @@ Expr *parser_comparison(Parser *parser)
     while (parser_match(parser, TOKEN_LESS) || parser_match(parser, TOKEN_LESS_EQUAL) ||
            parser_match(parser, TOKEN_GREATER) || parser_match(parser, TOKEN_GREATER_EQUAL))
     {
-        TokenType operator = parser->previous.type;
+        Token op = parser->previous;
+        TokenType operator = op.type;
         Expr *right = parser_term(parser);
-        expr = ast_create_binary_expr(parser->arena, expr, operator, right);
+        expr = ast_create_binary_expr(parser->arena, expr, operator, right, &op);
     }
     return expr;
 }
@@ -362,9 +368,10 @@ Expr *parser_term(Parser *parser)
     Expr *expr = parser_factor(parser);
     while (parser_match(parser, TOKEN_PLUS) || parser_match(parser, TOKEN_MINUS))
     {
-        TokenType operator = parser->previous.type;
+        Token op = parser->previous;
+        TokenType operator = op.type;
         Expr *right = parser_factor(parser);
-        expr = ast_create_binary_expr(parser->arena, expr, operator, right);
+        expr = ast_create_binary_expr(parser->arena, expr, operator, right, &op);
     }
     return expr;
 }
@@ -374,9 +381,10 @@ Expr *parser_factor(Parser *parser)
     Expr *expr = parser_unary(parser);
     while (parser_match(parser, TOKEN_STAR) || parser_match(parser, TOKEN_SLASH) || parser_match(parser, TOKEN_MODULO))
     {
-        TokenType operator = parser->previous.type;
+        Token op = parser->previous;
+        TokenType operator = op.type;
         Expr *right = parser_unary(parser);
-        expr = ast_create_binary_expr(parser->arena, expr, operator, right);
+        expr = ast_create_binary_expr(parser->arena, expr, operator, right, &op);
     }
     return expr;
 }
@@ -385,9 +393,10 @@ Expr *parser_unary(Parser *parser)
 {
     if (parser_match(parser, TOKEN_BANG) || parser_match(parser, TOKEN_MINUS))
     {
-        TokenType operator = parser->previous.type;
+        Token op = parser->previous;
+        TokenType operator = op.type;
         Expr *right = parser_unary(parser);
-        return ast_create_unary_expr(parser->arena, operator, right);
+        return ast_create_unary_expr(parser->arena, operator, right, &op);
     }
     return parser_postfix(parser);
 }
@@ -407,11 +416,11 @@ Expr *parser_postfix(Parser *parser)
         }
         else if (parser_match(parser, TOKEN_PLUS_PLUS))
         {
-            expr = ast_create_increment_expr(parser->arena, expr);
+            expr = ast_create_increment_expr(parser->arena, expr, &parser->previous);
         }
         else if (parser_match(parser, TOKEN_MINUS_MINUS))
         {
-            expr = ast_create_decrement_expr(parser->arena, expr);
+            expr = ast_create_decrement_expr(parser->arena, expr, &parser->previous);
         }
         else
         {
@@ -427,49 +436,49 @@ Expr *parser_primary(Parser *parser)
     {
         LiteralValue value;
         value.int_value = parser->previous.literal.int_value;
-        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_INT), false);
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_INT), false, &parser->previous);
     }
     if (parser_match(parser, TOKEN_LONG_LITERAL))
     {
         LiteralValue value;
         value.int_value = parser->previous.literal.int_value;
-        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_LONG), false);
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_LONG), false, &parser->previous);
     }
     if (parser_match(parser, TOKEN_DOUBLE_LITERAL))
     {
         LiteralValue value;
         value.double_value = parser->previous.literal.double_value;
-        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_DOUBLE), false);
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_DOUBLE), false, &parser->previous);
     }
     if (parser_match(parser, TOKEN_CHAR_LITERAL))
     {
         LiteralValue value;
         value.char_value = parser->previous.literal.char_value;
-        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_CHAR), false);
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_CHAR), false, &parser->previous);
     }
     if (parser_match(parser, TOKEN_STRING_LITERAL))
     {
         LiteralValue value;
         value.string_value = arena_strdup(parser->arena, parser->previous.literal.string_value);
-        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_STRING), false);
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_STRING), false, &parser->previous);
     }
     if (parser_match(parser, TOKEN_BOOL_LITERAL))
     {
         LiteralValue value;
         value.bool_value = parser->previous.literal.bool_value;
-        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_BOOL), false);
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_BOOL), false, &parser->previous);
     }
     if (parser_match(parser, TOKEN_NIL))
     {
         LiteralValue value;
         value.int_value = 0;
-        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_NIL), false);
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_NIL), false, &parser->previous);
     }
     if (parser_match(parser, TOKEN_IDENTIFIER))
     {
         Token var_token = parser->previous;
         var_token.start = arena_strndup(parser->arena, parser->previous.start, parser->previous.length);
-        return ast_create_variable_expr(parser->arena, var_token);
+        return ast_create_variable_expr(parser->arena, var_token, &parser->previous);
     }
     if (parser_match(parser, TOKEN_LEFT_PAREN))
     {
@@ -480,6 +489,7 @@ Expr *parser_primary(Parser *parser)
 
     if (parser_match(parser, TOKEN_INTERPOL_STRING))
     {
+        Token interpol_token = parser->previous;
         const char *content = parser->previous.literal.string_value;
         Expr **parts = NULL;
         int capacity = 0;
@@ -498,7 +508,7 @@ Expr *parser_primary(Parser *parser)
                     char *seg = arena_strndup(parser->arena, segment_start, len);
                     LiteralValue v;
                     v.string_value = seg;
-                    Expr *seg_expr = ast_create_literal_expr(parser->arena, v, ast_create_primitive_type(parser->arena, TYPE_STRING), false);
+                    Expr *seg_expr = ast_create_literal_expr(parser->arena, v, ast_create_primitive_type(parser->arena, TYPE_STRING), false, &interpol_token);
 
                     if (count >= capacity)
                     {
@@ -524,7 +534,8 @@ Expr *parser_primary(Parser *parser)
                 if (!*p)
                 {
                     parser_error_at_current(parser, "Unterminated interpolated expression");
-                    return ast_create_literal_expr(parser->arena, (LiteralValue){0}, ast_create_primitive_type(parser->arena, TYPE_STRING), false);
+                    LiteralValue zero = {0};
+                    return ast_create_literal_expr(parser->arena, zero, ast_create_primitive_type(parser->arena, TYPE_STRING), false, NULL);
                 }
                 int expr_len = p - expr_start;
                 char *expr_src = arena_strndup(parser->arena, expr_start, expr_len);
@@ -542,7 +553,8 @@ Expr *parser_primary(Parser *parser)
                 if (inner == NULL || sub_parser.had_error)
                 {
                     parser_error_at_current(parser, "Invalid expression in interpolation");
-                    return ast_create_literal_expr(parser->arena, (LiteralValue){0}, ast_create_primitive_type(parser->arena, TYPE_STRING), false);
+                    LiteralValue zero = {0};
+                    return ast_create_literal_expr(parser->arena, zero, ast_create_primitive_type(parser->arena, TYPE_STRING), false, NULL);
                 }
 
                 if (count >= capacity)
@@ -592,7 +604,7 @@ Expr *parser_primary(Parser *parser)
             char *seg = arena_strndup(parser->arena, segment_start, len);
             LiteralValue v;
             v.string_value = seg;
-            Expr *seg_expr = ast_create_literal_expr(parser->arena, v, ast_create_primitive_type(parser->arena, TYPE_STRING), false);
+            Expr *seg_expr = ast_create_literal_expr(parser->arena, v, ast_create_primitive_type(parser->arena, TYPE_STRING), false, &interpol_token);
 
             if (count >= capacity)
             {
@@ -611,17 +623,18 @@ Expr *parser_primary(Parser *parser)
             parts[count++] = seg_expr;
         }
 
-        return ast_create_interpolated_expr(parser->arena, parts, count);
+        return ast_create_interpolated_expr(parser->arena, parts, count, &interpol_token);
     }
 
     parser_error_at_current(parser, "Expected expression");
     LiteralValue value;
     value.int_value = 0;
-    return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_NIL), false);
+    return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_NIL), false, NULL);
 }
 
 Expr *parser_call(Parser *parser, Expr *callee)
 {
+    Token paren = parser->previous;
     Expr **arguments = NULL;
     int arg_count = 0;
     int capacity = 0;
@@ -654,14 +667,15 @@ Expr *parser_call(Parser *parser, Expr *callee)
     }
 
     parser_consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after arguments");
-    return ast_create_call_expr(parser->arena, callee, arguments, arg_count);
+    return ast_create_call_expr(parser->arena, callee, arguments, arg_count, &paren);
 }
 
 Expr *parser_array_access(Parser *parser, Expr *array)
 {
+    Token bracket = parser->previous;
     Expr *index = parser_expression(parser);
     parser_consume(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after index");
-    return ast_create_array_access_expr(parser->arena, array, index);
+    return ast_create_array_access_expr(parser->arena, array, index, &bracket);
 }
 
 Stmt *parser_statement(Parser *parser)
@@ -734,6 +748,7 @@ Stmt *parser_declaration(Parser *parser)
 
 Stmt *parser_var_declaration(Parser *parser)
 {
+    Token var_token = parser->previous;
     Token name;
     if (parser_check(parser, TOKEN_IDENTIFIER))
     {
@@ -773,11 +788,12 @@ Stmt *parser_var_declaration(Parser *parser)
         parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' or newline after variable declaration");
     }
 
-    return ast_create_var_decl_stmt(parser->arena, name, type, initializer);
+    return ast_create_var_decl_stmt(parser->arena, name, type, initializer, &var_token);
 }
 
 Stmt *parser_function_declaration(Parser *parser)
 {
+    Token fn_token = parser->previous;
     Token name;
     if (parser_check(parser, TOKEN_IDENTIFIER))
     {
@@ -891,14 +907,14 @@ Stmt *parser_function_declaration(Parser *parser)
     Stmt *body = parser_indented_block(parser);
     if (body == NULL)
     {
-        body = ast_create_block_stmt(parser->arena, NULL, 0);
+        body = ast_create_block_stmt(parser->arena, NULL, 0, NULL);
     }
 
     Stmt **stmts = body->as.block.statements;
     int stmt_count = body->as.block.count;
     body->as.block.statements = NULL;
 
-    return ast_create_function_stmt(parser->arena, name, params, param_count, return_type, stmts, stmt_count);
+    return ast_create_function_stmt(parser->arena, name, params, param_count, return_type, stmts, stmt_count, &fn_token);
 }
 
 Stmt *parser_return_statement(Parser *parser)
@@ -925,11 +941,12 @@ Stmt *parser_return_statement(Parser *parser)
     {
     }
 
-    return ast_create_return_stmt(parser->arena, keyword, value);
+    return ast_create_return_stmt(parser->arena, keyword, value, &keyword);
 }
 
 Stmt *parser_if_statement(Parser *parser)
 {
+    Token if_token = parser->previous;
     Expr *condition = parser_expression(parser);
     parser_consume(parser, TOKEN_ARROW, "Expected '=>' after if condition");
     skip_newlines(parser);
@@ -952,7 +969,7 @@ Stmt *parser_if_statement(Parser *parser)
             }
             block_stmts[0] = then_branch;
             block_stmts[1] = parser_indented_block(parser);
-            then_branch = ast_create_block_stmt(parser->arena, block_stmts, 2);
+            then_branch = ast_create_block_stmt(parser->arena, block_stmts, 2, NULL);
         }
     }
 
@@ -979,16 +996,17 @@ Stmt *parser_if_statement(Parser *parser)
                 }
                 block_stmts[0] = else_branch;
                 block_stmts[1] = parser_indented_block(parser);
-                else_branch = ast_create_block_stmt(parser->arena, block_stmts, 2);
+                else_branch = ast_create_block_stmt(parser->arena, block_stmts, 2, NULL);
             }
         }
     }
 
-    return ast_create_if_stmt(parser->arena, condition, then_branch, else_branch);
+    return ast_create_if_stmt(parser->arena, condition, then_branch, else_branch, &if_token);
 }
 
 Stmt *parser_while_statement(Parser *parser)
 {
+    Token while_token = parser->previous;
     Expr *condition = parser_expression(parser);
     parser_consume(parser, TOKEN_ARROW, "Expected '=>' after while condition");
     skip_newlines(parser);
@@ -1011,18 +1029,20 @@ Stmt *parser_while_statement(Parser *parser)
             }
             block_stmts[0] = body;
             block_stmts[1] = parser_indented_block(parser);
-            body = ast_create_block_stmt(parser->arena, block_stmts, 2);
+            body = ast_create_block_stmt(parser->arena, block_stmts, 2, NULL);
         }
     }
 
-    return ast_create_while_stmt(parser->arena, condition, body);
+    return ast_create_while_stmt(parser->arena, condition, body, &while_token);
 }
 
 Stmt *parser_for_statement(Parser *parser)
 {
+    Token for_token = parser->previous;
     Stmt *initializer = NULL;
     if (parser_match(parser, TOKEN_VAR))
     {
+        Token var_token = parser->previous;
         Token name;
         if (parser_check(parser, TOKEN_IDENTIFIER))
         {
@@ -1054,12 +1074,12 @@ Stmt *parser_for_statement(Parser *parser)
         {
             init_expr = parser_expression(parser);
         }
-        initializer = ast_create_var_decl_stmt(parser->arena, name, type, init_expr);
+        initializer = ast_create_var_decl_stmt(parser->arena, name, type, init_expr, &var_token);
     }
     else if (!parser_check(parser, TOKEN_SEMICOLON))
     {
         Expr *init_expr = parser_expression(parser);
-        initializer = ast_create_expr_stmt(parser->arena, init_expr);
+        initializer = ast_create_expr_stmt(parser->arena, init_expr, NULL);
     }
     parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after initializer");
 
@@ -1096,15 +1116,16 @@ Stmt *parser_for_statement(Parser *parser)
             }
             block_stmts[0] = body;
             block_stmts[1] = parser_indented_block(parser);
-            body = ast_create_block_stmt(parser->arena, block_stmts, 2);
+            body = ast_create_block_stmt(parser->arena, block_stmts, 2, NULL);
         }
     }
 
-    return ast_create_for_stmt(parser->arena, initializer, condition, increment, body);
+    return ast_create_for_stmt(parser->arena, initializer, condition, increment, body, &for_token);
 }
 
 Stmt *parser_block_statement(Parser *parser)
 {
+    Token brace = parser->previous;
     Stmt **statements = NULL;
     int count = 0;
     int capacity = 0;
@@ -1142,7 +1163,7 @@ Stmt *parser_block_statement(Parser *parser)
 
     symbol_table_pop_scope(parser->symbol_table);
 
-    return ast_create_block_stmt(parser->arena, statements, count);
+    return ast_create_block_stmt(parser->arena, statements, count, &brace);
 }
 
 Stmt *parser_expression_statement(Parser *parser)
@@ -1157,11 +1178,12 @@ Stmt *parser_expression_statement(Parser *parser)
     {
     }
 
-    return ast_create_expr_stmt(parser->arena, expr);
+    return ast_create_expr_stmt(parser->arena, expr, &parser->previous);
 }
 
 Stmt *parser_import_statement(Parser *parser)
 {
+    Token import_token = parser->previous;
     Token module_name;
     if (parser_check(parser, TOKEN_IDENTIFIER))
     {
@@ -1188,7 +1210,7 @@ Stmt *parser_import_statement(Parser *parser)
     }
 
     parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after import statement");
-    return ast_create_import_stmt(parser->arena, module_name);
+    return ast_create_import_stmt(parser->arena, module_name, &import_token);
 }
 
 Module *parser_execute(Parser *parser, const char *filename)
