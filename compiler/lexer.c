@@ -74,7 +74,7 @@ Token lexer_make_token(Lexer *lexer, TokenType type)
         exit(1);
     }
     Token token;
-    token_init(&token, type, dup_start, length, lexer->line);
+    token_init(&token, type, dup_start, length, lexer->line, lexer->filename);
     return token;
 }
 
@@ -87,7 +87,7 @@ Token lexer_error_token(Lexer *lexer, const char *message)
         exit(1);
     }
     Token token;
-    token_init(&token, TOKEN_ERROR, dup_message, (int)strlen(dup_message), lexer->line);
+    token_init(&token, TOKEN_ERROR, dup_message, (int)strlen(dup_message), lexer->line, lexer->filename);
     return token;
 }
 

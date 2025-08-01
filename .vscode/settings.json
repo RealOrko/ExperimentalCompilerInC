@@ -7,5 +7,6 @@
         "runtime.h": "c",
         "ast.h": "c",
         "debug.h": "c"
-    }
+    },
+    "C_Cpp.errorSquiggles": "enabled"
 }

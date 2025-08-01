@@ -118,6 +118,7 @@ typedef struct
 struct Expr
 {
     ExprType type;
+    Token *token;
 
     union
     {
@@ -218,6 +219,7 @@ typedef struct
 struct Stmt
 {
     StmtType type;
+    Token *token;
 
     union
     {
@@ -245,14 +247,11 @@ void ast_print_stmt(Stmt *stmt, int indent_level);
 void ast_print_expr(Expr *expr, int indent_level);
 
 Type *ast_clone_type(Arena *arena, Type *type);
-void ast_mark_type_non_freeable(Type *type);
 Type *ast_create_primitive_type(Arena *arena, TypeKind kind);
 Type *ast_create_array_type(Arena *arena, Type *element_type);
 Type *ast_create_function_type(Arena *arena, Type *return_type, Type **param_types, int param_count);
 int ast_type_equals(Type *a, Type *b);
 const char *ast_type_to_string(Type *type);
-void ast_free_type(Type *type);
-void ast_free_token(Token *token);
 
 Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr *right);
 Expr *ast_create_unary_expr(Arena *arena, TokenType operator, Expr *operand);
@@ -266,7 +265,6 @@ Expr *ast_create_increment_expr(Arena *arena, Expr *operand);
 Expr *ast_create_decrement_expr(Arena *arena, Expr *operand);
 Expr *ast_create_interpolated_expr(Arena *arena, Expr **parts, int part_count);
 Expr *ast_create_comparison_expr(Arena *arena, Expr *left, Expr *right, TokenType comparison_type);
-void ast_free_expr(Expr *expr);
 
 Stmt *ast_create_expr_stmt(Arena *arena, Expr *expression);
 Stmt *ast_create_var_decl_stmt(Arena *arena, Token name, Type *type, Expr *initializer);
@@ -280,6 +278,5 @@ Stmt *ast_create_for_stmt(Arena *arena, Stmt *initializer, Expr *condition, Expr
 Stmt *ast_create_import_stmt(Arena *arena, Token module_name);
 void ast_init_module(Arena *arena, Module *module, const char *filename);
 void ast_module_add_statement(Arena *arena, Module *module, Stmt *stmt);
-void ast_free_module(Module *module);
 
 #endif

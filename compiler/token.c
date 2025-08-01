@@ -4,13 +4,14 @@
 #include <stdlib.h>
 #include <string.h>
 
-void token_init(Token *token, TokenType type, const char *start, int length, int line)
+void token_init(Token *token, TokenType type, const char *start, int length, int line, const char *filename)
 {
     token->type = type;
     token->start = start;
     token->length = length;
     token->line = line;
     token->literal.int_value = 0;
+    token->filename = filename;
 }
 
 void token_set_int_literal(Token *token, int64_t value)

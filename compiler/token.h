@@ -79,10 +79,11 @@ typedef struct
     const char *start;
     int length;
     int line;
+    const char *filename;
     LiteralValue literal;
 } Token;
 
-void token_init(Token *token, TokenType type, const char *start, int length, int line);
+void token_init(Token *token, TokenType type, const char *start, int length, int line, const char *filename);
 void token_set_int_literal(Token *token, int64_t value);
 void token_set_double_literal(Token *token, double value);
 void token_set_char_literal(Token *token, char value);
