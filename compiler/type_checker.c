@@ -1,3 +1,4 @@
+// type_checker.c
 #include "type_checker.h"
 #include "debug.h"
 #include "lexer.h"
@@ -204,98 +205,43 @@ static Type *type_check_call(Expr *expr, SymbolTable *table)
         type_error(expr->token, "Invalid callee in function call");
         return NULL;
     }
-    bool is_print = false;
-    if (expr->as.call.callee->type == EXPR_VARIABLE)
+    if (callee_type->kind != TYPE_FUNCTION)
     {
-        Token name = expr->as.call.callee->as.variable.name;
-        char name_str[256];
-        strncpy(name_str, name.start, name.length);
-        name_str[name.length] = '\0';
-        if (strcmp(name_str, "print") == 0)
-        {
-            is_print = true;
-        }
+        type_error(expr->token, "Callee is not a function");
+        return NULL;
     }
-    if (is_print)
+    if (callee_type->as.function.param_count != expr->as.call.arg_count)
     {
-        if (expr->as.call.arg_count != 1)
-        {
-            type_error(expr->token, "print takes exactly one argument");
-            return NULL;
-        }
-        Type *arg_type = type_check_expr(expr->as.call.arguments[0], table);
+        type_error(expr->token, "Argument count mismatch in call");
+        return NULL;
+    }
+    for (int i = 0; i < expr->as.call.arg_count; i++)
+    {
+        Type *arg_type = type_check_expr(expr->as.call.arguments[i], table);
         if (arg_type == NULL)
         {
-            type_error(expr->token, "Invalid argument in print call");
+            type_error(expr->token, "Invalid argument in function call");
             return NULL;
         }
-        if (!is_printable_type(arg_type))
+        Type *param_type = callee_type->as.function.param_types[i];
+        if (param_type->kind == TYPE_ANY)
         {
-            type_error(expr->token, "Unsupported type for print");
-            return NULL;
-        }
-        return ast_create_primitive_type(table->arena, TYPE_VOID);
-    }
-    bool is_to_string = false;
-    if (expr->as.call.callee->type == EXPR_VARIABLE)
-    {
-        Token name = expr->as.call.callee->as.variable.name;
-        char name_str[256];
-        strncpy(name_str, name.start, name.length);
-        name_str[name.length] = '\0';
-        if (strcmp(name_str, "to_string") == 0)
-        {
-            is_to_string = true;
-        }
-    }
-    if (is_to_string)
-    {
-        if (expr->as.call.arg_count != 1)
-        {
-            type_error(expr->token, "to_string takes exactly one argument");
-            return NULL;
-        }
-        Type *arg_type = type_check_expr(expr->as.call.arguments[0], table);
-        if (arg_type == NULL)
-        {
-            type_error(expr->token, "Invalid argument in to_string call");
-            return NULL;
-        }
-        if (!is_printable_type(arg_type))
-        {
-            type_error(expr->token, "Unsupported type for to_string");
-            return NULL;
-        }
-        return ast_create_primitive_type(table->arena, TYPE_STRING);
-    }
-    else
-    {
-        if (callee_type->kind != TYPE_FUNCTION)
-        {
-            type_error(expr->token, "Callee is not a function");
-            return NULL;
-        }
-        if (callee_type->as.function.param_count != expr->as.call.arg_count)
-        {
-            type_error(expr->token, "Argument count mismatch in call");
-            return NULL;
-        }
-        for (int i = 0; i < expr->as.call.arg_count; i++)
-        {
-            Type *arg_type = type_check_expr(expr->as.call.arguments[i], table);
-            if (arg_type == NULL)
+            if (!is_printable_type(arg_type))
             {
-                type_error(expr->token, "Invalid argument in function call");
+                type_error(expr->token, "Unsupported type for built-in function");
                 return NULL;
             }
-            if (!ast_type_equals(arg_type, callee_type->as.function.param_types[i]))
+        }
+        else
+        {
+            if (!ast_type_equals(arg_type, param_type))
             {
                 type_error(expr->token, "Argument type mismatch in call");
                 return NULL;
             }
         }
-        return ast_clone_type(table->arena, callee_type->as.function.return_type);
     }
+    return ast_clone_type(table->arena, callee_type->as.function.return_type);
 }
 
 Type *type_check_expr(Expr *expr, SymbolTable *table)

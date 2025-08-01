@@ -848,26 +848,28 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
         return;
     }
 
+    // First part
     code_gen_expression(gen, expr->parts[0]);
     Type *pt = expr->parts[0]->expr_type;
     bool is_double;
     const char* to_str_func = get_to_str_func(pt->kind, &is_double);
-    fprintf(gen->output, "    mov r15, rsp\n");
-    fprintf(gen->output, "    and r15, 15\n");
-    fprintf(gen->output, "    sub rsp, r15\n");
-    if (is_double) {
-        fprintf(gen->output, "    movq xmm0, rax\n");
-    } else {
+    if (pt->kind == TYPE_STRING) {
+        fprintf(gen->output, "    mov r13, rax\n");
         fprintf(gen->output, "    mov rdi, rax\n");
-    }
-    fprintf(gen->output, "    call %s\n", to_str_func);
-    fprintf(gen->output, "    add rsp, r15\n");
-    fprintf(gen->output, "    mov rbx, rax\n");
-
-    for (int i = 1; i < count; i++) {
-        code_gen_expression(gen, expr->parts[i]);
-        pt = expr->parts[i]->expr_type;
-        to_str_func = get_to_str_func(pt->kind, &is_double);
+        fprintf(gen->output, "    mov r15, rsp\n");
+        fprintf(gen->output, "    and r15, 15\n");
+        fprintf(gen->output, "    sub rsp, r15\n");
+        fprintf(gen->output, "    call %s\n", to_str_func);
+        fprintf(gen->output, "    add rsp, r15\n");
+        if (expr->parts[0]->type != EXPR_VARIABLE) {
+            fprintf(gen->output, "    mov rdi, r13\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call free\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        }
+    } else {
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
         fprintf(gen->output, "    sub rsp, r15\n");
@@ -878,6 +880,41 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
         }
         fprintf(gen->output, "    call %s\n", to_str_func);
         fprintf(gen->output, "    add rsp, r15\n");
+    }
+    fprintf(gen->output, "    mov rbx, rax\n");
+
+    for (int i = 1; i < count; i++) {
+        code_gen_expression(gen, expr->parts[i]);
+        pt = expr->parts[i]->expr_type;
+        to_str_func = get_to_str_func(pt->kind, &is_double);
+        if (pt->kind == TYPE_STRING) {
+            fprintf(gen->output, "    mov r13, rax\n");
+            fprintf(gen->output, "    mov rdi, rax\n");
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call %s\n", to_str_func);
+            fprintf(gen->output, "    add rsp, r15\n");
+            if (expr->parts[i]->type != EXPR_VARIABLE) {
+                fprintf(gen->output, "    mov rdi, r13\n");
+                fprintf(gen->output, "    mov r15, rsp\n");
+                fprintf(gen->output, "    and r15, 15\n");
+                fprintf(gen->output, "    sub rsp, r15\n");
+                fprintf(gen->output, "    call free\n");
+                fprintf(gen->output, "    add rsp, r15\n");
+            }
+        } else {
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            if (is_double) {
+                fprintf(gen->output, "    movq xmm0, rax\n");
+            } else {
+                fprintf(gen->output, "    mov rdi, rax\n");
+            }
+            fprintf(gen->output, "    call %s\n", to_str_func);
+            fprintf(gen->output, "    add rsp, r15\n");
+        }
         fprintf(gen->output, "    mov rcx, rax\n");
 
         fprintf(gen->output, "    mov r12, rcx\n");

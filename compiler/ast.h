@@ -1,3 +1,4 @@
+// ast.h
 #ifndef AST_H
 #define AST_H
 
@@ -21,7 +22,8 @@ typedef enum
     TYPE_VOID,
     TYPE_ARRAY,
     TYPE_FUNCTION,
-    TYPE_NIL
+    TYPE_NIL,
+    TYPE_ANY
 } TypeKind;
 
 struct Type

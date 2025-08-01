@@ -1,3 +1,4 @@
+// ast.c
 #include "arena.h"
 #include "ast.h"
 #include "debug.h"
@@ -283,6 +284,7 @@ Type *ast_clone_type(Arena *arena, Type *type)
     case TYPE_BOOL:
     case TYPE_VOID:
     case TYPE_NIL:
+    case TYPE_ANY:
         break;
 
     case TYPE_ARRAY:
@@ -397,6 +399,7 @@ int ast_type_equals(Type *a, Type *b)
     case TYPE_BOOL:
     case TYPE_VOID:
     case TYPE_NIL:
+    case TYPE_ANY:
         return 1;
 
     case TYPE_ARRAY:
@@ -442,7 +445,7 @@ const char *ast_type_to_string(Type *type)
         return "NULL";
     }
 
-    if (type->kind < TYPE_INT || type->kind > TYPE_FUNCTION)
+    if (type->kind < TYPE_INT || type->kind > TYPE_ANY)
     {
         DEBUG_ERROR("Invalid TypeKind: %d", type->kind);
         return "INVALID";
@@ -466,6 +469,8 @@ const char *ast_type_to_string(Type *type)
         return "void";
     case TYPE_NIL:
         return "nil";
+    case TYPE_ANY:
+        return "any";
 
     case TYPE_ARRAY:
     {

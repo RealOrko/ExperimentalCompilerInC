@@ -1,3 +1,4 @@
+// parser.c
 #include "parser.h"
 #include "debug.h"
 #include <stdio.h>
@@ -131,6 +132,31 @@ void parser_init(Arena *arena, Parser *parser, Lexer *lexer)
     parser->had_error = 0;
     parser->panic_mode = 0;
     parser->symbol_table = symbol_table_init(arena);
+
+    // Add built-in functions to the global symbol table
+    Token print_token;
+    print_token.start = arena_strdup(arena, "print");
+    print_token.length = 5;
+    print_token.type = TOKEN_IDENTIFIER;
+    print_token.line = 0;
+    print_token.filename = arena_strdup(arena, "<built-in>");
+
+    Type *any_type = ast_create_primitive_type(arena, TYPE_ANY);
+    Type **builtin_params = arena_alloc(arena, sizeof(Type *));
+    builtin_params[0] = any_type;
+
+    Type *print_type = ast_create_function_type(arena, ast_create_primitive_type(arena, TYPE_VOID), builtin_params, 1);
+    symbol_table_add_symbol_with_kind(parser->symbol_table, print_token, print_type, SYMBOL_GLOBAL);
+
+    Token to_string_token;
+    to_string_token.start = arena_strdup(arena, "to_string");
+    to_string_token.length = 9;
+    to_string_token.type = TOKEN_IDENTIFIER;
+    to_string_token.line = 0;
+    to_string_token.filename = arena_strdup(arena, "<built-in>");
+
+    Type *to_string_type = ast_create_function_type(arena, ast_create_primitive_type(arena, TYPE_STRING), builtin_params, 1);
+    symbol_table_add_symbol_with_kind(parser->symbol_table, to_string_token, to_string_type, SYMBOL_GLOBAL);
 
     parser->previous.type = TOKEN_ERROR;
     parser->previous.start = NULL;
