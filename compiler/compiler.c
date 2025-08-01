@@ -45,12 +45,8 @@ void compiler_cleanup(CompilerOptions *options)
     }
 
     parser_cleanup(&options->parser);
-    lexer_cleanup(&options->parser);
-
+    lexer_cleanup(&options->lexer);
     arena_free(&options->arena);
-    options->source_file = NULL;
-    options->output_file = NULL;
-    options->source = NULL;
 }
 
 int compiler_parse_args(int argc, char **argv, CompilerOptions *options)

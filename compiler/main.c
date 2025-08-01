@@ -10,8 +10,8 @@ int main(int argc, char **argv)
     CompilerOptions options;
     Module *module = NULL;
 
-    init_debug(options.log_level);
     compiler_init(&options, argc, argv);
+    init_debug(options.log_level);
 
     module = parser_execute(&options.parser, options.source_file);
     if (module == NULL)
@@ -19,52 +19,6 @@ int main(int argc, char **argv)
         compiler_cleanup(&options);
         exit(1);
     }
-
-    Token print_token;
-    print_token.start = "print";
-    print_token.length = 5;
-    print_token.line = 0;
-    print_token.type = TOKEN_IDENTIFIER;
-
-    Type *placeholder_type = ast_create_primitive_type(TYPE_STRING);
-    Type **param_types = malloc(sizeof(Type *));
-    if (param_types == NULL)
-    {
-        exit(1);
-    }
-    param_types[0] = placeholder_type;
-
-    Type *void_type = ast_create_primitive_type(TYPE_VOID);
-    Type *print_type = ast_create_function_type(void_type, param_types, 1);
-    ast_free_type(void_type);
-
-    symbol_table_add_symbol(options.parser.symbol_table, print_token, print_type);
-    ast_free_type(print_type);
-    free(param_types);
-    ast_free_type(placeholder_type);
-
-    Token to_string_token;
-    to_string_token.start = "to_string";
-    to_string_token.length = 9;
-    to_string_token.line = 0;
-    to_string_token.type = TOKEN_IDENTIFIER;
-
-    placeholder_type = ast_create_primitive_type(TYPE_STRING);
-    param_types = malloc(sizeof(Type *));
-    if (param_types == NULL)
-    {
-        exit(1);
-    }
-    param_types[0] = placeholder_type;
-
-    Type *string_type = ast_create_primitive_type(TYPE_STRING);
-    Type *to_string_type = ast_create_function_type(string_type, param_types, 1);
-    ast_free_type(string_type);
-
-    symbol_table_add_symbol(options.parser.symbol_table, to_string_token, to_string_type);
-    ast_free_type(to_string_type);
-    free(param_types);
-    ast_free_type(placeholder_type);
 
     int type_check_success = type_check_module(module, options.parser.symbol_table);
     if (!type_check_success)
@@ -76,9 +30,7 @@ int main(int argc, char **argv)
             module = NULL;
         }
 
-        SymbolTable *table = options.parser.symbol_table;
-        options.parser.symbol_table = NULL;
-        symbol_table_cleanup(table);
+        symbol_table_cleanup(options.parser.symbol_table);
         compiler_cleanup(&options);
         exit(1);
     }
@@ -95,9 +47,7 @@ int main(int argc, char **argv)
         module = NULL;
     }
 
-    SymbolTable *table = options.parser.symbol_table;
-    options.parser.symbol_table = NULL;
-    symbol_table_cleanup(table);
+    symbol_table_cleanup(options.parser.symbol_table);
     compiler_cleanup(&options);
 
     return 0;

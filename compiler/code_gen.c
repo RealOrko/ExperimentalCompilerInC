@@ -6,8 +6,6 @@
 
 static StringLiteral *string_literals = NULL;
 
-static void pre_build_symbols(CodeGen *gen, Stmt *stmt);
-
 void code_gen_init_function_stack(CodeGen *gen)
 {
     gen->function_stack_capacity = 8;
@@ -1508,44 +1506,4 @@ void code_gen_module(CodeGen *gen, Module *module)
     }
     code_gen_data_section(gen);
     code_gen_footer(gen);
-}
-
-static void pre_build_symbols(CodeGen *gen, Stmt *stmt)
-{
-    if (stmt == NULL)
-        return;
-    switch (stmt->type)
-    {
-    case STMT_VAR_DECL:
-        symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->as.var_decl.name, stmt->as.var_decl.type, SYMBOL_LOCAL);
-        break;
-    case STMT_BLOCK:
-        symbol_table_push_scope(gen->symbol_table);
-        for (int i = 0; i < stmt->as.block.count; i++)
-        {
-            pre_build_symbols(gen, stmt->as.block.statements[i]);
-        }
-        symbol_table_pop_scope(gen->symbol_table);
-        break;
-    case STMT_IF:
-        pre_build_symbols(gen, stmt->as.if_stmt.then_branch);
-        if (stmt->as.if_stmt.else_branch)
-            pre_build_symbols(gen, stmt->as.if_stmt.else_branch);
-        break;
-    case STMT_WHILE:
-        pre_build_symbols(gen, stmt->as.while_stmt.body);
-        break;
-    case STMT_FOR:
-        symbol_table_push_scope(gen->symbol_table);
-        if (stmt->as.for_stmt.initializer)
-            pre_build_symbols(gen, stmt->as.for_stmt.initializer);
-        pre_build_symbols(gen, stmt->as.for_stmt.body);
-        symbol_table_pop_scope(gen->symbol_table);
-        break;
-    case STMT_EXPR:
-    case STMT_RETURN:
-    case STMT_FUNCTION:
-    case STMT_IMPORT:
-        break;
-    }
 }
