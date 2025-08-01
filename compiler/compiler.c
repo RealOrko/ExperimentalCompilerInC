@@ -41,7 +41,7 @@ void compiler_init(CompilerOptions *options, int argc, char **argv)
         exit(1);
     }
 
-    lexer_init(&options->lexer, options->source, options->source_file);
+    lexer_init(&options->lexer, options->source, options->source_file, &options->arena);
     parser_init(&options->parser, &options->lexer);
 }
 

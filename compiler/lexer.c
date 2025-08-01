@@ -1,32 +1,28 @@
 #include "lexer.h"
 #include "debug.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
 
 static char error_buffer[128];
 
-void lexer_init(Lexer *lexer, const char *source, const char *filename)
+void lexer_init(Arena *arena, Lexer *lexer, const char *source, const char *filename)
 {
     lexer->start = source;
     lexer->current = source;
     lexer->line = 1;
     lexer->filename = filename;
     lexer->indent_capacity = 8;
-    lexer->indent_stack = malloc(sizeof(int) * lexer->indent_capacity);
+    lexer->indent_stack = arena_alloc(arena, sizeof(int) * lexer->indent_capacity);
     lexer->indent_size = 1;
     lexer->indent_stack[0] = 0;
     lexer->at_line_start = 1;
+    lexer->arena = arena;
 }
 
 void lexer_cleanup(Lexer *lexer)
 {
-    if (lexer->indent_stack != NULL)
-    {
-        free(lexer->indent_stack);
-        lexer->indent_stack = NULL;
-    }
+    lexer->indent_stack = NULL;
 }
 
 void lexer_report_indentation_error(Lexer *lexer, int expected, int actual)
@@ -71,8 +67,9 @@ int lexer_match(Lexer *lexer, char expected)
 Token lexer_make_token(Lexer *lexer, TokenType type)
 {
     int length = (int)(lexer->current - lexer->start);
-    char *dup_start = strndup(lexer->start, length);
-    if (dup_start == NULL) {
+    char *dup_start = arena_strndup(lexer->arena, lexer->start, length);
+    if (dup_start == NULL)
+    {
         DEBUG_ERROR("Out of memory duplicating lexeme");
         exit(1);
     }
@@ -83,8 +80,9 @@ Token lexer_make_token(Lexer *lexer, TokenType type)
 
 Token lexer_error_token(Lexer *lexer, const char *message)
 {
-    char *dup_message = strdup(message);
-    if (dup_message == NULL) {
+    char *dup_message = arena_strdup(lexer->arena, message);
+    if (dup_message == NULL)
+    {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
@@ -331,7 +329,7 @@ Token lexer_scan_number(Lexer *lexer)
 Token lexer_scan_string(Lexer *lexer)
 {
     int buffer_size = 256;
-    char *buffer = malloc(buffer_size);
+    char *buffer = arena_alloc(lexer->arena, buffer_size);
     if (buffer == NULL)
     {
         snprintf(error_buffer, sizeof(error_buffer), "Memory allocation failed");
@@ -365,7 +363,6 @@ Token lexer_scan_string(Lexer *lexer)
                 buffer[buffer_index++] = '"';
                 break;
             default:
-                free(buffer);
                 snprintf(error_buffer, sizeof(error_buffer), "Invalid escape sequence");
                 return lexer_error_token(lexer, error_buffer);
             }
@@ -378,35 +375,31 @@ Token lexer_scan_string(Lexer *lexer)
         if (buffer_index >= buffer_size - 1)
         {
             buffer_size *= 2;
-            char *new_buffer = realloc(buffer, buffer_size);
+            char *new_buffer = arena_alloc(lexer->arena, buffer_size);
             if (new_buffer == NULL)
             {
-                free(buffer);
                 snprintf(error_buffer, sizeof(error_buffer), "Memory allocation failed");
                 return lexer_error_token(lexer, error_buffer);
             }
+            memcpy(new_buffer, buffer, buffer_index);
             buffer = new_buffer;
         }
     }
     if (lexer_is_at_end(lexer))
     {
-        free(buffer);
         snprintf(error_buffer, sizeof(error_buffer), "Unterminated string");
         return lexer_error_token(lexer, error_buffer);
     }
     lexer_advance(lexer);
     buffer[buffer_index] = '\0';
     Token token = lexer_make_token(lexer, TOKEN_STRING_LITERAL);
-    char *str_copy = malloc(buffer_index + 1);
+    char *str_copy = arena_strdup(lexer->arena, buffer);
     if (str_copy == NULL)
     {
-        free(buffer);
         snprintf(error_buffer, sizeof(error_buffer), "Memory allocation failed");
         return lexer_error_token(lexer, error_buffer);
     }
-    strcpy(str_copy, buffer);
     token_set_string_literal(&token, str_copy);
-    free(buffer);
     return token;
 }
 
@@ -496,8 +489,8 @@ Token lexer_scan_token(Lexer *lexer)
                 if (lexer->indent_size >= lexer->indent_capacity)
                 {
                     lexer->indent_capacity *= 2;
-                    lexer->indent_stack = realloc(lexer->indent_stack,
-                                                  lexer->indent_capacity * sizeof(int));
+                    lexer->indent_stack = arena_alloc(lexer->arena,
+                                                      lexer->indent_capacity * sizeof(int));
                     if (lexer->indent_stack == NULL)
                     {
                         DEBUG_ERROR("Out of memory");

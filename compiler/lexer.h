@@ -2,6 +2,7 @@
 #define LEXER_H
 
 #include "token.h"
+#include "arena.h"
 
 typedef struct
 {
@@ -13,9 +14,10 @@ typedef struct
     int indent_size;
     int indent_capacity;
     int at_line_start;
+    Arena *arena;  // Pointer to the arena for memory management
 } Lexer;
 
-void lexer_init(Lexer *lexer, const char *source, const char *filename);
+void lexer_init(Arena *arena, Lexer *lexer, const char *source, const char *filename);
 Token lexer_scan_token(Lexer *lexer);
 void lexer_cleanup(Lexer *lexer);
 

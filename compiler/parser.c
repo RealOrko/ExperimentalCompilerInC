@@ -1,7 +1,6 @@
 #include "parser.h"
 #include "debug.h"
 #include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 
 int parser_is_at_end(Parser *parser)
@@ -77,11 +76,16 @@ Stmt *parser_indented_block(Parser *parser)
         if (count >= capacity)
         {
             capacity = capacity == 0 ? 8 : capacity * 2;
-            statements = realloc(statements, sizeof(Stmt *) * capacity);
-            if (statements == NULL)
+            Stmt **new_statements = arena_alloc(parser->lexer->arena, sizeof(Stmt *) * capacity);
+            if (new_statements == NULL)
             {
                 exit(1);
             }
+            if (statements != NULL)
+            {
+                memcpy(new_statements, statements, sizeof(Stmt *) * count);
+            }
+            statements = new_statements;
         }
         statements[count++] = stmt;
     }
@@ -142,21 +146,11 @@ void parser_cleanup(Parser *parser)
 {
     symbol_table_cleanup(parser->symbol_table);
     lexer_cleanup(parser->lexer);
-    for (int i = 0; i < parser->interp_count; i++)
-    {
-        free(parser->interp_sources[i]);
-    }
-    free(parser->interp_sources);
-    if (parser->previous.start != NULL)
-    {
-        free((void *)parser->previous.start);
-        parser->previous.start = NULL;
-    }
-    if (parser->current.start != NULL)
-    {
-        free((void *)parser->current.start);
-        parser->current.start = NULL;
-    }
+    parser->interp_sources = NULL;
+    parser->interp_count = 0;
+    parser->interp_capacity = 0;
+    parser->previous.start = NULL;
+    parser->current.start = NULL;
 }
 
 void parser_error(Parser *parser, const char *message)
@@ -196,12 +190,6 @@ void parser_error_at(Parser *parser, Token *token, const char *message)
 
 void parser_advance(Parser *parser)
 {
-    if (parser->previous.start != NULL)
-    {
-        free((void *)parser->previous.start);
-        parser->previous.start = NULL;
-    }
-
     parser->previous = parser->current;
 
     for (;;)
@@ -307,7 +295,7 @@ Expr *parser_assignment(Parser *parser)
         if (expr->type == EXPR_VARIABLE)
         {
             Token name = expr->as.variable.name;
-            char *new_start = strndup(name.start, name.length);
+            char *new_start = arena_strndup(parser->lexer->arena, name.start, name.length);
             if (new_start == NULL)
             {
                 exit(1);
@@ -464,7 +452,7 @@ Expr *parser_primary(Parser *parser)
     if (parser_match(parser, TOKEN_STRING_LITERAL))
     {
         LiteralValue value;
-        value.string_value = parser->previous.literal.string_value;
+        value.string_value = arena_strdup(parser->lexer->arena, parser->previous.literal.string_value);
         return ast_create_literal_expr(value, ast_create_primitive_type(TYPE_STRING), false);
     }
     if (parser_match(parser, TOKEN_BOOL_LITERAL))
@@ -481,7 +469,9 @@ Expr *parser_primary(Parser *parser)
     }
     if (parser_match(parser, TOKEN_IDENTIFIER))
     {
-        return ast_create_variable_expr(parser->previous);
+        Token var_token = parser->previous;
+        var_token.start = arena_strndup(parser->lexer->arena, parser->previous.start, parser->previous.length);
+        return ast_create_variable_expr(var_token);
     }
     if (parser_match(parser, TOKEN_LEFT_PAREN))
     {
@@ -493,7 +483,6 @@ Expr *parser_primary(Parser *parser)
     if (parser_match(parser, TOKEN_INTERPOL_STRING))
     {
         const char *content = parser->previous.literal.string_value;
-
         Expr **parts = NULL;
         int capacity = 0;
         int count = 0;
@@ -508,9 +497,7 @@ Expr *parser_primary(Parser *parser)
                 if (p > segment_start)
                 {
                     int len = p - segment_start;
-                    char *seg = malloc(len + 1);
-                    strncpy(seg, segment_start, len);
-                    seg[len] = '\0';
+                    char *seg = arena_strndup(parser->lexer->arena, segment_start, len);
                     LiteralValue v;
                     v.string_value = seg;
                     Expr *seg_expr = ast_create_literal_expr(v, ast_create_primitive_type(TYPE_STRING), false);
@@ -518,7 +505,11 @@ Expr *parser_primary(Parser *parser)
                     if (count >= capacity)
                     {
                         capacity = capacity == 0 ? 8 : capacity * 2;
-                        parts = realloc(parts, sizeof(Expr *) * capacity);
+                        parts = arena_alloc(parser->lexer->arena, sizeof(Expr *) * capacity);
+                        if (count > 0)
+                        {
+                            memcpy(parts, parts, sizeof(Expr *) * count);
+                        }
                     }
                     parts[count++] = seg_expr;
                 }
@@ -530,19 +521,13 @@ Expr *parser_primary(Parser *parser)
                 if (!*p)
                 {
                     parser_error_at_current(parser, "Unterminated interpolated expression");
-                    for (int j = 0; j < count; j++)
-                        ast_free_expr(parts[j]);
-                    free(parts);
-                    free((char *)content);
                     return ast_create_literal_expr((LiteralValue){0}, ast_create_primitive_type(TYPE_STRING), false);
                 }
                 int expr_len = p - expr_start;
-                char *expr_src = malloc(expr_len + 1);
-                strncpy(expr_src, expr_start, expr_len);
-                expr_src[expr_len] = '\0';
+                char *expr_src = arena_strndup(parser->lexer->arena, expr_start, expr_len);
 
                 Lexer sub_lexer;
-                lexer_init(&sub_lexer, expr_src, "interpolated");
+                lexer_init(parser->lexer->arena, &sub_lexer, expr_src, "interpolated");
                 Parser sub_parser;
                 parser_init(&sub_parser, &sub_lexer);
                 SymbolTable *unused_table = sub_parser.symbol_table;
@@ -551,43 +536,36 @@ Expr *parser_primary(Parser *parser)
                 symbol_table_cleanup(unused_table);
 
                 Expr *inner = parser_expression(&sub_parser);
-                if (sub_parser.previous.start != NULL)
-                {
-                    free((void *)sub_parser.previous.start);
-                    sub_parser.previous.start = NULL;
-                }
-                if (sub_parser.current.start != NULL)
-                {
-                    free((void *)sub_parser.current.start);
-                    sub_parser.current.start = NULL;
-                }
                 if (inner == NULL || sub_parser.had_error)
                 {
                     parser_error_at_current(parser, "Invalid expression in interpolation");
                     ast_free_expr(inner);
-                    free(expr_src);
                     lexer_cleanup(&sub_lexer);
-                    for (int j = 0; j < count; j++)
-                        ast_free_expr(parts[j]);
-                    free(parts);
-                    free((char *)content);
                     return ast_create_literal_expr((LiteralValue){0}, ast_create_primitive_type(TYPE_STRING), false);
                 }
 
                 if (count >= capacity)
                 {
                     capacity = capacity == 0 ? 8 : capacity * 2;
-                    parts = realloc(parts, sizeof(Expr *) * capacity);
+                    parts = arena_alloc(parser->lexer->arena, sizeof(Expr *) * capacity);
+                    if (count > 0)
+                    {
+                        memcpy(parts, parts, sizeof(Expr *) * count);
+                    }
                 }
                 parts[count++] = inner;
 
                 if (parser->interp_count >= parser->interp_capacity)
                 {
                     parser->interp_capacity = parser->interp_capacity ? parser->interp_capacity * 2 : 8;
-                    parser->interp_sources = realloc(parser->interp_sources, sizeof(char *) * parser->interp_capacity);
+                    parser->interp_sources = arena_alloc(parser->lexer->arena, sizeof(char *) * parser->interp_capacity);
                     if (parser->interp_sources == NULL)
                     {
                         exit(1);
+                    }
+                    if (parser->interp_count > 0)
+                    {
+                        memcpy(parser->interp_sources, parser->interp_sources, sizeof(char *) * parser->interp_count);
                     }
                 }
                 parser->interp_sources[parser->interp_count++] = expr_src;
@@ -606,9 +584,7 @@ Expr *parser_primary(Parser *parser)
         if (p > segment_start)
         {
             int len = p - segment_start;
-            char *seg = malloc(len + 1);
-            strncpy(seg, segment_start, len);
-            seg[len] = '\0';
+            char *seg = arena_strndup(parser->lexer->arena, segment_start, len);
             LiteralValue v;
             v.string_value = seg;
             Expr *seg_expr = ast_create_literal_expr(v, ast_create_primitive_type(TYPE_STRING), false);
@@ -616,12 +592,14 @@ Expr *parser_primary(Parser *parser)
             if (count >= capacity)
             {
                 capacity = capacity == 0 ? 8 : capacity * 2;
-                parts = realloc(parts, sizeof(Expr *) * capacity);
+                parts = arena_alloc(parser->lexer->arena, sizeof(Expr *) * capacity);
+                if (count > 0)
+                {
+                    memcpy(parts, parts, sizeof(Expr *) * count);
+                }
             }
             parts[count++] = seg_expr;
         }
-
-        free((char *)content);
 
         return ast_create_interpolated_expr(parts, count);
     }
@@ -650,10 +628,14 @@ Expr *parser_call(Parser *parser, Expr *callee)
             if (arg_count >= capacity)
             {
                 capacity = capacity == 0 ? 8 : capacity * 2;
-                arguments = realloc(arguments, sizeof(Expr *) * capacity);
+                arguments = arena_alloc(parser->lexer->arena, sizeof(Expr *) * capacity);
                 if (arguments == NULL)
                 {
                     exit(1);
+                }
+                if (arg_count > 0)
+                {
+                    memcpy(arguments, arguments, sizeof(Expr *) * arg_count);
                 }
             }
             arguments[arg_count++] = arg;
@@ -746,7 +728,7 @@ Stmt *parser_var_declaration(Parser *parser)
     {
         name = parser->current;
         parser_advance(parser);
-        name.start = strndup(name.start, name.length);
+        name.start = arena_strndup(parser->lexer->arena, name.start, name.length);
         if (name.start == NULL)
         {
             parser_error_at_current(parser, "Out of memory");
@@ -758,7 +740,7 @@ Stmt *parser_var_declaration(Parser *parser)
         parser_error_at_current(parser, "Expected variable name");
         name = parser->current;
         parser_advance(parser);
-        name.start = strndup(name.start, name.length);
+        name.start = arena_strndup(parser->lexer->arena, name.start, name.length);
         if (name.start == NULL)
         {
             parser_error_at_current(parser, "Out of memory");
@@ -780,9 +762,7 @@ Stmt *parser_var_declaration(Parser *parser)
         parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' or newline after variable declaration");
     }
 
-    Stmt *decl = ast_create_var_decl_stmt(name, type, initializer);
-    free((void *)name.start);
-    return decl;
+    return ast_create_var_decl_stmt(name, type, initializer);
 }
 
 Stmt *parser_function_declaration(Parser *parser)
@@ -792,7 +772,7 @@ Stmt *parser_function_declaration(Parser *parser)
     {
         name = parser->current;
         parser_advance(parser);
-        name.start = strndup(name.start, name.length);
+        name.start = arena_strndup(parser->lexer->arena, name.start, name.length);
         if (name.start == NULL)
         {
             parser_error_at_current(parser, "Out of memory");
@@ -804,7 +784,7 @@ Stmt *parser_function_declaration(Parser *parser)
         parser_error_at_current(parser, "Expected function name");
         name = parser->current;
         parser_advance(parser);
-        name.start = strndup(name.start, name.length);
+        name.start = arena_strndup(parser->lexer->arena, name.start, name.length);
         if (name.start == NULL)
         {
             parser_error_at_current(parser, "Out of memory");
@@ -831,7 +811,7 @@ Stmt *parser_function_declaration(Parser *parser)
                 {
                     param_name = parser->current;
                     parser_advance(parser);
-                    param_name.start = strndup(param_name.start, param_name.length);
+                    param_name.start = arena_strndup(parser->lexer->arena, param_name.start, param_name.length);
                     if (param_name.start == NULL)
                     {
                         parser_error_at_current(parser, "Out of memory");
@@ -843,7 +823,7 @@ Stmt *parser_function_declaration(Parser *parser)
                     parser_error_at_current(parser, "Expected parameter name");
                     param_name = parser->current;
                     parser_advance(parser);
-                    param_name.start = strndup(param_name.start, param_name.length);
+                    param_name.start = arena_strndup(parser->lexer->arena, param_name.start, param_name.length);
                     if (param_name.start == NULL)
                     {
                         parser_error_at_current(parser, "Out of memory");
@@ -856,10 +836,14 @@ Stmt *parser_function_declaration(Parser *parser)
                 if (param_count >= param_capacity)
                 {
                     param_capacity = param_capacity == 0 ? 8 : param_capacity * 2;
-                    params = realloc(params, sizeof(Parameter) * param_capacity);
+                    params = arena_alloc(parser->lexer->arena, sizeof(Parameter) * param_capacity);
                     if (params == NULL)
                     {
                         exit(1);
+                    }
+                    if (param_count > 0)
+                    {
+                        memcpy(params, params, sizeof(Parameter) * param_count);
                     }
                 }
                 params[param_count].name = param_name;
@@ -877,7 +861,7 @@ Stmt *parser_function_declaration(Parser *parser)
         return_type = parser_type(parser);
     }
 
-    Type **param_types = malloc(sizeof(Type *) * param_count);
+    Type **param_types = arena_alloc(parser->lexer->arena, sizeof(Type *) * param_count);
     if (param_types == NULL && param_count > 0)
     {
         exit(1);
@@ -887,7 +871,6 @@ Stmt *parser_function_declaration(Parser *parser)
         param_types[i] = params[i].type;
     }
     Type *function_type = ast_create_function_type(return_type, param_types, param_count);
-    free(param_types);
 
     symbol_table_add_symbol(parser->symbol_table, name, function_type);
     ast_free_type(function_type);
@@ -906,30 +889,20 @@ Stmt *parser_function_declaration(Parser *parser)
     body->as.block.statements = NULL;
     ast_free_stmt(body);
 
-    Stmt *func_stmt = ast_create_function_stmt(name, params, param_count, return_type,
-                                               stmts, stmt_count);
-
-    free((void *)name.start);
-    for (int i = 0; i < param_count; i++)
-    {
-        free((void *)params[i].name.start);
-    }
-    free(params);
-    return func_stmt;
+    return ast_create_function_stmt(name, params, param_count, return_type, stmts, stmt_count);
 }
 
 Stmt *parser_return_statement(Parser *parser)
 {
     Token keyword = parser->previous;
-    Expr *value = NULL;
-
-    keyword.start = strndup(keyword.start, keyword.length);
+    keyword.start = arena_strndup(parser->lexer->arena, keyword.start, keyword.length);
     if (keyword.start == NULL)
     {
         parser_error_at_current(parser, "Out of memory");
         return NULL;
     }
 
+    Expr *value = NULL;
     if (!parser_check(parser, TOKEN_SEMICOLON) && !parser_check(parser, TOKEN_NEWLINE) && !parser_is_at_end(parser))
     {
         value = parser_expression(parser);
@@ -963,7 +936,7 @@ Stmt *parser_if_statement(Parser *parser)
         skip_newlines(parser);
         if (parser_check(parser, TOKEN_INDENT))
         {
-            Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
+            Stmt **block_stmts = arena_alloc(parser->lexer->arena, sizeof(Stmt *) * 2);
             if (block_stmts == NULL)
             {
                 exit(1);
@@ -990,7 +963,7 @@ Stmt *parser_if_statement(Parser *parser)
             skip_newlines(parser);
             if (parser_check(parser, TOKEN_INDENT))
             {
-                Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
+                Stmt **block_stmts = arena_alloc(parser->lexer->arena, sizeof(Stmt *) * 2);
                 if (block_stmts == NULL)
                 {
                     exit(1);
@@ -1022,7 +995,7 @@ Stmt *parser_while_statement(Parser *parser)
         skip_newlines(parser);
         if (parser_check(parser, TOKEN_INDENT))
         {
-            Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
+            Stmt **block_stmts = arena_alloc(parser->lexer->arena, sizeof(Stmt *) * 2);
             if (block_stmts == NULL)
             {
                 exit(1);
@@ -1046,7 +1019,7 @@ Stmt *parser_for_statement(Parser *parser)
         {
             name = parser->current;
             parser_advance(parser);
-            name.start = strndup(name.start, name.length);
+            name.start = arena_strndup(parser->lexer->arena, name.start, name.length);
             if (name.start == NULL)
             {
                 parser_error_at_current(parser, "Out of memory");
@@ -1058,7 +1031,7 @@ Stmt *parser_for_statement(Parser *parser)
             parser_error_at_current(parser, "Expected variable name");
             name = parser->current;
             parser_advance(parser);
-            name.start = strndup(name.start, name.length);
+            name.start = arena_strndup(parser->lexer->arena, name.start, name.length);
             if (name.start == NULL)
             {
                 parser_error_at_current(parser, "Out of memory");
@@ -1073,7 +1046,6 @@ Stmt *parser_for_statement(Parser *parser)
             init_expr = parser_expression(parser);
         }
         initializer = ast_create_var_decl_stmt(name, type, init_expr);
-        free((void *)name.start);
     }
     else if (!parser_check(parser, TOKEN_SEMICOLON))
     {
@@ -1108,7 +1080,7 @@ Stmt *parser_for_statement(Parser *parser)
         skip_newlines(parser);
         if (parser_check(parser, TOKEN_INDENT))
         {
-            Stmt **block_stmts = malloc(sizeof(Stmt *) * 2);
+            Stmt **block_stmts = arena_alloc(parser->lexer->arena, sizeof(Stmt *) * 2);
             if (block_stmts == NULL)
             {
                 exit(1);
@@ -1145,10 +1117,14 @@ Stmt *parser_block_statement(Parser *parser)
         if (count >= capacity)
         {
             capacity = capacity == 0 ? 8 : capacity * 2;
-            statements = realloc(statements, sizeof(Stmt *) * capacity);
+            statements = arena_alloc(parser->lexer->arena, sizeof(Stmt *) * capacity);
             if (statements == NULL)
             {
                 exit(1);
+            }
+            if (count > 0)
+            {
+                memcpy(statements, statements, sizeof(Stmt *) * count);
             }
         }
         statements[count++] = stmt;
@@ -1181,7 +1157,7 @@ Stmt *parser_import_statement(Parser *parser)
     {
         module_name = parser->current;
         parser_advance(parser);
-        module_name.start = strndup(module_name.start, module_name.length);
+        module_name.start = arena_strndup(parser->lexer->arena, module_name.start, module_name.length);
         if (module_name.start == NULL)
         {
             parser_error_at_current(parser, "Out of memory");
@@ -1193,7 +1169,7 @@ Stmt *parser_import_statement(Parser *parser)
         parser_error_at_current(parser, "Expected module name");
         module_name = parser->current;
         parser_advance(parser);
-        module_name.start = strndup(module_name.start, module_name.length);
+        module_name.start = arena_strndup(parser->lexer->arena, module_name.start, module_name.length);
         if (module_name.start == NULL)
         {
             parser_error_at_current(parser, "Out of memory");
@@ -1202,14 +1178,12 @@ Stmt *parser_import_statement(Parser *parser)
     }
 
     parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after import statement");
-    Stmt *import_stmt = ast_create_import_stmt(module_name);
-    free((void *)module_name.start);
-    return import_stmt;
+    return ast_create_import_stmt(module_name);
 }
 
 Module *parser_execute(Parser *parser, const char *filename)
 {
-    Module *module = malloc(sizeof(Module));
+    Module *module = arena_alloc(parser->lexer->arena, sizeof(Module));
     ast_init_module(module, filename);
 
     while (!parser_is_at_end(parser))
@@ -1223,9 +1197,9 @@ Module *parser_execute(Parser *parser, const char *filename)
         Stmt *stmt = parser_declaration(parser);
         if (stmt != NULL)
         {
+            ast_module_add_statement(module, stmt);
+            ast_print_stmt(stmt, 0);
         }
-        ast_module_add_statement(module, stmt);
-        ast_print_stmt(stmt, 0);
 
         if (parser->panic_mode)
         {
@@ -1236,7 +1210,6 @@ Module *parser_execute(Parser *parser, const char *filename)
     if (parser->had_error)
     {
         ast_free_module(module);
-        free(module);
         return NULL;
     }
 

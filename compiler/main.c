@@ -23,14 +23,6 @@ int main(int argc, char **argv)
     int type_check_success = type_check_module(module, options.parser.symbol_table);
     if (!type_check_success)
     {
-        if (module != NULL)
-        {
-            ast_free_module(module);
-            free(module);
-            module = NULL;
-        }
-
-        symbol_table_cleanup(options.parser.symbol_table);
         compiler_cleanup(&options);
         exit(1);
     }
@@ -40,14 +32,6 @@ int main(int argc, char **argv)
     code_gen_module(&gen, module);
     code_gen_cleanup(&gen);
 
-    if (module != NULL)
-    {
-        ast_free_module(module);
-        free(module);
-        module = NULL;
-    }
-
-    symbol_table_cleanup(options.parser.symbol_table);
     compiler_cleanup(&options);
 
     return 0;
