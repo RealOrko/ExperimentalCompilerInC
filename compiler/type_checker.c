@@ -54,7 +54,7 @@ static Type *type_check_binary(Expr *expr, SymbolTable *table)
             type_error("Type mismatch in comparison");
             return NULL;
         }
-        return ast_create_primitive_type(TYPE_BOOL);
+        return ast_create_primitive_type(table->arena, TYPE_BOOL);
     }
     else if (is_arithmetic_operator(op))
     {
@@ -63,21 +63,21 @@ static Type *type_check_binary(Expr *expr, SymbolTable *table)
             type_error("Invalid types for arithmetic operator");
             return NULL;
         }
-        return ast_clone_type(left);
+        return ast_clone_type(table->arena, left);
     }
     else if (op == TOKEN_PLUS)
     {
         if (is_numeric_type(left) && ast_type_equals(left, right))
         {
-            return ast_clone_type(left);
+            return ast_clone_type(table->arena, left);
         }
         else if (left->kind == TYPE_STRING && is_printable_type(right))
         {
-            return ast_clone_type(left);
+            return ast_clone_type(table->arena, left);
         }
         else if (is_printable_type(left) && right->kind == TYPE_STRING)
         {
-            return ast_clone_type(right);
+            return ast_clone_type(table->arena, right);
         }
         else
         {
@@ -104,7 +104,7 @@ static Type *type_check_unary(Expr *expr, SymbolTable *table)
             type_error("Unary minus on non-numeric");
             return NULL;
         }
-        return ast_clone_type(operand);
+        return ast_clone_type(table->arena, operand);
     }
     else if (expr->as.unary.operator == TOKEN_BANG)
     {
@@ -113,7 +113,7 @@ static Type *type_check_unary(Expr *expr, SymbolTable *table)
             type_error("Unary ! on non-bool");
             return NULL;
         }
-        return ast_clone_type(operand);
+        return ast_clone_type(table->arena, operand);
     }
     type_error("Invalid unary operator");
     return NULL;
@@ -135,13 +135,13 @@ static Type *type_check_interpolated(Expr *expr, SymbolTable *table)
             return NULL;
         }
     }
-    return ast_create_primitive_type(TYPE_STRING);
+    return ast_create_primitive_type(table->arena, TYPE_STRING);
 }
 
 static Type *type_check_literal(Expr *expr, SymbolTable *table)
 {
     (void)table;
-    return ast_clone_type(expr->as.literal.type);
+    return ast_clone_type(table->arena, expr->as.literal.type);
 }
 
 static Type *type_check_variable(Expr *expr, SymbolTable *table)
@@ -157,7 +157,7 @@ static Type *type_check_variable(Expr *expr, SymbolTable *table)
         type_error("Symbol has no type");
         return NULL;
     }
-    return ast_clone_type(sym->type);
+    return ast_clone_type(table->arena, sym->type);
 }
 
 static Type *type_check_assign(Expr *expr, SymbolTable *table)
@@ -176,7 +176,7 @@ static Type *type_check_assign(Expr *expr, SymbolTable *table)
         type_error("Type mismatch in assignment");
         return NULL;
     }
-    return ast_clone_type(sym->type);
+    return ast_clone_type(table->arena, sym->type);
 }
 
 static Type *type_check_call(Expr *expr, SymbolTable *table)
@@ -211,7 +211,7 @@ static Type *type_check_call(Expr *expr, SymbolTable *table)
             type_error("Unsupported type for print");
             return NULL;
         }
-        return ast_create_primitive_type(TYPE_VOID);
+        return ast_create_primitive_type(table->arena, TYPE_VOID);
     }
     bool is_to_string = false;
     if (expr->as.call.callee->type == EXPR_VARIABLE)
@@ -240,7 +240,7 @@ static Type *type_check_call(Expr *expr, SymbolTable *table)
             type_error("Unsupported type for to_string");
             return NULL;
         }
-        return ast_create_primitive_type(TYPE_STRING);
+        return ast_create_primitive_type(table->arena, TYPE_STRING);
     }
     else
     {
@@ -265,7 +265,7 @@ static Type *type_check_call(Expr *expr, SymbolTable *table)
                 return NULL;
             }
         }
-        return ast_clone_type(callee_type->as.function.return_type);
+        return ast_clone_type(table->arena, callee_type->as.function.return_type);
     }
 }
 
@@ -297,20 +297,19 @@ Type *type_check_expr(Expr *expr, SymbolTable *table)
         t = type_check_call(expr, table);
         break;
     case EXPR_ARRAY:
-        t = ast_create_array_type(ast_create_primitive_type(TYPE_NIL));
+        t = ast_create_array_type(table->arena, ast_create_primitive_type(table->arena, TYPE_NIL));
         break;
     case EXPR_ARRAY_ACCESS:
-        t = ast_create_primitive_type(TYPE_NIL);
+        t = ast_create_primitive_type(table->arena, TYPE_NIL);
         break;
     case EXPR_INCREMENT:
     case EXPR_DECREMENT:
     {
         Type *operand_type = type_check_expr(expr->as.operand, table);
-        t = ast_clone_type(operand_type);
+        t = ast_clone_type(table->arena, operand_type);
         if (operand_type == NULL || !is_numeric_type(operand_type))
         {
             type_error("Increment/decrement on non-numeric type");
-            ast_free_type(t);
             t = NULL;
         }
         break;
@@ -335,7 +334,7 @@ static void type_check_var_decl(Stmt *stmt, SymbolTable *table, Type *return_typ
     }
     else
     {
-        init_type = ast_create_primitive_type(TYPE_NIL);
+        init_type = ast_create_primitive_type(table->arena, TYPE_NIL);
     }
     if (!ast_type_equals(init_type, stmt->as.var_decl.type))
     {
@@ -343,7 +342,6 @@ static void type_check_var_decl(Stmt *stmt, SymbolTable *table, Type *return_typ
     }
     if (!stmt->as.var_decl.initializer)
     {
-        ast_free_type(init_type);
     }
     symbol_table_add_symbol_with_kind(table, stmt->as.var_decl.name,
                                       stmt->as.var_decl.type, SYMBOL_LOCAL);
@@ -379,7 +377,7 @@ static void type_check_return(Stmt *stmt, SymbolTable *table, Type *return_type)
     }
     else
     {
-        value_type = ast_create_primitive_type(TYPE_VOID);
+        value_type = ast_create_primitive_type(table->arena, TYPE_VOID);
     }
     if (!ast_type_equals(value_type, return_type))
     {
@@ -387,7 +385,6 @@ static void type_check_return(Stmt *stmt, SymbolTable *table, Type *return_type)
     }
     if (!stmt->as.return_stmt.value)
     {
-        ast_free_type(value_type);
     }
 }
 

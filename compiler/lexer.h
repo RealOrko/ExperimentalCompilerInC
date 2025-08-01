@@ -14,7 +14,7 @@ typedef struct
     int indent_size;
     int indent_capacity;
     int at_line_start;
-    Arena *arena;  // Pointer to the arena for memory management
+    Arena *arena;
 } Lexer;
 
 void lexer_init(Arena *arena, Lexer *lexer, const char *source, const char *filename);

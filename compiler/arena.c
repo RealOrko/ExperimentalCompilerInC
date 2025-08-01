@@ -1,6 +1,6 @@
 // arena.c
 #include "arena.h"
-#include "debug.h"  // Assuming you have DEBUG_ERROR
+#include "debug.h" 
 #include <stdlib.h>
 #include <string.h>
 
@@ -10,34 +10,54 @@ static size_t align_up(size_t size, size_t alignment) {
     return (size + alignment - 1) & ~(alignment - 1);
 }
 
-void arena_init(Arena *arena, size_t initial_capacity) {
-    arena->buffer = malloc(initial_capacity);
-    if (arena->buffer == NULL) {
-        DEBUG_ERROR("Failed to initialize arena");
+void arena_init(Arena *arena, size_t initial_block_size) {
+    arena->block_size = initial_block_size;
+    arena->first = malloc(sizeof(Block));
+    if (arena->first == NULL) {
+        DEBUG_ERROR("Failed to initialize arena block");
         exit(1);
     }
-    arena->capacity = initial_capacity;
-    arena->used = 0;
+    arena->first->data = malloc(initial_block_size);
+    if (arena->first->data == NULL) {
+        DEBUG_ERROR("Failed to allocate initial arena block data");
+        free(arena->first);
+        exit(1);
+    }
+    arena->first->size = initial_block_size;
+    arena->first->next = NULL;
+    arena->current = arena->first;
+    arena->current_used = 0;
 }
 
 void *arena_alloc(Arena *arena, size_t size) {
     size = align_up(size, ARENA_ALIGNMENT);
-    if (arena->used + size > arena->capacity) {
-        // Grow the arena (double capacity)
-        size_t new_capacity = arena->capacity * 2;
-        if (new_capacity < arena->used + size) {
-            new_capacity = arena->used + size;
+    
+    if (arena->current_used + size > arena->current->size) {
+        size_t new_block_size = arena->block_size * 2;
+        if (new_block_size < size) {
+            new_block_size = size;
         }
-        char *new_buffer = realloc(arena->buffer, new_capacity);
-        if (new_buffer == NULL) {
-            DEBUG_ERROR("Arena growth failed");
+        Block *new_block = malloc(sizeof(Block));
+        if (new_block == NULL) {
+            DEBUG_ERROR("Failed to allocate new arena block");
             exit(1);
         }
-        arena->buffer = new_buffer;
-        arena->capacity = new_capacity;
+        new_block->data = malloc(new_block_size);
+        if (new_block->data == NULL) {
+            DEBUG_ERROR("Failed to allocate new arena block data");
+            free(new_block);
+            exit(1);
+        }
+        new_block->size = new_block_size;
+        new_block->next = NULL;
+        arena->current->next = new_block;
+        arena->current = new_block;
+        arena->current_used = 0;
+        arena->block_size = new_block_size;  
     }
-    void *ptr = arena->buffer + arena->used;
-    arena->used += size;
+    
+    void *ptr = arena->current->data + arena->current_used;
+    arena->current_used += size;
     return ptr;
 }
 
@@ -59,8 +79,15 @@ char *arena_strndup(Arena *arena, const char *str, size_t n) {
 }
 
 void arena_free(Arena *arena) {
-    free(arena->buffer);
-    arena->buffer = NULL;
-    arena->capacity = 0;
-    arena->used = 0;
+    Block *block = arena->first;
+    while (block != NULL) {
+        Block *next = block->next;
+        free(block->data);
+        free(block);
+        block = next;
+    }
+    arena->first = NULL;
+    arena->current = NULL;
+    arena->current_used = 0;
+    arena->block_size = 0;
 }

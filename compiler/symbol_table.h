@@ -1,8 +1,10 @@
+// symbol_table.h
 #ifndef SYMBOL_TABLE_H
 #define SYMBOL_TABLE_H
 
 #include "token.h"
 #include "ast.h"
+#include "arena.h"
 
 #define OFFSET_ALIGNMENT 8
 #define CALLEE_SAVED_SPACE 16  
@@ -39,6 +41,7 @@ typedef struct Scope
 typedef struct {
     Scope *current;
     Scope *global_scope;
+    Arena *arena;
     Scope **scopes;
     int scopes_count;
     int scopes_capacity;
@@ -48,7 +51,7 @@ int get_type_size(Type *type);
 
 void symbol_table_print(SymbolTable *table, const char *where);
 
-SymbolTable *symbol_table_init();
+SymbolTable *symbol_table_init(Arena *arena);
 void symbol_table_cleanup(SymbolTable *table);
 
 void symbol_table_push_scope(SymbolTable *table);

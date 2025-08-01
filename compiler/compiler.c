@@ -12,7 +12,6 @@ void compiler_init(CompilerOptions *options, int argc, char **argv)
         exit(1);
     }
 
-    // Initialize arena with a reasonable default size
     arena_init(&options->arena, 4096);
     options->source_file = NULL;
     options->output_file = NULL;
@@ -20,7 +19,6 @@ void compiler_init(CompilerOptions *options, int argc, char **argv)
     options->verbose = 0;
     options->log_level = DEBUG_LEVEL_ERROR;
 
-    // Initialize debug level
     init_debug(options->log_level);
 
     if (!compiler_parse_args(argc, argv, options)) {
@@ -41,8 +39,8 @@ void compiler_init(CompilerOptions *options, int argc, char **argv)
         exit(1);
     }
 
-    lexer_init(&options->lexer, options->source, options->source_file, &options->arena);
-    parser_init(&options->parser, &options->lexer);
+    lexer_init(&options->arena, &options->lexer, options->source, options->source_file);
+    parser_init(&options->arena, &options->parser, &options->lexer);
 }
 
 void compiler_cleanup(CompilerOptions *options)
@@ -51,14 +49,10 @@ void compiler_cleanup(CompilerOptions *options)
         return;
     }
 
-    // Clean up parser and lexer first
     parser_cleanup(&options->parser);
     lexer_cleanup(&options->lexer);
-    
-    // Free all arena memory in one go
     arena_free(&options->arena);
     
-    // Reset fields to avoid use-after-free
     options->source_file = NULL;
     options->output_file = NULL;
     options->source = NULL;

@@ -2,6 +2,7 @@
 #define PARSER_H
 
 #include "lexer.h"
+#include "arena.h"
 #include "ast.h"
 #include "symbol_table.h"
 
@@ -16,9 +17,10 @@ typedef struct
     char **interp_sources;
     int interp_count;
     int interp_capacity;
+    Arena *arena;
 } Parser;
 
-void parser_init(Parser *parser, Lexer *lexer);
+void parser_init(Arena *arena, Parser *parser, Lexer *lexer);
 void parser_cleanup(Parser *parser);
 
 void parser_error(Parser *parser, const char *message);

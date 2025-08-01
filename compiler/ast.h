@@ -1,6 +1,7 @@
 #ifndef AST_H
 #define AST_H
 
+#include "arena.h"
 #include "token.h"
 #include <stddef.h>
 #include <stdbool.h>
@@ -26,7 +27,6 @@ typedef enum
 struct Type
 {
     TypeKind kind;
-    int should_free;
 
     union
     {
@@ -244,44 +244,42 @@ typedef struct
 void ast_print_stmt(Stmt *stmt, int indent_level);
 void ast_print_expr(Expr *expr, int indent_level);
 
-Type *ast_clone_type(Type *type);
+Type *ast_clone_type(Arena *arena, Type *type);
 void ast_mark_type_non_freeable(Type *type);
-Type *ast_create_primitive_type(TypeKind kind);
-Type *ast_create_array_type(Type *element_type);
-Type *ast_create_function_type(Type *return_type, Type **param_types, int param_count);
+Type *ast_create_primitive_type(Arena *arena, TypeKind kind);
+Type *ast_create_array_type(Arena *arena, Type *element_type);
+Type *ast_create_function_type(Arena *arena, Type *return_type, Type **param_types, int param_count);
 int ast_type_equals(Type *a, Type *b);
 const char *ast_type_to_string(Type *type);
 void ast_free_type(Type *type);
 void ast_free_token(Token *token);
 
-Expr *ast_create_binary_expr(Expr *left, TokenType operator, Expr * right);
-Expr *ast_create_unary_expr(TokenType operator, Expr * operand);
-Expr *ast_create_literal_expr(LiteralValue value, Type *type, bool is_interpolated);
-Expr *ast_create_variable_expr(Token name);
-Expr *ast_create_assign_expr(Token name, Expr *value);
-Expr *ast_create_call_expr(Expr *callee, Expr **arguments, int arg_count);
-Expr *ast_create_array_expr(Expr **elements, int element_count);
-Expr *ast_create_array_access_expr(Expr *array, Expr *index);
-Expr *ast_create_increment_expr(Expr *operand);
-Expr *ast_create_decrement_expr(Expr *operand);
-Expr *ast_create_interpolated_expr(Expr **parts, int part_count);
-Expr *ast_create_comparison_expr(Expr *left, Expr *right, TokenType comparison_type);
+Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr *right);
+Expr *ast_create_unary_expr(Arena *arena, TokenType operator, Expr *operand);
+Expr *ast_create_literal_expr(Arena *arena, LiteralValue value, Type *type, bool is_interpolated);
+Expr *ast_create_variable_expr(Arena *arena, Token name);
+Expr *ast_create_assign_expr(Arena *arena, Token name, Expr *value);
+Expr *ast_create_call_expr(Arena *arena, Expr *callee, Expr **arguments, int arg_count);
+Expr *ast_create_array_expr(Arena *arena, Expr **elements, int element_count);
+Expr *ast_create_array_access_expr(Arena *arena, Expr *array, Expr *index);
+Expr *ast_create_increment_expr(Arena *arena, Expr *operand);
+Expr *ast_create_decrement_expr(Arena *arena, Expr *operand);
+Expr *ast_create_interpolated_expr(Arena *arena, Expr **parts, int part_count);
+Expr *ast_create_comparison_expr(Arena *arena, Expr *left, Expr *right, TokenType comparison_type);
 void ast_free_expr(Expr *expr);
 
-Stmt *ast_create_expr_stmt(Expr *expression);
-Stmt *ast_create_var_decl_stmt(Token name, Type *type, Expr *initializer);
-Stmt *ast_create_function_stmt(Token name, Parameter *params, int param_count,
+Stmt *ast_create_expr_stmt(Arena *arena, Expr *expression);
+Stmt *ast_create_var_decl_stmt(Arena *arena, Token name, Type *type, Expr *initializer);
+Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int param_count,
                                Type *return_type, Stmt **body, int body_count);
-Stmt *ast_create_return_stmt(Token keyword, Expr *value);
-Stmt *ast_create_block_stmt(Stmt **statements, int count);
-Stmt *ast_create_if_stmt(Expr *condition, Stmt *then_branch, Stmt *else_branch);
-Stmt *ast_create_while_stmt(Expr *condition, Stmt *body);
-Stmt *ast_create_for_stmt(Stmt *initializer, Expr *condition, Expr *increment, Stmt *body);
-Stmt *ast_create_import_stmt(Token module_name);
-void ast_free_stmt(Stmt *stmt);
-
-void ast_init_module(Module *module, const char *filename);
-void ast_module_add_statement(Module *module, Stmt *stmt);
+Stmt *ast_create_return_stmt(Arena *arena, Token keyword, Expr *value);
+Stmt *ast_create_block_stmt(Arena *arena, Stmt **statements, int count);
+Stmt *ast_create_if_stmt(Arena *arena, Expr *condition, Stmt *then_branch, Stmt *else_branch);
+Stmt *ast_create_while_stmt(Arena *arena, Expr *condition, Stmt *body);
+Stmt *ast_create_for_stmt(Arena *arena, Stmt *initializer, Expr *condition, Expr *increment, Stmt *body);
+Stmt *ast_create_import_stmt(Arena *arena, Token module_name);
+void ast_init_module(Arena *arena, Module *module, const char *filename);
+void ast_module_add_statement(Arena *arena, Module *module, Stmt *stmt);
 void ast_free_module(Module *module);
 
 #endif

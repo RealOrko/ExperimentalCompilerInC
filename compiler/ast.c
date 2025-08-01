@@ -1,6 +1,6 @@
+#include "arena.h"
 #include "ast.h"
 #include "debug.h"
-#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
@@ -224,7 +224,7 @@ void ast_print_expr(Expr *expr, int indent_level)
     }
 }
 
-Expr *ast_create_comparison_expr(Expr *left, Expr *right, TokenType comparison_type)
+Expr *ast_create_comparison_expr(Arena *arena, Expr *left, Expr *right, TokenType comparison_type)
 {
     if (left == NULL || right == NULL)
     {
@@ -232,23 +232,23 @@ Expr *ast_create_comparison_expr(Expr *left, Expr *right, TokenType comparison_t
         return NULL;
     }
 
-    return ast_create_binary_expr(left, comparison_type, right);
+    return ast_create_binary_expr(arena, left, comparison_type, right);
 }
 
-Type *ast_clone_type(Type *type)
+Type *ast_clone_type(Arena *arena, Type *type)
 {
     if (type == NULL)
         return NULL;
 
-    Type *clone = calloc(1, sizeof(Type));
+    Type *clone = arena_alloc(arena, sizeof(Type));
     if (clone == NULL)
     {
         DEBUG_ERROR("Out of memory when cloning type");
         exit(1);
     }
+    memset(clone, 0, sizeof(Type));
 
     clone->kind = type->kind;
-    clone->should_free = 1;
 
     switch (type->kind)
     {
@@ -263,16 +263,16 @@ Type *ast_clone_type(Type *type)
         break;
 
     case TYPE_ARRAY:
-        clone->as.array.element_type = ast_clone_type(type->as.array.element_type);
+        clone->as.array.element_type = ast_clone_type(arena, type->as.array.element_type);
         break;
 
     case TYPE_FUNCTION:
-        clone->as.function.return_type = ast_clone_type(type->as.function.return_type);
+        clone->as.function.return_type = ast_clone_type(arena, type->as.function.return_type);
         clone->as.function.param_count = type->as.function.param_count;
 
         if (type->as.function.param_count > 0)
         {
-            clone->as.function.param_types = malloc(sizeof(Type *) * type->as.function.param_count);
+            clone->as.function.param_types = arena_alloc(arena, sizeof(Type *) * type->as.function.param_count);
             if (clone->as.function.param_types == NULL)
             {
                 DEBUG_ERROR("Out of memory when cloning function param types");
@@ -280,7 +280,7 @@ Type *ast_clone_type(Type *type)
             }
             for (int i = 0; i < type->as.function.param_count; i++)
             {
-                clone->as.function.param_types[i] = ast_clone_type(type->as.function.param_types[i]);
+                clone->as.function.param_types[i] = ast_clone_type(arena, type->as.function.param_types[i]);
             }
         }
         else
@@ -293,74 +293,50 @@ Type *ast_clone_type(Type *type)
     return clone;
 }
 
-void ast_mark_type_non_freeable(Type *type)
+Type *ast_create_primitive_type(Arena *arena, TypeKind kind)
 {
-    if (type == NULL)
-        return;
-
-    type->should_free = 0;
-
-    if (type->kind == TYPE_ARRAY && type->as.array.element_type)
-    {
-        ast_mark_type_non_freeable(type->as.array.element_type);
-    }
-    else if (type->kind == TYPE_FUNCTION)
-    {
-        if (type->as.function.return_type)
-            ast_mark_type_non_freeable(type->as.function.return_type);
-
-        for (int i = 0; i < type->as.function.param_count; i++)
-        {
-            if (type->as.function.param_types[i])
-                ast_mark_type_non_freeable(type->as.function.param_types[i]);
-        }
-    }
-}
-
-Type *ast_create_primitive_type(TypeKind kind)
-{
-    Type *type = calloc(1, sizeof(Type));
+    Type *type = arena_alloc(arena, sizeof(Type));
     if (type == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(type, 0, sizeof(Type));
     type->kind = kind;
-    type->should_free = 1;
     return type;
 }
 
-Type *ast_create_array_type(Type *element_type)
+Type *ast_create_array_type(Arena *arena, Type *element_type)
 {
-    Type *type = calloc(1, sizeof(Type));
+    Type *type = arena_alloc(arena, sizeof(Type));
     if (type == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(type, 0, sizeof(Type));
     type->kind = TYPE_ARRAY;
-    type->should_free = 1;
     type->as.array.element_type = element_type;
     return type;
 }
 
-Type *ast_create_function_type(Type *return_type, Type **param_types, int param_count)
+Type *ast_create_function_type(Arena *arena, Type *return_type, Type **param_types, int param_count)
 {
-    Type *type = calloc(1, sizeof(Type));
+    Type *type = arena_alloc(arena, sizeof(Type));
     if (type == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(type, 0, sizeof(Type));
     type->kind = TYPE_FUNCTION;
-    type->should_free = 1;
 
-    type->as.function.return_type = ast_clone_type(return_type);
+    type->as.function.return_type = ast_clone_type(arena, return_type);
 
     type->as.function.param_count = param_count;
     if (param_count > 0)
     {
-        type->as.function.param_types = malloc(sizeof(Type *) * param_count);
+        type->as.function.param_types = arena_alloc(arena, sizeof(Type *) * param_count);
         if (type->as.function.param_types == NULL)
         {
             DEBUG_ERROR("Out of memory");
@@ -368,7 +344,7 @@ Type *ast_create_function_type(Type *return_type, Type **param_types, int param_
         }
         for (int i = 0; i < param_count; i++)
         {
-            type->as.function.param_types[i] = ast_clone_type(param_types[i]);
+            type->as.function.param_types[i] = ast_clone_type(arena, param_types[i]);
         }
     }
     else
@@ -510,70 +486,15 @@ const char *ast_type_to_string(Type *type)
     return "UNKNOWN";
 }
 
-void ast_free_type(Type *type)
+Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr *right)
 {
-    if (type == NULL)
-        return;
-
-    if (!type->should_free)
-        return;
-
-    switch (type->kind)
-    {
-    case TYPE_ARRAY:
-        if (type->as.array.element_type != NULL)
-        {
-            ast_free_type(type->as.array.element_type);
-            type->as.array.element_type = NULL;
-        }
-        break;
-
-    case TYPE_FUNCTION:
-        if (type->as.function.return_type != NULL)
-        {
-            ast_free_type(type->as.function.return_type);
-            type->as.function.return_type = NULL;
-        }
-
-        if (type->as.function.param_types != NULL)
-        {
-            for (int i = 0; i < type->as.function.param_count; i++)
-            {
-                if (type->as.function.param_types[i] != NULL)
-                {
-                    ast_free_type(type->as.function.param_types[i]);
-                    type->as.function.param_types[i] = NULL;
-                }
-            }
-            free(type->as.function.param_types);
-            type->as.function.param_types = NULL;
-        }
-        break;
-
-    default:
-        break;
-    }
-
-    free(type);
-}
-
-void ast_free_token(Token *token)
-{
-    if (token && token->start)
-    {
-        free((void *)token->start);
-        token->start = NULL;
-    }
-}
-
-Expr *ast_create_binary_expr(Expr *left, TokenType operator, Expr *right)
-{
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_BINARY;
     expr->as.binary.left = left;
     expr->as.binary.right = right;
@@ -582,14 +503,15 @@ Expr *ast_create_binary_expr(Expr *left, TokenType operator, Expr *right)
     return expr;
 }
 
-Expr *ast_create_unary_expr(TokenType operator, Expr *operand)
+Expr *ast_create_unary_expr(Arena *arena, TokenType operator, Expr *operand)
 {
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_UNARY;
     expr->as.unary.operator = operator;
     expr->as.unary.operand = operand;
@@ -597,32 +519,34 @@ Expr *ast_create_unary_expr(TokenType operator, Expr *operand)
     return expr;
 }
 
-Expr *ast_create_literal_expr(LiteralValue value, Type *type, bool is_interpolated)
+Expr *ast_create_literal_expr(Arena *arena, LiteralValue value, Type *type, bool is_interpolated)
 {
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_LITERAL;
     expr->as.literal.value = value;
     expr->as.literal.type = type;
     expr->as.literal.is_interpolated = is_interpolated;
-    expr->expr_type = ast_clone_type(type);
+    expr->expr_type = ast_clone_type(arena, type);
     return expr;
 }
 
-Expr *ast_create_variable_expr(Token name)
+Expr *ast_create_variable_expr(Arena *arena, Token name)
 {
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_VARIABLE;
-    char *new_start = strndup(name.start, name.length);
+    char *new_start = arena_strndup(arena, name.start, name.length);
     if (new_start == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -636,29 +560,40 @@ Expr *ast_create_variable_expr(Token name)
     return expr;
 }
 
-Expr *ast_create_assign_expr(Token name, Expr *value)
+Expr *ast_create_assign_expr(Arena *arena, Token name, Expr *value)
 {
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_ASSIGN;
-    expr->as.assign.name = name;
+    char *new_start = arena_strndup(arena, name.start, name.length);
+    if (new_start == NULL)
+    {
+        DEBUG_ERROR("Out of memory");
+        exit(1);
+    }
+    expr->as.assign.name.start = new_start;
+    expr->as.assign.name.length = name.length;
+    expr->as.assign.name.line = name.line;
+    expr->as.assign.name.type = name.type;
     expr->as.assign.value = value;
     expr->expr_type = NULL;
     return expr;
 }
 
-Expr *ast_create_call_expr(Expr *callee, Expr **arguments, int arg_count)
+Expr *ast_create_call_expr(Arena *arena, Expr *callee, Expr **arguments, int arg_count)
 {
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_CALL;
     expr->as.call.callee = callee;
     expr->as.call.arguments = arguments;
@@ -667,14 +602,15 @@ Expr *ast_create_call_expr(Expr *callee, Expr **arguments, int arg_count)
     return expr;
 }
 
-Expr *ast_create_array_expr(Expr **elements, int element_count)
+Expr *ast_create_array_expr(Arena *arena, Expr **elements, int element_count)
 {
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_ARRAY;
     expr->as.array.elements = elements;
     expr->as.array.element_count = element_count;
@@ -682,14 +618,15 @@ Expr *ast_create_array_expr(Expr **elements, int element_count)
     return expr;
 }
 
-Expr *ast_create_array_access_expr(Expr *array, Expr *index)
+Expr *ast_create_array_access_expr(Arena *arena, Expr *array, Expr *index)
 {
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_ARRAY_ACCESS;
     expr->as.array_access.array = array;
     expr->as.array_access.index = index;
@@ -697,42 +634,45 @@ Expr *ast_create_array_access_expr(Expr *array, Expr *index)
     return expr;
 }
 
-Expr *ast_create_increment_expr(Expr *operand)
+Expr *ast_create_increment_expr(Arena *arena, Expr *operand)
 {
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_INCREMENT;
     expr->as.operand = operand;
     expr->expr_type = NULL;
     return expr;
 }
 
-Expr *ast_create_decrement_expr(Expr *operand)
+Expr *ast_create_decrement_expr(Arena *arena, Expr *operand)
 {
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_DECREMENT;
     expr->as.operand = operand;
     expr->expr_type = NULL;
     return expr;
 }
 
-Expr *ast_create_interpolated_expr(Expr **parts, int part_count)
+Expr *ast_create_interpolated_expr(Arena *arena, Expr **parts, int part_count)
 {
-    Expr *expr = malloc(sizeof(Expr));
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(expr, 0, sizeof(Expr));
     expr->type = EXPR_INTERPOLATED;
     expr->as.interpol.parts = parts;
     expr->as.interpol.part_count = part_count;
@@ -740,169 +680,31 @@ Expr *ast_create_interpolated_expr(Expr **parts, int part_count)
     return expr;
 }
 
-void ast_free_expr(Expr *expr)
+Stmt *ast_create_expr_stmt(Arena *arena, Expr *expression)
 {
-    if (expr == NULL)
-        return;
-
-    switch (expr->type)
-    {
-    case EXPR_BINARY:
-        if (expr->as.binary.left != NULL)
-        {
-            ast_free_expr(expr->as.binary.left);
-            expr->as.binary.left = NULL;
-        }
-        if (expr->as.binary.right != NULL)
-        {
-            ast_free_expr(expr->as.binary.right);
-            expr->as.binary.right = NULL;
-        }
-        break;
-
-    case EXPR_UNARY:
-        if (expr->as.unary.operand != NULL)
-        {
-            ast_free_expr(expr->as.unary.operand);
-            expr->as.unary.operand = NULL;
-        }
-        break;
-
-    case EXPR_LITERAL:
-        if (expr->as.literal.type != NULL && expr->as.literal.type->kind == TYPE_STRING)
-        {
-            free((char *)expr->as.literal.value.string_value);
-            expr->as.literal.value.string_value = NULL;
-        }
-        if (expr->as.literal.type != NULL)
-        {
-            ast_free_type(expr->as.literal.type);
-            expr->as.literal.type = NULL;
-        }
-        break;
-
-    case EXPR_VARIABLE:
-        ast_free_token(&expr->as.variable.name);
-        break;
-
-    case EXPR_ASSIGN:
-        if (expr->as.assign.value != NULL)
-        {
-            ast_free_expr(expr->as.assign.value);
-            expr->as.assign.value = NULL;
-        }
-        ast_free_token(&expr->as.assign.name);
-        break;
-
-    case EXPR_CALL:
-        if (expr->as.call.callee != NULL)
-        {
-            ast_free_expr(expr->as.call.callee);
-            expr->as.call.callee = NULL;
-        }
-
-        if (expr->as.call.arguments != NULL)
-        {
-            for (int i = 0; i < expr->as.call.arg_count; i++)
-            {
-                if (expr->as.call.arguments[i] != NULL)
-                {
-                    ast_free_expr(expr->as.call.arguments[i]);
-                    expr->as.call.arguments[i] = NULL;
-                }
-            }
-            free(expr->as.call.arguments);
-            expr->as.call.arguments = NULL;
-        }
-        break;
-
-    case EXPR_ARRAY:
-        if (expr->as.array.elements != NULL)
-        {
-            for (int i = 0; i < expr->as.array.element_count; i++)
-            {
-                if (expr->as.array.elements[i] != NULL)
-                {
-                    ast_free_expr(expr->as.array.elements[i]);
-                    expr->as.array.elements[i] = NULL;
-                }
-            }
-            free(expr->as.array.elements);
-            expr->as.array.elements = NULL;
-        }
-        break;
-
-    case EXPR_ARRAY_ACCESS:
-        if (expr->as.array_access.array != NULL)
-        {
-            ast_free_expr(expr->as.array_access.array);
-            expr->as.array_access.array = NULL;
-        }
-        if (expr->as.array_access.index != NULL)
-        {
-            ast_free_expr(expr->as.array_access.index);
-            expr->as.array_access.index = NULL;
-        }
-        break;
-
-    case EXPR_INCREMENT:
-    case EXPR_DECREMENT:
-        if (expr->as.operand != NULL)
-        {
-            ast_free_expr(expr->as.operand);
-            expr->as.operand = NULL;
-        }
-        break;
-
-    case EXPR_INTERPOLATED:
-        if (expr->as.interpol.parts != NULL)
-        {
-            for (int i = 0; i < expr->as.interpol.part_count; i++)
-            {
-                if (expr->as.interpol.parts[i] != NULL)
-                {
-                    ast_free_expr(expr->as.interpol.parts[i]);
-                    expr->as.interpol.parts[i] = NULL;
-                }
-            }
-            free(expr->as.interpol.parts);
-            expr->as.interpol.parts = NULL;
-        }
-        break;
-    }
-
-    if (expr->expr_type != NULL)
-    {
-        ast_free_type(expr->expr_type);
-        expr->expr_type = NULL;
-    }
-
-    free(expr);
-}
-
-Stmt *ast_create_expr_stmt(Expr *expression)
-{
-    Stmt *stmt = malloc(sizeof(Stmt));
+    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_EXPR;
     stmt->as.expression.expression = expression;
     return stmt;
 }
 
-Stmt *ast_create_var_decl_stmt(Token name, Type *type, Expr *initializer)
+Stmt *ast_create_var_decl_stmt(Arena *arena, Token name, Type *type, Expr *initializer)
 {
-    Stmt *stmt = malloc(sizeof(Stmt));
+    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_VAR_DECL;
-    char *new_start = strndup(name.start, name.length);
+    char *new_start = arena_strndup(arena, name.start, name.length);
     if (new_start == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -917,17 +719,18 @@ Stmt *ast_create_var_decl_stmt(Token name, Type *type, Expr *initializer)
     return stmt;
 }
 
-Stmt *ast_create_function_stmt(Token name, Parameter *params, int param_count,
+Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int param_count,
                                Type *return_type, Stmt **body, int body_count)
 {
-    Stmt *stmt = malloc(sizeof(Stmt));
+    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_FUNCTION;
-    char *new_name_start = strndup(name.start, name.length);
+    char *new_name_start = arena_strndup(arena, name.start, name.length);
     if (new_name_start == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -938,7 +741,7 @@ Stmt *ast_create_function_stmt(Token name, Parameter *params, int param_count,
     stmt->as.function.name.line = name.line;
     stmt->as.function.name.type = name.type;
 
-    Parameter *new_params = malloc(sizeof(Parameter) * param_count);
+    Parameter *new_params = arena_alloc(arena, sizeof(Parameter) * param_count);
     if (new_params == NULL && param_count > 0)
     {
         DEBUG_ERROR("Out of memory");
@@ -946,7 +749,7 @@ Stmt *ast_create_function_stmt(Token name, Parameter *params, int param_count,
     }
     for (int i = 0; i < param_count; i++)
     {
-        char *new_param_start = strndup(params[i].name.start, params[i].name.length);
+        char *new_param_start = arena_strndup(arena, params[i].name.start, params[i].name.length);
         if (new_param_start == NULL)
         {
             DEBUG_ERROR("Out of memory");
@@ -966,14 +769,15 @@ Stmt *ast_create_function_stmt(Token name, Parameter *params, int param_count,
     return stmt;
 }
 
-Stmt *ast_create_return_stmt(Token keyword, Expr *value)
+Stmt *ast_create_return_stmt(Arena *arena, Token keyword, Expr *value)
 {
-    Stmt *stmt = malloc(sizeof(Stmt));
+    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_RETURN;
     stmt->as.return_stmt.keyword.start = keyword.start;
     stmt->as.return_stmt.keyword.length = keyword.length;
@@ -983,28 +787,30 @@ Stmt *ast_create_return_stmt(Token keyword, Expr *value)
     return stmt;
 }
 
-Stmt *ast_create_block_stmt(Stmt **statements, int count)
+Stmt *ast_create_block_stmt(Arena *arena, Stmt **statements, int count)
 {
-    Stmt *stmt = malloc(sizeof(Stmt));
+    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_BLOCK;
     stmt->as.block.statements = statements;
     stmt->as.block.count = count;
     return stmt;
 }
 
-Stmt *ast_create_if_stmt(Expr *condition, Stmt *then_branch, Stmt *else_branch)
+Stmt *ast_create_if_stmt(Arena *arena, Expr *condition, Stmt *then_branch, Stmt *else_branch)
 {
-    Stmt *stmt = malloc(sizeof(Stmt));
+    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_IF;
     stmt->as.if_stmt.condition = condition;
     stmt->as.if_stmt.then_branch = then_branch;
@@ -1012,28 +818,30 @@ Stmt *ast_create_if_stmt(Expr *condition, Stmt *then_branch, Stmt *else_branch)
     return stmt;
 }
 
-Stmt *ast_create_while_stmt(Expr *condition, Stmt *body)
+Stmt *ast_create_while_stmt(Arena *arena, Expr *condition, Stmt *body)
 {
-    Stmt *stmt = malloc(sizeof(Stmt));
+    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_WHILE;
     stmt->as.while_stmt.condition = condition;
     stmt->as.while_stmt.body = body;
     return stmt;
 }
 
-Stmt *ast_create_for_stmt(Stmt *initializer, Expr *condition, Expr *increment, Stmt *body)
+Stmt *ast_create_for_stmt(Arena *arena, Stmt *initializer, Expr *condition, Expr *increment, Stmt *body)
 {
-    Stmt *stmt = malloc(sizeof(Stmt));
+    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_FOR;
     stmt->as.for_stmt.initializer = initializer;
     stmt->as.for_stmt.condition = condition;
@@ -1042,16 +850,17 @@ Stmt *ast_create_for_stmt(Stmt *initializer, Expr *condition, Expr *increment, S
     return stmt;
 }
 
-Stmt *ast_create_import_stmt(Token module_name)
+Stmt *ast_create_import_stmt(Arena *arena, Token module_name)
 {
-    Stmt *stmt = malloc(sizeof(Stmt));
+    Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_IMPORT;
-    char *new_start = strndup(module_name.start, module_name.length);
+    char *new_start = arena_strndup(arena, module_name.start, module_name.length);
     if (new_start == NULL)
     {
         DEBUG_ERROR("Out of memory");
@@ -1064,161 +873,7 @@ Stmt *ast_create_import_stmt(Token module_name)
     return stmt;
 }
 
-void ast_free_stmt(Stmt *stmt)
-{
-    if (stmt == NULL)
-        return;
-
-    switch (stmt->type)
-    {
-    case STMT_EXPR:
-        if (stmt->as.expression.expression != NULL)
-        {
-            ast_free_expr(stmt->as.expression.expression);
-            stmt->as.expression.expression = NULL;
-        }
-        break;
-
-    case STMT_VAR_DECL:
-        if (stmt->as.var_decl.type != NULL)
-        {
-            ast_free_type(stmt->as.var_decl.type);
-            stmt->as.var_decl.type = NULL;
-        }
-        if (stmt->as.var_decl.initializer != NULL)
-        {
-            ast_free_expr(stmt->as.var_decl.initializer);
-            stmt->as.var_decl.initializer = NULL;
-        }
-        ast_free_token(&stmt->as.var_decl.name);
-        break;
-
-    case STMT_FUNCTION:
-        if (stmt->as.function.return_type != NULL)
-        {
-            ast_free_type(stmt->as.function.return_type);
-            stmt->as.function.return_type = NULL;
-        }
-
-        if (stmt->as.function.params != NULL)
-        {
-            for (int i = 0; i < stmt->as.function.param_count; i++)
-            {
-                if (stmt->as.function.params[i].type != NULL)
-                {
-                    ast_free_type(stmt->as.function.params[i].type);
-                    stmt->as.function.params[i].type = NULL;
-                }
-                ast_free_token(&stmt->as.function.params[i].name);
-            }
-            free(stmt->as.function.params);
-            stmt->as.function.params = NULL;
-        }
-
-        if (stmt->as.function.body != NULL)
-        {
-            for (int i = 0; i < stmt->as.function.body_count; i++)
-            {
-                if (stmt->as.function.body[i] != NULL)
-                {
-                    ast_free_stmt(stmt->as.function.body[i]);
-                    stmt->as.function.body[i] = NULL;
-                }
-            }
-            free(stmt->as.function.body);
-            stmt->as.function.body = NULL;
-        }
-        ast_free_token(&stmt->as.function.name);
-        break;
-
-    case STMT_RETURN:
-        if (stmt->as.return_stmt.value != NULL)
-        {
-            ast_free_expr(stmt->as.return_stmt.value);
-            stmt->as.return_stmt.value = NULL;
-        }
-        ast_free_token(&stmt->as.return_stmt.keyword);
-        break;
-
-    case STMT_BLOCK:
-        if (stmt->as.block.statements != NULL)
-        {
-            for (int i = 0; i < stmt->as.block.count; i++)
-            {
-                if (stmt->as.block.statements[i] != NULL)
-                {
-                    ast_free_stmt(stmt->as.block.statements[i]);
-                    stmt->as.block.statements[i] = NULL;
-                }
-            }
-            free(stmt->as.block.statements);
-            stmt->as.block.statements = NULL;
-        }
-        break;
-
-    case STMT_IF:
-        if (stmt->as.if_stmt.condition != NULL)
-        {
-            ast_free_expr(stmt->as.if_stmt.condition);
-            stmt->as.if_stmt.condition = NULL;
-        }
-        if (stmt->as.if_stmt.then_branch != NULL)
-        {
-            ast_free_stmt(stmt->as.if_stmt.then_branch);
-            stmt->as.if_stmt.then_branch = NULL;
-        }
-        if (stmt->as.if_stmt.else_branch != NULL)
-        {
-            ast_free_stmt(stmt->as.if_stmt.else_branch);
-            stmt->as.if_stmt.else_branch = NULL;
-        }
-        break;
-
-    case STMT_WHILE:
-        if (stmt->as.while_stmt.condition != NULL)
-        {
-            ast_free_expr(stmt->as.while_stmt.condition);
-            stmt->as.while_stmt.condition = NULL;
-        }
-        if (stmt->as.while_stmt.body != NULL)
-        {
-            ast_free_stmt(stmt->as.while_stmt.body);
-            stmt->as.while_stmt.body = NULL;
-        }
-        break;
-
-    case STMT_FOR:
-        if (stmt->as.for_stmt.initializer != NULL)
-        {
-            ast_free_stmt(stmt->as.for_stmt.initializer);
-            stmt->as.for_stmt.initializer = NULL;
-        }
-        if (stmt->as.for_stmt.condition != NULL)
-        {
-            ast_free_expr(stmt->as.for_stmt.condition);
-            stmt->as.for_stmt.condition = NULL;
-        }
-        if (stmt->as.for_stmt.increment != NULL)
-        {
-            ast_free_expr(stmt->as.for_stmt.increment);
-            stmt->as.for_stmt.increment = NULL;
-        }
-        if (stmt->as.for_stmt.body != NULL)
-        {
-            ast_free_stmt(stmt->as.for_stmt.body);
-            stmt->as.for_stmt.body = NULL;
-        }
-        break;
-
-    case STMT_IMPORT:
-        ast_free_token(&stmt->as.import.module_name);
-        break;
-    }
-
-    free(stmt);
-}
-
-void ast_init_module(Module *module, const char *filename)
+void ast_init_module(Arena *arena, Module *module, const char *filename)
 {
     if (module == NULL)
         return;
@@ -1226,56 +881,36 @@ void ast_init_module(Module *module, const char *filename)
     module->count = 0;
     module->capacity = 8;
 
-    module->statements = malloc(sizeof(Stmt *) * module->capacity);
+    module->statements = arena_alloc(arena, sizeof(Stmt *) * module->capacity);
     if (module->statements == NULL)
     {
         DEBUG_ERROR("Out of memory");
         exit(1);
     }
+    memset(module->statements, 0, sizeof(Stmt *) * module->capacity);
 
     module->filename = filename;
 }
 
-void ast_module_add_statement(Module *module, Stmt *stmt)
+void ast_module_add_statement(Arena *arena, Module *module, Stmt *stmt)
 {
     if (module == NULL || stmt == NULL)
         return;
 
     if (module->count == module->capacity)
     {
-        module->capacity *= 2;
-        Stmt **new_statements = realloc(module->statements, sizeof(Stmt *) * module->capacity);
+        size_t new_capacity = module->capacity * 2;
+        Stmt **new_statements = arena_alloc(arena, sizeof(Stmt *) * new_capacity);
         if (new_statements == NULL)
         {
             DEBUG_ERROR("Out of memory");
             exit(1);
         }
+        memcpy(new_statements, module->statements, sizeof(Stmt *) * module->capacity);
+        memset(new_statements + module->capacity, 0, sizeof(Stmt *) * (new_capacity - module->capacity));
         module->statements = new_statements;
+        module->capacity = new_capacity;
     }
 
     module->statements[module->count++] = stmt;
-}
-
-void ast_free_module(Module *module)
-{
-    if (module == NULL)
-        return;
-
-    if (module->statements != NULL)
-    {
-        for (int i = 0; i < module->count; i++)
-        {
-            if (module->statements[i] != NULL)
-            {
-                ast_free_stmt(module->statements[i]);
-                module->statements[i] = NULL;
-            }
-        }
-
-        free(module->statements);
-        module->statements = NULL;
-    }
-
-    module->count = 0;
-    module->capacity = 0;
 }

@@ -4,6 +4,8 @@
         "symbol_table.h": "c",
         "stdlib.h": "c",
         "standard.h": "c",
-        "runtime.h": "c"
+        "runtime.h": "c",
+        "ast.h": "c",
+        "debug.h": "c"
     }
 }

@@ -75,24 +75,25 @@ void symbol_table_print(SymbolTable *table, const char *where)
     DEBUG_VERBOSE("====================================");
 }
 
-SymbolTable *symbol_table_init()
+SymbolTable *symbol_table_init(Arena *arena)
 {
-    SymbolTable *table = malloc(sizeof(SymbolTable));
+    SymbolTable *table = arena_alloc(arena, sizeof(SymbolTable));
     if (table == NULL)
     {
         DEBUG_ERROR("Out of memory creating symbol table");
         return NULL;
     }
-    table->current = NULL;
-    table->scopes = malloc(sizeof(Scope *) * 8);
+    table->scopes = arena_alloc(arena, sizeof(Scope *) * 8);
     if (table->scopes == NULL)
     {
         DEBUG_ERROR("Out of memory creating scopes array");
         free(table);
         return NULL;
     }
+    table->arena = arena;
     table->scopes_count = 0;
     table->scopes_capacity = 8;
+    table->current = NULL;
 
     symbol_table_push_scope(table);
     table->global_scope = table->current;
@@ -109,14 +110,8 @@ void free_scope(Scope *scope)
     while (symbol != NULL)
     {
         Symbol *next = symbol->next;
-        ast_free_type(symbol->type);
-        free((char*)symbol->name.start);
-        symbol->name.start = NULL;
-        free(symbol);
         symbol = next;
     }
-
-    free(scope);
 }
 
 void symbol_table_cleanup(SymbolTable *table)
@@ -127,13 +122,11 @@ void symbol_table_cleanup(SymbolTable *table)
     {
         free_scope(table->scopes[i]);
     }
-    free(table->scopes);
-    free(table);
 }
 
 void symbol_table_push_scope(SymbolTable *table)
 {
-    Scope *scope = malloc(sizeof(Scope));
+    Scope *scope = arena_alloc(table->arena, sizeof(Scope));
     if (scope == NULL)
     {
         DEBUG_ERROR("Out of memory creating scope");
@@ -149,13 +142,16 @@ void symbol_table_push_scope(SymbolTable *table)
 
     if (table->scopes_count >= table->scopes_capacity)
     {
-        table->scopes_capacity *= 2;
-        table->scopes = realloc(table->scopes, sizeof(Scope *) * table->scopes_capacity);
-        if (table->scopes == NULL)
+        int new_capacity = table->scopes_capacity * 2;
+        Scope **new_scopes = arena_alloc(table->arena, sizeof(Scope *) * new_capacity);
+        if (new_scopes == NULL)
         {
             DEBUG_ERROR("Out of memory expanding scopes array");
             return;
         }
+        memcpy(new_scopes, table->scopes, sizeof(Scope *) * table->scopes_count);
+        table->scopes = new_scopes;
+        table->scopes_capacity = new_capacity;
     }
     table->scopes[table->scopes_count++] = scope;
 }
@@ -238,12 +234,11 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     Symbol *existing = symbol_table_lookup_symbol_current(table, name);
     if (existing != NULL)
     {
-        ast_free_type(existing->type);
-        existing->type = ast_clone_type(type);
+        existing->type = ast_clone_type(table->arena, type);
         return;
     }
 
-    Symbol *symbol = malloc(sizeof(Symbol));
+    Symbol *symbol = arena_alloc(table->arena, sizeof(Symbol));
     if (symbol == NULL)
     {
         DEBUG_ERROR("Out of memory when creating symbol");
@@ -251,7 +246,7 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
     }
 
     symbol->name = name;
-    symbol->type = ast_clone_type(type);
+    symbol->type = ast_clone_type(table->arena, type);
     symbol->kind = kind;
 
     if (kind == SYMBOL_PARAM)
@@ -273,11 +268,10 @@ void symbol_table_add_symbol_with_kind(SymbolTable *table, Token name, Type *typ
         symbol->offset = 0;
     }
 
-    symbol->name.start = strndup(name.start, name.length);
+    symbol->name.start = arena_strndup(table->arena, name.start, name.length);
     if (symbol->name.start == NULL)
     {
         DEBUG_ERROR("Out of memory duplicating token string");
-        free(symbol);
         return;
     }
     symbol->name.length = name.length;
