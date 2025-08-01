@@ -9,19 +9,32 @@ void compiler_init(CompilerOptions *options, int argc, char **argv)
 {
     if (options == NULL)
     {
-        return;
+        exit(1);
     }
     
     arena_init(&options->arena, 1024);
     options->source_file = NULL;
     options->output_file = NULL;
+    options->source = NULL;
     options->verbose = 0;
     options->log_level = DEBUG_LEVEL_ERROR;
 
     if (!compiler_parse_args(argc, argv, options))
     {
-        return;
+        exit(1);
     }
+
+    if (options->source_file != NULL)
+    {
+        options->source = compiler_read_file(&options->arena, options->source_file);
+    }
+    if (options->source == NULL)
+    {
+        exit(1);
+    }
+
+    lexer_init(&options->lexer, options->source, options->source_file);
+    parser_init(&options->parser, &options->lexer);
 }
 
 void compiler_cleanup(CompilerOptions *options)
@@ -31,9 +44,13 @@ void compiler_cleanup(CompilerOptions *options)
         return;
     }
 
+    parser_cleanup(&options->parser);
+    lexer_cleanup(&options->parser);
+
     arena_free(&options->arena);
     options->source_file = NULL;
     options->output_file = NULL;
+    options->source = NULL;
 }
 
 int compiler_parse_args(int argc, char **argv, CompilerOptions *options)

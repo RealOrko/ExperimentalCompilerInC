@@ -10,25 +10,14 @@ int main(int argc, char **argv)
     CompilerOptions options;
     Module *module = NULL;
 
-    compiler_init(&options, argc, argv);
     init_debug(options.log_level);
-
-    options.source = compiler_read_file(&options.arena, options.source_file);
-    if (options.source == NULL)
-    {
-        compiler_cleanup(&options);
-        return 1;
-    }
-
-    lexer_init(&options.lexer, options.source, options.source_file);
-    parser_init(&options.parser, &options.lexer);
+    compiler_init(&options, argc, argv);
 
     module = parser_execute(&options.parser, options.source_file);
     if (module == NULL)
     {
-        parser_cleanup(&options.parser);
         compiler_cleanup(&options);
-        return 1;
+        exit(1);
     }
 
     Token print_token;
@@ -78,7 +67,6 @@ int main(int argc, char **argv)
     ast_free_type(placeholder_type);
 
     int type_check_success = type_check_module(module, options.parser.symbol_table);
-
     if (!type_check_success)
     {
         if (module != NULL)
@@ -91,11 +79,8 @@ int main(int argc, char **argv)
         SymbolTable *table = options.parser.symbol_table;
         options.parser.symbol_table = NULL;
         symbol_table_cleanup(table);
-
-        parser_cleanup(&options.parser);
         compiler_cleanup(&options);
-
-        return 1;
+        exit(1);
     }
 
     CodeGen gen;
@@ -113,7 +98,6 @@ int main(int argc, char **argv)
     SymbolTable *table = options.parser.symbol_table;
     options.parser.symbol_table = NULL;
     symbol_table_cleanup(table);
-    parser_cleanup(&options.parser);
     compiler_cleanup(&options);
 
     return 0;
