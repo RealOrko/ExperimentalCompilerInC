@@ -272,7 +272,9 @@ Stmt *ast_create_expr_stmt(Arena *arena, Expr *expression, const Token *loc_toke
 Stmt *ast_create_var_decl_stmt(Arena *arena, Token name, Type *type, Expr *initializer, const Token *loc_token);
 Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int param_count,
                                Type *return_type, Stmt **body, int body_count, const Token *loc_token);
+Stmt *ast_create_return_stmt(Arena *arena, Token keyword, Expr *value, const Token *loc_token);
 Stmt *ast_create_block_stmt(Arena *arena, Stmt **statements, int count, const Token *loc_token);
+Stmt *ast_create_if_stmt(Arena *arena, Expr *condition, Stmt *then_branch, Stmt *else_branch, const Token *loc_token);
 Stmt *ast_create_while_stmt(Arena *arena, Expr *condition, Stmt *body, const Token *loc_token);
 Stmt *ast_create_for_stmt(Arena *arena, Stmt *initializer, Expr *condition, Expr *increment, Stmt *body, const Token *loc_token);
 Stmt *ast_create_import_stmt(Arena *arena, Token module_name, const Token *loc_token);
