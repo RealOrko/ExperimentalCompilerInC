@@ -267,7 +267,7 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
                 fprintf(gen->output, "    mov r15, rsp\n");
                 fprintf(gen->output, "    and r15, 15\n");
                 fprintf(gen->output, "    sub rsp, r15\n");
-                fprintf(gen->output, "    call free\n");
+                fprintf(gen->output, "    call rt_free_string\n");
                 fprintf(gen->output, "    add rsp, r15\n");
             }
             fprintf(gen->output, "    mov rax, r14\n");
@@ -862,7 +862,7 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
         fprintf(gen->output, "    sub rsp, r15\n");
-        fprintf(gen->output, "    call free\n");
+        fprintf(gen->output, "    call rt_free_string\n");
         fprintf(gen->output, "    add rsp, r15\n");
         if (pt->kind != TYPE_STRING || expr->parts[i]->type != EXPR_VARIABLE) {
             fprintf(gen->output, "    mov rdi, r12\n");
@@ -1023,10 +1023,31 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
             return;
         }
     }
+    // Compute number of temp string args
+    int num_temps = 0;
+    for (int i = 0; i < call->arg_count; i++)
+    {
+        Expr *arg = call->arguments[i];
+        if (arg->expr_type && arg->expr_type->kind == TYPE_STRING && arg->type != EXPR_VARIABLE)
+        {
+            num_temps++;
+        }
+    }
+    if (num_temps > 0)
+    {
+        fprintf(gen->output, "    sub rsp, %d\n", 8 * num_temps);
+    }
+    int temp_idx = 0;
     // Evaluate arguments left to right and push to stack
     for (int i = 0; i < call->arg_count; i++)
     {
+        Expr *arg = call->arguments[i];
         code_gen_expression(gen, call->arguments[i]);
+        if (arg->expr_type && arg->expr_type->kind == TYPE_STRING && arg->type != EXPR_VARIABLE)
+        {
+            fprintf(gen->output, "    mov [rsp + %d], rax\n", 8 * temp_idx);
+            temp_idx++;
+        }
         fprintf(gen->output, "    push rax\n");
     }
     // Pop into registers right to left
@@ -1040,6 +1061,19 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
     fprintf(gen->output, "    sub rsp, r15\n");
     fprintf(gen->output, "    call %s\n", function_name);
     fprintf(gen->output, "    add rsp, r15\n");
+    if (num_temps > 0)
+    {
+        for (int j = 0; j < num_temps; j++)
+        {
+            fprintf(gen->output, "    mov rdi, [rsp + %d]\n", 8 * j);
+            fprintf(gen->output, "    mov r15, rsp\n");
+            fprintf(gen->output, "    and r15, 15\n");
+            fprintf(gen->output, "    sub rsp, r15\n");
+            fprintf(gen->output, "    call rt_free_string\n");
+            fprintf(gen->output, "    add rsp, r15\n");
+        }
+        fprintf(gen->output, "    add rsp, %d\n", 8 * num_temps);
+    }
 }
 
 void code_gen_array_expression(CodeGen *gen, ArrayExpr *expr)

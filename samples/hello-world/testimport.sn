@@ -1,0 +1,3 @@
+fn recurse(i:int):void=>
+  if i < 100 => recurse(i+1)
+  print($"{i}\n") 
