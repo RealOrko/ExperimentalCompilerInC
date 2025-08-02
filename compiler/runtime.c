@@ -4,28 +4,21 @@
 #include <math.h>
 #include <limits.h>
 
-char *rt_str_concat(const char *left, const char *right)
-{
+char *rt_str_concat(const char *left, const char *right) {
     const char *l = left ? left : "";
     const char *r = right ? right : "";
     size_t left_len = strlen(l);
     size_t right_len = strlen(r);
     size_t new_len = left_len + right_len;
-
-    if (new_len > (size_t)-1) {  // Simplified overflow check (though unlikely)
-        fprintf(stderr, "rt_str_concat: concatenated string length overflow\n");
-        exit(1);
+    if (new_len > (1UL << 30) - 1) {
+        return NULL;
     }
-
     char *new_str = malloc(new_len + 1);
     if (new_str == NULL) {
-        fprintf(stderr, "Memory allocation failed for string concatenation (length: %zu)\n", new_len);
-        exit(1);
+        return NULL;
     }
-
     memcpy(new_str, l, left_len);
     memcpy(new_str + left_len, r, right_len + 1);
-
     return new_str;
 }
 

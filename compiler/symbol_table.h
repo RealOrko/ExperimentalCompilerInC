@@ -7,9 +7,10 @@
 #include "arena.h"
 
 #define OFFSET_ALIGNMENT 8
-#define CALLEE_SAVED_SPACE 16  
-#define LOCAL_BASE_OFFSET (8 + CALLEE_SAVED_SPACE)  
+#define CALLEE_SAVED_SPACE 40 
+#define LOCAL_BASE_OFFSET (8 + CALLEE_SAVED_SPACE)
 #define PARAM_BASE_OFFSET LOCAL_BASE_OFFSET
+
 #define MAX(a, b) ((a) > (b) ? (a) : (b))
 
 typedef struct Type Type;
