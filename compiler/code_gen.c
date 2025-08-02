@@ -4,1469 +4,718 @@
 #include "parser.h"
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include "arena.h"
 
-static StringLiteral *string_literals = NULL;
+static char *code_gen_expression(CodeGen *gen, Expr *expr);
+static char *code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr);
+static char *code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr);
+static char *code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr);
+static char *code_gen_variable_expression(CodeGen *gen, VariableExpr *expr);
+static char *code_gen_assign_expression(CodeGen *gen, AssignExpr *expr);
+static char *code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr);
+static char *code_gen_call_expression(CodeGen *gen, Expr *expr);
+static char *code_gen_array_expression(CodeGen *gen, ArrayExpr *expr);
+static char *code_gen_array_access_expression(CodeGen *gen, ArrayAccessExpr *expr);
+static char *code_gen_increment_expression(CodeGen *gen, Expr *expr);
+static char *code_gen_decrement_expression(CodeGen *gen, Expr *expr);
+static bool expression_produces_temp(Expr *expr);
 
-void code_gen_init_function_stack(CodeGen *gen)
-{
-    gen->function_stack_capacity = 8;
-    gen->function_stack_size = 0;
-    gen->function_stack = arena_alloc(gen->arena, gen->function_stack_capacity * sizeof(char *));
-    if (gen->function_stack == NULL)
-    {
+static char *arena_vsprintf(Arena *arena, const char *fmt, va_list args) {
+    va_list args_copy;
+    va_copy(args_copy, args);
+    int size = vsnprintf(NULL, 0, fmt, args_copy);
+    va_end(args_copy);
+    if (size < 0) {
         exit(1);
     }
+    char *buf = arena_alloc(arena, size + 1);
+    if (buf == NULL) {
+        exit(1);
+    }
+    vsnprintf(buf, size + 1, fmt, args);
+    return buf;
 }
 
-void code_gen_push_function_context(CodeGen *gen)
-{
-    if (gen->function_stack_size >= gen->function_stack_capacity)
-    {
-        size_t old_capacity = gen->function_stack_capacity;
-        gen->function_stack_capacity *= 2;
-        char **new_stack = arena_alloc(gen->arena, gen->function_stack_capacity * sizeof(char *));
-        if (new_stack == NULL)
-        {
-            exit(1);
+static char *arena_sprintf(Arena *arena, const char *fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    char *result = arena_vsprintf(arena, fmt, args);
+    va_end(args);
+    return result;
+}
+
+static char *escape_c_string(Arena *arena, const char *str) {
+    if (str == NULL) {
+        return arena_strdup(arena, "NULL");
+    }
+    size_t len = strlen(str);
+    char *buf = arena_alloc(arena, len * 2 + 3);
+    if (buf == NULL) {
+        exit(1);
+    }
+    char *p = buf;
+    *p++ = '"';
+    for (const char *s = str; *s; s++) {
+        switch (*s) {
+        case '"':
+            *p++ = '\\';
+            *p++ = '"';
+            break;
+        case '\\':
+            *p++ = '\\';
+            *p++ = '\\';
+            break;
+        case '\n':
+            *p++ = '\\';
+            *p++ = 'n';
+            break;
+        case '\t':
+            *p++ = '\\';
+            *p++ = 't';
+            break;
+        case '\r':
+            *p++ = '\\';
+            *p++ = 'r';
+            break;
+        default:
+            *p++ = *s;
+            break;
         }
-        memcpy(new_stack, gen->function_stack, old_capacity * sizeof(char *));
-        gen->function_stack = new_stack;
     }
-    if (gen->current_function != NULL)
-    {
-        gen->function_stack[gen->function_stack_size] = arena_strdup(gen->arena, gen->current_function);
-        if (gen->function_stack[gen->function_stack_size] == NULL)
-        {
-            exit(1);
-        }
-    }
-    else
-    {
-        gen->function_stack[gen->function_stack_size] = NULL;
-    }
-    gen->function_stack_size++;
+    *p++ = '"';
+    *p = '\0';
+    return buf;
 }
 
-void code_gen_pop_function_context(CodeGen *gen)
-{
-    if (gen->function_stack_size <= 0)
-    {
-        return;
+static const char *get_c_type(Type *type) {
+    if (type == NULL) {
+        return "void";
     }
-    gen->current_function = gen->function_stack[gen->function_stack_size - 1];
-    gen->function_stack_size--;
+    switch (type->kind) {
+    case TYPE_INT:
+    case TYPE_LONG:
+    case TYPE_CHAR:
+    case TYPE_BOOL:
+        return "long";
+    case TYPE_DOUBLE:
+        return "double";
+    case TYPE_STRING:
+        return "char *";
+    case TYPE_NIL:
+        return "long";
+    default:
+        exit(1);
+    }
+    return NULL;
 }
 
-void code_gen_free_function_stack(CodeGen *gen)
-{
-    gen->function_stack = NULL;
-    gen->function_stack_size = 0;
-    gen->function_stack_capacity = 0;
+static const char *get_rt_to_string_func(TypeKind kind) {
+    switch (kind) {
+    case TYPE_INT:
+    case TYPE_LONG:
+        return "rt_to_string_long";
+    case TYPE_DOUBLE:
+        return "rt_to_string_double";
+    case TYPE_CHAR:
+        return "rt_to_string_char";
+    case TYPE_BOOL:
+        return "rt_to_string_bool";
+    default:
+        exit(1);
+    }
+    return NULL;
 }
 
-void code_gen_init(Arena *arena, CodeGen *gen, SymbolTable *symbol_table, const char *output_file)
-{
+static const char *get_rt_print_func(TypeKind kind) {
+    switch (kind) {
+    case TYPE_INT:
+    case TYPE_LONG:
+        return "rt_print_long";
+    case TYPE_DOUBLE:
+        return "rt_print_double";
+    case TYPE_CHAR:
+        return "rt_print_char";
+    case TYPE_STRING:
+        return "rt_print_string";
+    case TYPE_BOOL:
+        return "rt_print_bool";
+    default:
+        exit(1);
+    }
+    return NULL;
+}
+
+static const char *get_default_value(Type *type) {
+    if (type->kind == TYPE_STRING) {
+        return "NULL";
+    } else {
+        return "0";
+    }
+}
+
+static char *get_var_name(Arena *arena, Token name) {
+    char *var_name = arena_alloc(arena, name.length + 1);
+    if (var_name == NULL) {
+        exit(1);
+    }
+    strncpy(var_name, name.start, name.length);
+    var_name[name.length] = '\0';
+    return var_name;
+}
+
+void code_gen_init(Arena *arena, CodeGen *gen, SymbolTable *symbol_table, const char *output_file) {
     gen->arena = arena;
     gen->label_count = 0;
     gen->symbol_table = symbol_table;
     gen->output = fopen(output_file, "w");
     gen->current_function = NULL;
     gen->current_return_type = NULL;
-    code_gen_init_function_stack(gen);
-    if (gen->output == NULL)
-    {
+    if (gen->output == NULL) {
         exit(1);
     }
-    string_literals = NULL;
 }
 
-void code_gen_cleanup(CodeGen *gen)
-{
-    if (gen->output != NULL)
-    {
+void code_gen_cleanup(CodeGen *gen) {
+    if (gen->output != NULL) {
         fclose(gen->output);
     }
     gen->current_function = NULL;
-    code_gen_free_function_stack(gen);
-    string_literals = NULL;
 }
 
-int code_gen_new_label(CodeGen *gen)
-{
+int code_gen_new_label(CodeGen *gen) {
     return gen->label_count++;
 }
 
-int code_gen_add_string_literal(CodeGen *gen, const char *string)
-{
-    if (string == NULL)
-    {
-        return -1;
-    }
-    int label = code_gen_new_label(gen);
-    StringLiteral *literal = arena_alloc(gen->arena, sizeof(StringLiteral));
-    if (literal == NULL)
-    {
-        exit(1);
-    }
-    literal->string = arena_strdup(gen->arena, string);
-    if (literal->string == NULL)
-    {
-        exit(1);
-    }
-    literal->label = label;
-    literal->next = string_literals;
-    string_literals = literal;
-    return label;
+static void code_gen_headers(CodeGen *gen) {
+    fprintf(gen->output, "#include <stdlib.h>\n");
+    fprintf(gen->output, "#include <string.h>\n");
+    fprintf(gen->output, "#include <stdio.h>\n\n");
 }
 
-void code_gen_string_literal(CodeGen *gen, const char *string, int label)
-{
-    fprintf(gen->output, "str_%d db ", label);
-    if (*string == '\0')
-    {
-        fprintf(gen->output, "0\n");
-        return;
-    }
-    const unsigned char *p = (const unsigned char *)string;
-    int first = 1;
-    while (*p)
-    {
-        if (!first)
-            fprintf(gen->output, ", ");
-        first = 0;
-        fprintf(gen->output, "%d", *p);
-        p++;
-    }
-    fprintf(gen->output, ", 0\n");
+static void code_gen_externs(CodeGen *gen) {
+    fprintf(gen->output, "extern char *rt_str_concat(char *, char *);\n");
+    fprintf(gen->output, "extern void rt_print_long(long);\n");
+    fprintf(gen->output, "extern void rt_print_double(double);\n");
+    fprintf(gen->output, "extern void rt_print_char(long);\n");
+    fprintf(gen->output, "extern void rt_print_string(char *);\n");
+    fprintf(gen->output, "extern void rt_print_bool(long);\n");
+    fprintf(gen->output, "extern long rt_add_long(long, long);\n");
+    fprintf(gen->output, "extern long rt_sub_long(long, long);\n");
+    fprintf(gen->output, "extern long rt_mul_long(long, long);\n");
+    fprintf(gen->output, "extern long rt_div_long(long, long);\n");
+    fprintf(gen->output, "extern long rt_mod_long(long, long);\n");
+    fprintf(gen->output, "extern long rt_eq_long(long, long);\n");
+    fprintf(gen->output, "extern long rt_ne_long(long, long);\n");
+    fprintf(gen->output, "extern long rt_lt_long(long, long);\n");
+    fprintf(gen->output, "extern long rt_le_long(long, long);\n");
+    fprintf(gen->output, "extern long rt_gt_long(long, long);\n");
+    fprintf(gen->output, "extern long rt_ge_long(long, long);\n");
+    fprintf(gen->output, "extern double rt_add_double(double, double);\n");
+    fprintf(gen->output, "extern double rt_sub_double(double, double);\n");
+    fprintf(gen->output, "extern double rt_mul_double(double, double);\n");
+    fprintf(gen->output, "extern double rt_div_double(double, double);\n");
+    fprintf(gen->output, "extern long rt_eq_double(double, double);\n");
+    fprintf(gen->output, "extern long rt_ne_double(double, double);\n");
+    fprintf(gen->output, "extern long rt_lt_double(double, double);\n");
+    fprintf(gen->output, "extern long rt_le_double(double, double);\n");
+    fprintf(gen->output, "extern long rt_gt_double(double, double);\n");
+    fprintf(gen->output, "extern long rt_ge_double(double, double);\n");
+    fprintf(gen->output, "extern long rt_neg_long(long);\n");
+    fprintf(gen->output, "extern double rt_neg_double(double);\n");
+    fprintf(gen->output, "extern long rt_not_bool(long);\n");
+    fprintf(gen->output, "extern long rt_post_inc_long(long *);\n");
+    fprintf(gen->output, "extern long rt_post_dec_long(long *);\n");
+    fprintf(gen->output, "extern char *rt_to_string_long(long);\n");
+    fprintf(gen->output, "extern char *rt_to_string_double(double);\n");
+    fprintf(gen->output, "extern char *rt_to_string_char(long);\n");
+    fprintf(gen->output, "extern char *rt_to_string_bool(long);\n");
+    fprintf(gen->output, "extern char *rt_to_string_string(char *);\n");
+    fprintf(gen->output, "extern long rt_eq_string(char *, char *);\n");
+    fprintf(gen->output, "extern long rt_ne_string(char *, char *);\n");
+    fprintf(gen->output, "extern long rt_lt_string(char *, char *);\n");
+    fprintf(gen->output, "extern long rt_le_string(char *, char *);\n");
+    fprintf(gen->output, "extern long rt_gt_string(char *, char *);\n");
+    fprintf(gen->output, "extern long rt_ge_string(char *, char *);\n");
+    fprintf(gen->output, "extern void rt_free_string(char *);\n\n");
 }
 
-void code_gen_data_section(CodeGen *gen)
-{
-    fprintf(gen->output, "section .data\n");
-    fprintf(gen->output, "empty_str db 0\n");
-    StringLiteral *current = string_literals;
-    while (current != NULL)
-    {
-        if (current->string != NULL)
-        {
-            code_gen_string_literal(gen, current->string, current->label);
-        }
-        current = current->next;
+static char *code_gen_binary_op_str(TokenType op) {
+    switch (op) {
+    case TOKEN_PLUS: return "add";
+    case TOKEN_MINUS: return "sub";
+    case TOKEN_STAR: return "mul";
+    case TOKEN_SLASH: return "div";
+    case TOKEN_MODULO: return "mod";
+    case TOKEN_EQUAL_EQUAL: return "eq";
+    case TOKEN_BANG_EQUAL: return "ne";
+    case TOKEN_LESS: return "lt";
+    case TOKEN_LESS_EQUAL: return "le";
+    case TOKEN_GREATER: return "gt";
+    case TOKEN_GREATER_EQUAL: return "ge";
+    default: exit(1);
     }
-    fprintf(gen->output, "\n");
+    return NULL;
 }
 
-void code_gen_text_section(CodeGen *gen)
-{
-    fprintf(gen->output, "section .text\n");
-    fprintf(gen->output, "    global main\n\n");
-    fprintf(gen->output, "    extern rt_str_concat\n");
-    fprintf(gen->output, "    extern rt_print_long\n");
-    fprintf(gen->output, "    extern rt_print_double\n");
-    fprintf(gen->output, "    extern rt_print_char\n");
-    fprintf(gen->output, "    extern rt_print_string\n");
-    fprintf(gen->output, "    extern rt_print_bool\n");
-    fprintf(gen->output, "    extern rt_add_long\n");
-    fprintf(gen->output, "    extern rt_sub_long\n");
-    fprintf(gen->output, "    extern rt_mul_long\n");
-    fprintf(gen->output, "    extern rt_div_long\n");
-    fprintf(gen->output, "    extern rt_mod_long\n");
-    fprintf(gen->output, "    extern rt_eq_long\n");
-    fprintf(gen->output, "    extern rt_ne_long\n");
-    fprintf(gen->output, "    extern rt_lt_long\n");
-    fprintf(gen->output, "    extern rt_le_long\n");
-    fprintf(gen->output, "    extern rt_gt_long\n");
-    fprintf(gen->output, "    extern rt_ge_long\n");
-    fprintf(gen->output, "    extern rt_add_double\n");
-    fprintf(gen->output, "    extern rt_sub_double\n");
-    fprintf(gen->output, "    extern rt_mul_double\n");
-    fprintf(gen->output, "    extern rt_div_double\n");
-    fprintf(gen->output, "    extern rt_eq_double\n");
-    fprintf(gen->output, "    extern rt_ne_double\n");
-    fprintf(gen->output, "    extern rt_lt_double\n");
-    fprintf(gen->output, "    extern rt_le_double\n");
-    fprintf(gen->output, "    extern rt_gt_double\n");
-    fprintf(gen->output, "    extern rt_ge_double\n");
-    fprintf(gen->output, "    extern rt_neg_long\n");
-    fprintf(gen->output, "    extern rt_neg_double\n");
-    fprintf(gen->output, "    extern rt_not_bool\n");
-    fprintf(gen->output, "    extern rt_post_inc_long\n");
-    fprintf(gen->output, "    extern rt_post_dec_long\n");
-    fprintf(gen->output, "    extern rt_to_string_long\n");
-    fprintf(gen->output, "    extern rt_to_string_double\n");
-    fprintf(gen->output, "    extern rt_to_string_char\n");
-    fprintf(gen->output, "    extern rt_to_string_bool\n");
-    fprintf(gen->output, "    extern rt_to_string_string\n");
-    fprintf(gen->output, "    extern rt_eq_string\n");
-    fprintf(gen->output, "    extern rt_ne_string\n");
-    fprintf(gen->output, "    extern rt_lt_string\n");
-    fprintf(gen->output, "    extern rt_le_string\n");
-    fprintf(gen->output, "    extern rt_gt_string\n");
-    fprintf(gen->output, "    extern rt_ge_string\n");
-    fprintf(gen->output, "    extern rt_free_string\n");
-    fprintf(gen->output, "    extern free\n\n");
-}
-
-static int code_gen_get_var_offset(CodeGen *gen, Token name)
-{
-    char var_name[256];
-    int name_len = name.length < 255 ? name.length : 255;
-    strncpy(var_name, name.start, name_len);
-    var_name[name_len] = '\0';
-    Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, name);
-    if (symbol == NULL)
-    {
-        return -1;
-    }
-    return symbol->offset;
-}
-
-void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
-{
-    code_gen_expression(gen, expr->left);
-    fprintf(gen->output, "    mov rbx, rax\n");
-    code_gen_expression(gen, expr->right);
-    fprintf(gen->output, "    mov rcx, rax\n");
-    Type *left_type = expr->left->expr_type;
-    if (left_type == NULL)
-    {
-        exit(1);
-    }
-    bool free_left = (expr->left->type != EXPR_VARIABLE);
-    bool free_right = (expr->right->type != EXPR_VARIABLE);
-    switch (expr->operator)
-    {
-    case TOKEN_PLUS:
-        if (left_type->kind == TYPE_STRING)
-        {
-            if (free_right)
-            {
-                fprintf(gen->output, "    mov r12, rcx\n");
-            }
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_str_concat\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-            fprintf(gen->output, "    mov r14, rax\n");
-            if (free_left)
-            {
-                fprintf(gen->output, "    mov rdi, rbx\n");
-                fprintf(gen->output, "    mov r15, rsp\n");
-                fprintf(gen->output, "    and r15, 15\n");
-                fprintf(gen->output, "    sub rsp, r15\n");
-                fprintf(gen->output, "    call rt_free_string\n");
-                fprintf(gen->output, "    add rsp, r15\n");
-            }
-            if (free_right)
-            {
-                fprintf(gen->output, "    mov rdi, r12\n");
-                fprintf(gen->output, "    mov r15, rsp\n");
-                fprintf(gen->output, "    and r15, 15\n");
-                fprintf(gen->output, "    sub rsp, r15\n");
-                fprintf(gen->output, "    call rt_free_string\n");
-                fprintf(gen->output, "    add rsp, r15\n");
-            }
-            fprintf(gen->output, "    mov rax, r14\n");
-        }
-        else if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_add_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rbx\n");
-            fprintf(gen->output, "    movq xmm1, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_add_double\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-            fprintf(gen->output, "    movq rax, xmm0\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_MINUS:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_sub_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rbx\n");
-            fprintf(gen->output, "    movq xmm1, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_sub_double\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-            fprintf(gen->output, "    movq rax, xmm0\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_STAR:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_mul_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rbx\n");
-            fprintf(gen->output, "    movq xmm1, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_mul_double\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-            fprintf(gen->output, "    movq rax, xmm0\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_SLASH:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_div_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rbx\n");
-            fprintf(gen->output, "    movq xmm1, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_div_double\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-            fprintf(gen->output, "    movq rax, xmm0\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_MODULO:
-        if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_mod_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_EQUAL_EQUAL:
-        if (left_type->kind == TYPE_STRING)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_eq_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_eq_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rbx\n");
-            fprintf(gen->output, "    movq xmm1, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_eq_double\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_BANG_EQUAL:
-        if (left_type->kind == TYPE_STRING)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_ne_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_ne_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rbx\n");
-            fprintf(gen->output, "    movq xmm1, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_ne_double\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_LESS:
-        if (left_type->kind == TYPE_STRING)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_lt_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_lt_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rbx\n");
-            fprintf(gen->output, "    movq xmm1, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_lt_double\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_LESS_EQUAL:
-        if (left_type->kind == TYPE_STRING)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_le_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_le_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rbx\n");
-            fprintf(gen->output, "    movq xmm1, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_le_double\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_GREATER:
-        if (left_type->kind == TYPE_STRING)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_gt_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_gt_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rbx\n");
-            fprintf(gen->output, "    movq xmm1, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_gt_double\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_GREATER_EQUAL:
-        if (left_type->kind == TYPE_STRING)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_ge_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_INT || left_type->kind == TYPE_LONG || left_type->kind == TYPE_CHAR || left_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov rsi, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_ge_long\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else if (left_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rbx\n");
-            fprintf(gen->output, "    movq xmm1, rcx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_ge_double\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        break;
-    case TOKEN_AND:
-    {
-        int end_label = code_gen_new_label(gen);
-        fprintf(gen->output, "    test rbx, rbx\n");
-        fprintf(gen->output, "    jz .L%d\n", end_label);
-        fprintf(gen->output, "    test rcx, rcx\n");
-        fprintf(gen->output, "    jz .L%d\n", end_label);
-        fprintf(gen->output, "    mov rax, 1\n");
-        fprintf(gen->output, "    jmp .L%d_end\n", end_label);
-        fprintf(gen->output, ".L%d:\n", end_label);
-        fprintf(gen->output, "    xor rax, rax\n");
-        fprintf(gen->output, ".L%d_end:\n", end_label);
-    }
-    break;
-    case TOKEN_OR:
-    {
-        int end_label = code_gen_new_label(gen);
-        fprintf(gen->output, "    test rbx, rbx\n");
-        fprintf(gen->output, "    jnz .L%d\n", end_label);
-        fprintf(gen->output, "    test rcx, rcx\n");
-        fprintf(gen->output, "    jz .L%d_false\n", end_label);
-        fprintf(gen->output, ".L%d:\n", end_label);
-        fprintf(gen->output, "    mov rax, 1\n");
-        fprintf(gen->output, "    jmp .L%d_end\n", end_label);
-        fprintf(gen->output, ".L%d_false:\n", end_label);
-        fprintf(gen->output, "    xor rax, rax\n");
-        fprintf(gen->output, ".L%d_end:\n", end_label);
-    }
-    break;
-    default:
-        exit(1);
-    }
-}
-
-void code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr)
-{
-    code_gen_expression(gen, expr->operand);
-    Type *op_type = expr->operand->expr_type;
-    if (op_type == NULL)
-    {
-        exit(1);
-    }
-    switch (expr->operator)
-    {
-    case TOKEN_MINUS:
-        fprintf(gen->output, "    mov r15, rsp\n");
-        fprintf(gen->output, "    and r15, 15\n");
-        fprintf(gen->output, "    sub rsp, r15\n");
-        if (op_type->kind == TYPE_INT || op_type->kind == TYPE_LONG || op_type->kind == TYPE_CHAR || op_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    mov rdi, rax\n");
-            fprintf(gen->output, "    call rt_neg_long\n");
-        }
-        else if (op_type->kind == TYPE_DOUBLE)
-        {
-            fprintf(gen->output, "    movq xmm0, rax\n");
-            fprintf(gen->output, "    call rt_neg_double\n");
-            fprintf(gen->output, "    movq rax, xmm0\n");
-        }
-        else
-        {
-            exit(1);
-        }
-        fprintf(gen->output, "    add rsp, r15\n");
-        break;
-    case TOKEN_BANG:
-        fprintf(gen->output, "    mov r15, rsp\n");
-        fprintf(gen->output, "    and r15, 15\n");
-        fprintf(gen->output, "    sub rsp, r15\n");
-        fprintf(gen->output, "    mov rdi, rax\n");
-        fprintf(gen->output, "    call rt_not_bool\n");
-        fprintf(gen->output, "    add rsp, r15\n");
-        break;
-    default:
-        exit(1);
-    }
-}
-
-void code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr)
-{
-    TypeKind kind = expr->type->kind;
-    switch (kind)
-    {
+static char *code_gen_type_suffix(Type *type) {
+    switch (type->kind) {
     case TYPE_INT:
     case TYPE_LONG:
-        fprintf(gen->output, "    mov rax, %ld\n", expr->value.int_value);
-        break;
-    case TYPE_DOUBLE:
-        fprintf(gen->output, "    mov rax, 0x%lx\n",
-                *(int64_t *)&expr->value.double_value);
-        break;
     case TYPE_CHAR:
-        fprintf(gen->output, "    mov rax, %d\n", expr->value.char_value);
-        break;
-    case TYPE_STRING:
-    {
-        if (expr->value.string_value == NULL)
-        {
-            fprintf(gen->output, "    xor rax, rax\n");
-        }
-        else
-        {
-            int label = code_gen_add_string_literal(gen, expr->value.string_value);
-            fprintf(gen->output, "    lea rax, [rel str_%d]\n", label);
-            fprintf(gen->output, "    mov rdi, rax\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_to_string_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-        }
-    }
-    break;
     case TYPE_BOOL:
-        fprintf(gen->output, "    mov rax, %d\n", expr->value.bool_value);
-        break;
-    case TYPE_NIL:
-        fprintf(gen->output, "    xor rax, rax\n");
-        break;
+        return "long";
+    case TYPE_DOUBLE:
+        return "double";
+    case TYPE_STRING:
+        return "string";
     default:
         exit(1);
     }
+    return NULL;
 }
 
-void code_gen_variable_expression(CodeGen *gen, VariableExpr *expr)
-{
-    char var_name[256];
-    int name_len = expr->name.length < 255 ? expr->name.length : 255;
-    strncpy(var_name, expr->name.start, name_len);
-    var_name[name_len] = '\0';
-    int offset = code_gen_get_var_offset(gen, expr->name);
-    if (offset == -1)
-    {
+static bool expression_produces_temp(Expr *expr) {
+    if (expr->expr_type->kind != TYPE_STRING) return false;
+    switch (expr->type) {
+    case EXPR_VARIABLE:
+    case EXPR_ASSIGN:
+        return false;
+    case EXPR_LITERAL:
+    case EXPR_BINARY:
+    case EXPR_CALL:
+    case EXPR_INTERPOLATED:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static char *code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr) {
+    char *left_str = code_gen_expression(gen, expr->left);
+    char *right_str = code_gen_expression(gen, expr->right);
+    Type *type = expr->left->expr_type;
+    TokenType op = expr->operator;
+    if (op == TOKEN_AND) {
+        return arena_sprintf(gen->arena, "((%s != 0 && %s != 0) ? 1L : 0L)", left_str, right_str);
+    } else if (op == TOKEN_OR) {
+        return arena_sprintf(gen->arena, "((%s != 0 || %s != 0) ? 1L : 0L)", left_str, right_str);
+    }
+    char *op_str = code_gen_binary_op_str(op);
+    char *suffix = code_gen_type_suffix(type);
+    if (op == TOKEN_PLUS && type->kind == TYPE_STRING) {
+        bool free_left = expression_produces_temp(expr->left);
+        bool free_right = expression_produces_temp(expr->right);
+        char *free_l_str = free_left ? "rt_free_string(_left); " : "";
+        char *free_r_str = free_right ? "rt_free_string(_right); " : "";
+        return arena_sprintf(gen->arena, "({ char *_left = %s; char *_right = %s; char *_res = rt_str_concat(_left, _right); %s%s _res; })",
+                             left_str, right_str, free_l_str, free_r_str);
+    } else {
+        return arena_sprintf(gen->arena, "rt_%s_%s(%s, %s)", op_str, suffix, left_str, right_str);
+    }
+}
+
+static char *code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr) {
+    char *operand_str = code_gen_expression(gen, expr->operand);
+    Type *type = expr->operand->expr_type;
+    switch (expr->operator) {
+    case TOKEN_MINUS:
+        if (type->kind == TYPE_DOUBLE) {
+            return arena_sprintf(gen->arena, "rt_neg_double(%s)", operand_str);
+        } else {
+            return arena_sprintf(gen->arena, "rt_neg_long(%s)", operand_str);
+        }
+    case TOKEN_BANG:
+        return arena_sprintf(gen->arena, "rt_not_bool(%s)", operand_str);
+    default:
         exit(1);
     }
-    fprintf(gen->output, "    mov rax, [rbp + %d]\n", offset);
+    return NULL;
 }
 
-void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
-{
-    code_gen_expression(gen, expr->value);
+static char *code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr) {
+    Type *type = expr->type;
+    switch (type->kind) {
+    case TYPE_INT:
+    case TYPE_LONG:
+        return arena_sprintf(gen->arena, "%ldL", expr->value.int_value);
+    case TYPE_DOUBLE:
+        return arena_sprintf(gen->arena, "%.17g", expr->value.double_value);
+    case TYPE_CHAR:
+        return arena_sprintf(gen->arena, "%ldL", (long)(unsigned char)expr->value.char_value);
+    case TYPE_STRING: {
+        char *escaped = escape_c_string(gen->arena, expr->value.string_value);
+        return arena_sprintf(gen->arena, "rt_to_string_string(%s)", escaped);
+    }
+    case TYPE_BOOL:
+        return arena_sprintf(gen->arena, "%ldL", expr->value.bool_value ? 1L : 0L);
+    case TYPE_NIL:
+        return arena_strdup(gen->arena, "0L");
+    default:
+        exit(1);
+    }
+    return NULL;
+}
+
+static char *code_gen_variable_expression(CodeGen *gen, VariableExpr *expr) {
+    return get_var_name(gen->arena, expr->name);
+}
+
+static char *code_gen_assign_expression(CodeGen *gen, AssignExpr *expr) {
+    char *var_name = get_var_name(gen->arena, expr->name);
+    char *value_str = code_gen_expression(gen, expr->value);
     Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, expr->name);
-    if (symbol == NULL)
-    {
+    if (symbol == NULL) {
         exit(1);
     }
-    int offset = symbol->offset;
-    fprintf(gen->output, "    mov r14, rax\n");
-    if (symbol->type && symbol->type->kind == TYPE_STRING)
-    {
-        int label = code_gen_new_label(gen);
-        fprintf(gen->output, "    mov rdi, [rbp + %d]\n", offset);
-        fprintf(gen->output, "    test rdi, rdi\n");
-        fprintf(gen->output, "    jz .no_free_%d\n", label);
-        fprintf(gen->output, "    mov r15, rsp\n");
-        fprintf(gen->output, "    and r15, 15\n");
-        fprintf(gen->output, "    sub rsp, r15\n");
-        fprintf(gen->output, "    call rt_free_string\n");
-        fprintf(gen->output, "    add rsp, r15\n");
-        fprintf(gen->output, ".no_free_%d:\n", label);
+    Type *type = symbol->type;
+    if (type->kind == TYPE_STRING) {
+        return arena_sprintf(gen->arena, "({ char *_val = %s; if (%s) rt_free_string(%s); %s = _val; _val; })",
+                             value_str, var_name, var_name, var_name);
+    } else {
+        return arena_sprintf(gen->arena, "(%s = %s)", var_name, value_str);
     }
-    fprintf(gen->output, "    mov [rbp + %d], r14\n", offset);
-    fprintf(gen->output, "    mov rax, r14\n");
 }
 
-void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
+static char *code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
     int count = expr->part_count;
     if (count == 0) {
-        fprintf(gen->output, "    lea rdi, [rel empty_str]\n");
-        fprintf(gen->output, "    mov r15, rsp\n");
-        fprintf(gen->output, "    and r15, 15\n");
-        fprintf(gen->output, "    sub rsp, r15\n");
-        fprintf(gen->output, "    call rt_to_string_string\n");
-        fprintf(gen->output, "    add rsp, r15\n");
-        return;
+        return arena_strdup(gen->arena, "rt_to_string_string(\"\")");
     }
-    // First part
-    code_gen_expression(gen, expr->parts[0]);
-    Type *pt = expr->parts[0]->expr_type;
-    if (pt->kind == TYPE_STRING) {
-        fprintf(gen->output, "    mov rbx, rax\n");
+    char **part_strs = arena_alloc(gen->arena, count * sizeof(char *));
+    Type **part_types = arena_alloc(gen->arena, count * sizeof(Type *));
+    bool *free_parts = arena_alloc(gen->arena, count * sizeof(bool));
+    for (int i = 0; i < count; i++) {
+        part_strs[i] = code_gen_expression(gen, expr->parts[i]);
+        part_types[i] = expr->parts[i]->expr_type;
+        free_parts[i] = (part_types[i]->kind == TYPE_STRING ? expression_produces_temp(expr->parts[i]) : true);
+    }
+    char *result = arena_sprintf(gen->arena, "({ ");
+    char *first_str;
+    if (part_types[0]->kind == TYPE_STRING) {
+        first_str = part_strs[0];
     } else {
-        fprintf(gen->output, "    mov r15, rsp\n");
-        fprintf(gen->output, "    and r15, 15\n");
-        fprintf(gen->output, "    sub rsp, r15\n");
-        fprintf(gen->output, "    mov rdi, rax\n");
-        switch (pt->kind) {
-        case TYPE_INT:
-        case TYPE_LONG:
-            fprintf(gen->output, "    call rt_to_string_long\n");
-            break;
-        case TYPE_DOUBLE:
-            fprintf(gen->output, "    movq xmm0, rax\n");
-            fprintf(gen->output, "    call rt_to_string_double\n");
-            break;
-        case TYPE_CHAR:
-            fprintf(gen->output, "    call rt_to_string_char\n");
-            break;
-        case TYPE_BOOL:
-            fprintf(gen->output, "    call rt_to_string_bool\n");
-            break;
-        default:
-            exit(1);
-        }
-        fprintf(gen->output, "    add rsp, r15\n");
-        fprintf(gen->output, "    mov rbx, rax\n");
+        const char *to_str_func = get_rt_to_string_func(part_types[0]->kind);
+        first_str = arena_sprintf(gen->arena, "%s(%s)", to_str_func, part_strs[0]);
     }
+    result = arena_sprintf(gen->arena, "%schar *_res = %s; ", result, first_str);
     for (int i = 1; i < count; i++) {
-        code_gen_expression(gen, expr->parts[i]);
-        pt = expr->parts[i]->expr_type;
-        if (pt->kind == TYPE_STRING) {
-            fprintf(gen->output, "    mov rcx, rax\n");
+        char *next_str;
+        if (part_types[i]->kind == TYPE_STRING) {
+            next_str = part_strs[i];
         } else {
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    mov rdi, rax\n");
-            switch (pt->kind) {
-            case TYPE_INT:
-            case TYPE_LONG:
-                fprintf(gen->output, "    call rt_to_string_long\n");
-                break;
-            case TYPE_DOUBLE:
-                fprintf(gen->output, "    movq xmm0, rax\n");
-                fprintf(gen->output, "    call rt_to_string_double\n");
-                break;
-            case TYPE_CHAR:
-                fprintf(gen->output, "    call rt_to_string_char\n");
-                break;
-            case TYPE_BOOL:
-                fprintf(gen->output, "    call rt_to_string_bool\n");
-                break;
-            default:
-                exit(1);
-            }
-            fprintf(gen->output, "    add rsp, r15\n");
-            fprintf(gen->output, "    mov rcx, rax\n");
+            const char *to_str_func = get_rt_to_string_func(part_types[i]->kind);
+            next_str = arena_sprintf(gen->arena, "%s(%s)", to_str_func, part_strs[i]);
         }
-        fprintf(gen->output, "    mov r12, rcx\n");
-        fprintf(gen->output, "    mov rdi, rbx\n");
-        fprintf(gen->output, "    mov rsi, rcx\n");
-        fprintf(gen->output, "    mov r15, rsp\n");
-        fprintf(gen->output, "    and r15, 15\n");
-        fprintf(gen->output, "    sub rsp, r15\n");
-        fprintf(gen->output, "    call rt_str_concat\n");
-        fprintf(gen->output, "    add rsp, r15\n");
-        fprintf(gen->output, "    mov r14, rax\n");
-        fprintf(gen->output, "    mov rdi, rbx\n");
-        fprintf(gen->output, "    mov r15, rsp\n");
-        fprintf(gen->output, "    and r15, 15\n");
-        fprintf(gen->output, "    sub rsp, r15\n");
-        fprintf(gen->output, "    call rt_free_string\n");
-        fprintf(gen->output, "    add rsp, r15\n");
-        if (pt->kind != TYPE_STRING || expr->parts[i]->type != EXPR_VARIABLE) {
-            fprintf(gen->output, "    mov rdi, r12\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_free_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
+        result = arena_sprintf(gen->arena, "%schar *_next%d = %s; char *_new%d = rt_str_concat(_res, _next%d); rt_free_string(_res); ",
+                               result, i, next_str, i, i);
+        if (free_parts[i]) {
+            result = arena_sprintf(gen->arena, "%srt_free_string(_next%d); ", result, i);
         }
-        fprintf(gen->output, "    mov rbx, r14\n");
+        result = arena_sprintf(gen->arena, "%s_res = _new%d; ", result, i);
     }
-    fprintf(gen->output, "    mov rax, rbx\n");
+    result = arena_sprintf(gen->arena, "%s_res; })", result);
+    return result;
 }
 
 static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr) {
     for (int i = 0; i < expr->part_count; i++) {
         Expr *part = expr->parts[i];
         Type *pt = part->expr_type;
-        code_gen_expression(gen, part);
-        const char *rt_func = NULL;
-        bool is_double = false;
-        switch (pt->kind) {
-        case TYPE_STRING:
-            rt_func = "rt_print_string";
-            break;
-        case TYPE_INT:
-        case TYPE_LONG:
-            rt_func = "rt_print_long";
-            break;
-        case TYPE_DOUBLE:
-            rt_func = "rt_print_double";
-            is_double = true;
-            break;
-        case TYPE_CHAR:
-            rt_func = "rt_print_char";
-            break;
-        case TYPE_BOOL:
-            rt_func = "rt_print_bool";
-            break;
-        default:
-            exit(1);
-        }
-        bool needs_free = (pt->kind == TYPE_STRING) && (part->type != EXPR_VARIABLE);
-        if (needs_free && !is_double) {
-            fprintf(gen->output, "    mov rbx, rax\n");
-        }
-        fprintf(gen->output, "    mov r15, rsp\n");
-        fprintf(gen->output, "    and r15, 15\n");
-        fprintf(gen->output, "    sub rsp, r15\n");
-        if (is_double) {
-            fprintf(gen->output, "    movq xmm0, rax\n");
+        char *part_str = code_gen_expression(gen, part);
+        const char *rt_func = get_rt_print_func(pt->kind);
+        bool needs_free = (pt->kind == TYPE_STRING && expression_produces_temp(part));
+        if (needs_free) {
+            fprintf(gen->output, "{\n");
+            fprintf(gen->output, "    char *_tmp = %s;\n", part_str);
+            fprintf(gen->output, "    %s(_tmp);\n", rt_func);
+            fprintf(gen->output, "    rt_free_string(_tmp);\n");
+            fprintf(gen->output, "}\n");
         } else {
-            fprintf(gen->output, "    mov rdi, rax\n");
-        }
-        fprintf(gen->output, "    call %s\n", rt_func);
-        fprintf(gen->output, "    add rsp, r15\n");
-        if (needs_free && !is_double) {
-            fprintf(gen->output, "    mov rdi, rbx\n");
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_free_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
+            fprintf(gen->output, "%s(%s);\n", rt_func, part_str);
         }
     }
 }
 
-void code_gen_call_expression(CodeGen *gen, Expr *expr)
-{
+static char *code_gen_call_expression(CodeGen *gen, Expr *expr) {
     CallExpr *call = &expr->as.call;
-    if (call->arg_count > 6)
-    {
-        exit(1); // Support more args if needed
-    }
-    const char *function_name = NULL;
-    if (call->callee->type == EXPR_VARIABLE)
-    {
-        VariableExpr *var = &call->callee->as.variable;
-        char *name = arena_alloc(gen->arena, var->name.length + 1);
-        if (name == NULL)
-        {
-            exit(1);
-        }
-        strncpy(name, var->name.start, var->name.length);
-        name[var->name.length] = '\0';
-        function_name = name;
-    }
-    else
-    {
+    if (call->callee->type != EXPR_VARIABLE) {
         exit(1);
     }
-    if (strcmp(function_name, "print") == 0 && call->arg_count == 1)
-    {
+    char *func_name = get_var_name(gen->arena, call->callee->as.variable.name);
+    if (strcmp(func_name, "print") == 0 && call->arg_count == 1) {
         Expr *arg = call->arguments[0];
-        if (arg->type == EXPR_INTERPOLATED)
-        {
+        if (arg->type == EXPR_INTERPOLATED) {
             code_gen_interpolated_print(gen, &arg->as.interpol);
-            return;
-        }
-        else
-        {
-            code_gen_expression(gen, arg);
+            return arena_strdup(gen->arena, "0L");
+        } else {
+            char *arg_str = code_gen_expression(gen, arg);
             Type *arg_type = arg->expr_type;
-            const char *rt_func = NULL;
-            bool is_double = false;
-            switch (arg_type->kind)
-            {
-            case TYPE_INT:
-            case TYPE_LONG:
-                rt_func = "rt_print_long";
-                break;
-            case TYPE_DOUBLE:
-                rt_func = "rt_print_double";
-                is_double = true;
-                break;
-            case TYPE_CHAR:
-                rt_func = "rt_print_char";
-                break;
-            case TYPE_STRING:
-                rt_func = "rt_print_string";
-                break;
-            case TYPE_BOOL:
-                rt_func = "rt_print_bool";
-                break;
-            default:
-                exit(1);
+            const char *rt_func = get_rt_print_func(arg_type->kind);
+            bool needs_free = (arg_type->kind == TYPE_STRING && expression_produces_temp(arg));
+            if (needs_free) {
+                return arena_sprintf(gen->arena, "({ char *_arg = %s; %s(_arg); rt_free_string(_arg); 0L; })",
+                                     arg_str, rt_func);
+            } else {
+                return arena_sprintf(gen->arena, "({ %s(%s); 0L; })", rt_func, arg_str);
             }
-            if (rt_func)
-            {
-                bool needs_free = (arg_type->kind == TYPE_STRING) && (arg->type != EXPR_VARIABLE);
-                if (needs_free)
-                {
-                    fprintf(gen->output, "    mov rbx, rax\n");
-                }
-                fprintf(gen->output, "    mov r15, rsp\n");
-                fprintf(gen->output, "    and r15, 15\n");
-                fprintf(gen->output, "    sub rsp, r15\n");
-                if (is_double)
-                {
-                    fprintf(gen->output, "    movq xmm0, rax\n");
-                }
-                else
-                {
-                    fprintf(gen->output, "    mov rdi, rax\n");
-                }
-                fprintf(gen->output, "    call %s\n", rt_func);
-                fprintf(gen->output, "    add rsp, r15\n");
-                if (needs_free)
-                {
-                    fprintf(gen->output, "    mov rdi, rbx\n");
-                    fprintf(gen->output, "    mov r15, rsp\n");
-                    fprintf(gen->output, "    and r15, 15\n");
-                    fprintf(gen->output, "    sub rsp, r15\n");
-                    fprintf(gen->output, "    call rt_free_string\n");
-                    fprintf(gen->output, "    add rsp, r15\n");
-                }
-            }
-            return;
         }
     }
-    // Compute number of temp string args
+    // General call
+    char **arg_strs = arena_alloc(gen->arena, call->arg_count * sizeof(char *));
+    Type **arg_types = arena_alloc(gen->arena, call->arg_count * sizeof(Type *));
     int num_temps = 0;
-    for (int i = 0; i < call->arg_count; i++)
-    {
-        Expr *arg = call->arguments[i];
-        if (arg->expr_type && arg->expr_type->kind == TYPE_STRING && arg->type != EXPR_VARIABLE)
-        {
+    for (int i = 0; i < call->arg_count; i++) {
+        arg_strs[i] = code_gen_expression(gen, call->arguments[i]);
+        arg_types[i] = call->arguments[i]->expr_type;
+        if (arg_types[i]->kind == TYPE_STRING && expression_produces_temp(call->arguments[i])) {
             num_temps++;
         }
     }
-    if (num_temps > 0)
-    {
-        fprintf(gen->output, "    sub rsp, %d\n", 8 * num_temps);
+    char *result = arena_sprintf(gen->arena, "({ ");
+    for (int i = 0; i < call->arg_count; i++) {
+        const char *arg_type_c = get_c_type(arg_types[i]);
+        result = arena_sprintf(gen->arena, "%s%s _arg%d = %s; ", result, arg_type_c, i, arg_strs[i]);
     }
-    int temp_idx = 0;
-    // Evaluate arguments left to right and push to stack
-    for (int i = 0; i < call->arg_count; i++)
-    {
-        Expr *arg = call->arguments[i];
-        code_gen_expression(gen, call->arguments[i]);
-        if (arg->expr_type && arg->expr_type->kind == TYPE_STRING && arg->type != EXPR_VARIABLE)
-        {
-            fprintf(gen->output, "    mov [rsp + %d], rax\n", 8 * temp_idx);
-            temp_idx++;
+    if (num_temps > 0) {
+        result = arena_sprintf(gen->arena, "%schar *_temps[%d]; ", result, num_temps);
+        int ti = 0;
+        for (int i = 0; i < call->arg_count; i++) {
+            if (arg_types[i]->kind == TYPE_STRING && expression_produces_temp(call->arguments[i])) {
+                result = arena_sprintf(gen->arena, "%s_temps[%d] = _arg%d; ", result, ti, i);
+                ti++;
+            }
         }
-        fprintf(gen->output, "    push rax\n");
     }
-    // Pop into registers right to left
-    const char *param_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-    for (int i = call->arg_count - 1; i >= 0; i--)
-    {
-        fprintf(gen->output, "    pop %s\n", param_regs[i]);
-    }
-    fprintf(gen->output, "    mov r15, rsp\n");
-    fprintf(gen->output, "    and r15, 15\n");
-    fprintf(gen->output, "    sub rsp, r15\n");
-    fprintf(gen->output, "    call %s\n", function_name);
-    fprintf(gen->output, "    add rsp, r15\n");
-    if (num_temps > 0)
-    {
-        for (int j = 0; j < num_temps; j++)
-        {
-            fprintf(gen->output, "    mov rdi, [rsp + %d]\n", 8 * j);
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_free_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
+    const char *ret_type_c = get_c_type(expr->expr_type);
+    result = arena_sprintf(gen->arena, "%s%s _res = %s(", result, ret_type_c, func_name);
+    for (int i = 0; i < call->arg_count; i++) {
+        result = arena_sprintf(gen->arena, "%s_arg%d", result, i);
+        if (i < call->arg_count - 1) {
+            result = arena_sprintf(gen->arena, "%s, ", result);
         }
-        fprintf(gen->output, "    add rsp, %d\n", 8 * num_temps);
     }
+    result = arena_sprintf(gen->arena, "%s); ", result);
+    if (num_temps > 0) {
+        result = arena_sprintf(gen->arena, "%sfor (int _j = 0; _j < %d; _j++) { rt_free_string(_temps[_j]); } ", result, num_temps);
+    }
+    result = arena_sprintf(gen->arena, "%s_res; })", result);
+    return result;
 }
 
-void code_gen_array_expression(CodeGen *gen, ArrayExpr *expr)
-{
+static char *code_gen_array_expression(CodeGen *gen, ArrayExpr *expr) {
     (void)gen;
     (void)expr;
-    fprintf(gen->output, "    xor rax, rax\n");
+    return arena_strdup(gen->arena, "0L");
 }
 
-void code_gen_array_access_expression(CodeGen *gen, ArrayAccessExpr *expr)
-{
+static char *code_gen_array_access_expression(CodeGen *gen, ArrayAccessExpr *expr) {
     (void)gen;
     (void)expr;
-    fprintf(gen->output, "    xor rax, rax\n");
+    return arena_strdup(gen->arena, "0L");
 }
 
-void code_gen_increment_expression(CodeGen *gen, Expr *expr)
-{
-    if (expr->as.operand->type != EXPR_VARIABLE)
-    {
+static char *code_gen_increment_expression(CodeGen *gen, Expr *expr) {
+    if (expr->as.operand->type != EXPR_VARIABLE) {
         exit(1);
     }
-    Token name = expr->as.operand->as.variable.name;
-    int offset = code_gen_get_var_offset(gen, name);
-    if (offset == -1)
-    {
-        exit(1);
-    }
-    fprintf(gen->output, "    mov r15, rsp\n");
-    fprintf(gen->output, "    and r15, 15\n");
-    fprintf(gen->output, "    sub rsp, r15\n");
-    fprintf(gen->output, "    lea rdi, [rbp + %d]\n", offset);
-    fprintf(gen->output, "    call rt_post_inc_long\n");
-    fprintf(gen->output, "    add rsp, r15\n");
+    char *var_name = get_var_name(gen->arena, expr->as.operand->as.variable.name);
+    return arena_sprintf(gen->arena, "rt_post_inc_long(&%s)", var_name);
 }
 
-void code_gen_decrement_expression(CodeGen *gen, Expr *expr)
-{
-    if (expr->as.operand->type != EXPR_VARIABLE)
-    {
+static char *code_gen_decrement_expression(CodeGen *gen, Expr *expr) {
+    if (expr->as.operand->type != EXPR_VARIABLE) {
         exit(1);
     }
-    Token name = expr->as.operand->as.variable.name;
-    int offset = code_gen_get_var_offset(gen, name);
-    if (offset == -1)
-    {
-        exit(1);
-    }
-    fprintf(gen->output, "    mov r15, rsp\n");
-    fprintf(gen->output, "    and r15, 15\n");
-    fprintf(gen->output, "    sub rsp, r15\n");
-    fprintf(gen->output, "    lea rdi, [rbp + %d]\n", offset);
-    fprintf(gen->output, "    call rt_post_dec_long\n");
-    fprintf(gen->output, "    add rsp, r15\n");
+    char *var_name = get_var_name(gen->arena, expr->as.operand->as.variable.name);
+    return arena_sprintf(gen->arena, "rt_post_dec_long(&%s)", var_name);
 }
 
-void code_gen_expression(CodeGen *gen, Expr *expr)
-{
-    if (expr == NULL)
-    {
-        fprintf(gen->output, "    xor rax, rax\n");
-        return;
+static char *code_gen_expression(CodeGen *gen, Expr *expr) {
+    if (expr == NULL) {
+        return arena_strdup(gen->arena, "0L");
     }
-    code_gen_push_function_context(gen);
-    switch (expr->type)
-    {
+    switch (expr->type) {
     case EXPR_BINARY:
-        code_gen_binary_expression(gen, &expr->as.binary);
-        if (expr->expr_type && expr->expr_type->kind == TYPE_BOOL)
-        {
-            fprintf(gen->output, "    test rax, rax\n");
-            fprintf(gen->output, "    setne al\n");
-            fprintf(gen->output, "    movzx rax, al\n");
-        }
-        break;
+        return code_gen_binary_expression(gen, &expr->as.binary);
     case EXPR_UNARY:
-        code_gen_unary_expression(gen, &expr->as.unary);
-        break;
+        return code_gen_unary_expression(gen, &expr->as.unary);
     case EXPR_LITERAL:
-        code_gen_literal_expression(gen, &expr->as.literal);
-        break;
+        return code_gen_literal_expression(gen, &expr->as.literal);
     case EXPR_VARIABLE:
-        code_gen_variable_expression(gen, &expr->as.variable);
-        break;
+        return code_gen_variable_expression(gen, &expr->as.variable);
     case EXPR_ASSIGN:
-        code_gen_assign_expression(gen, &expr->as.assign);
-        break;
+        return code_gen_assign_expression(gen, &expr->as.assign);
     case EXPR_CALL:
-        code_gen_call_expression(gen, expr);
-        break;
+        return code_gen_call_expression(gen, expr);
     case EXPR_ARRAY:
-        code_gen_array_expression(gen, &expr->as.array);
-        break;
+        return code_gen_array_expression(gen, &expr->as.array);
     case EXPR_ARRAY_ACCESS:
-        code_gen_array_access_expression(gen, &expr->as.array_access);
-        break;
+        return code_gen_array_access_expression(gen, &expr->as.array_access);
     case EXPR_INCREMENT:
-        code_gen_increment_expression(gen, expr);
-        break;
+        return code_gen_increment_expression(gen, expr);
     case EXPR_DECREMENT:
-        code_gen_decrement_expression(gen, expr);
-        break;
+        return code_gen_decrement_expression(gen, expr);
     case EXPR_INTERPOLATED:
-        code_gen_interpolated_expression(gen, &expr->as.interpol);
-        break;
+        return code_gen_interpolated_expression(gen, &expr->as.interpol);
+    default:
+        exit(1);
     }
-    code_gen_pop_function_context(gen);
+    return NULL;
 }
 
-void code_gen_expression_statement(CodeGen *gen, ExprStmt *stmt)
-{
-    code_gen_expression(gen, stmt->expression);
-}
-
-void code_gen_var_declaration(CodeGen *gen, VarDeclStmt *stmt) {
-    symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->name, stmt->type, SYMBOL_LOCAL);
-    if (stmt->initializer != NULL) {
-        code_gen_expression(gen, stmt->initializer);
+static void code_gen_expression_statement(CodeGen *gen, ExprStmt *stmt) {
+    char *expr_str = code_gen_expression(gen, stmt->expression);
+    if (stmt->expression->expr_type->kind == TYPE_STRING && expression_produces_temp(stmt->expression)) {
+        fprintf(gen->output, "{\n");
+        fprintf(gen->output, "    char *_tmp = %s;\n", expr_str);
+        fprintf(gen->output, "    (void)_tmp;\n");
+        fprintf(gen->output, "    rt_free_string(_tmp);\n");
+        fprintf(gen->output, "}\n");
     } else {
-        fprintf(gen->output, "    xor rax, rax\n");
+        fprintf(gen->output, "%s;\n", expr_str);
     }
-    int offset = code_gen_get_var_offset(gen, stmt->name);
-    fprintf(gen->output, "    mov [rbp + %d], rax\n", offset);
+}
+
+static void code_gen_var_declaration(CodeGen *gen, VarDeclStmt *stmt) {
+    symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->name, stmt->type, SYMBOL_LOCAL);
+    const char *type_c = get_c_type(stmt->type);
+    char *var_name = get_var_name(gen->arena, stmt->name);
+    char *init_str;
+    if (stmt->initializer) {
+        init_str = code_gen_expression(gen, stmt->initializer);
+    } else {
+        init_str = arena_strdup(gen->arena, get_default_value(stmt->type));
+    }
+    fprintf(gen->output, "%s %s = %s;\n", type_c, var_name, init_str);
+}
+
+static void code_gen_free_locals(CodeGen *gen, Scope *scope, bool is_function) {
+    Symbol *sym = scope->symbols;
+    while (sym) {
+        if (sym->type && sym->type->kind == TYPE_STRING && sym->kind == SYMBOL_LOCAL) {
+            char *var_name = get_var_name(gen->arena, sym->name);
+            fprintf(gen->output, "if (%s) {\n", var_name);
+            if (is_function && gen->current_return_type && gen->current_return_type->kind == TYPE_STRING) {
+                fprintf(gen->output, "    if (%s != _return_value) {\n", var_name);
+                fprintf(gen->output, "        rt_free_string(%s);\n", var_name);
+                fprintf(gen->output, "    }\n");
+            } else {
+                fprintf(gen->output, "    rt_free_string(%s);\n", var_name);
+            }
+            fprintf(gen->output, "}\n");
+        }
+        sym = sym->next;
+    }
 }
 
 void code_gen_block(CodeGen *gen, BlockStmt *stmt) {
     symbol_table_push_scope(gen->symbol_table);
+    fprintf(gen->output, "{\n");
     for (int i = 0; i < stmt->count; i++) {
         code_gen_statement(gen, stmt->statements[i]);
     }
-    Scope *scope = gen->symbol_table->current;
-    Symbol *sym = scope->symbols;
-    int label_base = code_gen_new_label(gen);
-    int free_idx = 0;
-    while (sym) {
-        if (sym->type && sym->type->kind == TYPE_STRING && sym->kind == SYMBOL_LOCAL) {
-            int label = label_base + free_idx++;
-            fprintf(gen->output, "    mov rdi, [rbp + %d]\n", sym->offset);
-            fprintf(gen->output, "    test rdi, rdi\n");
-            fprintf(gen->output, "    jz .no_free_%d\n", label);
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_free_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-            fprintf(gen->output, ".no_free_%d:\n", label);
-        }
-        sym = sym->next;
-    }
+    code_gen_free_locals(gen, gen->symbol_table->current, false);
+    fprintf(gen->output, "}\n");
     symbol_table_pop_scope(gen->symbol_table);
-}
-
-static void pre_compute_stack_usage(CodeGen *gen, Stmt *stmt) {
-    if (stmt == NULL) return;
-
-    switch (stmt->type) {
-    case STMT_VAR_DECL: {
-        int type_size = get_type_size(stmt->as.var_decl.type);
-        int aligned_size = ((type_size + OFFSET_ALIGNMENT - 1) / OFFSET_ALIGNMENT) * OFFSET_ALIGNMENT;
-        gen->symbol_table->current->next_local_offset += aligned_size;
-        break;
-    }
-    case STMT_BLOCK: {
-        int save = gen->symbol_table->current->next_local_offset;
-        for (int i = 0; i < stmt->as.block.count; i++) {
-            pre_compute_stack_usage(gen, stmt->as.block.statements[i]);
-        }
-        gen->symbol_table->current->next_local_offset = MAX(save, gen->symbol_table->current->next_local_offset);
-        break;
-    }
-    case STMT_IF: {
-        int save = gen->symbol_table->current->next_local_offset;
-        pre_compute_stack_usage(gen, stmt->as.if_stmt.then_branch);
-        int then_max = gen->symbol_table->current->next_local_offset;
-        gen->symbol_table->current->next_local_offset = save;
-        if (stmt->as.if_stmt.else_branch) {
-            pre_compute_stack_usage(gen, stmt->as.if_stmt.else_branch);
-        }
-        int else_max = gen->symbol_table->current->next_local_offset;
-        gen->symbol_table->current->next_local_offset = MAX(save, MAX(then_max, else_max));
-        break;
-    }
-    case STMT_WHILE: {
-        pre_compute_stack_usage(gen, stmt->as.while_stmt.body);
-        break;
-    }
-    case STMT_FOR: {
-        int save = gen->symbol_table->current->next_local_offset;
-        if (stmt->as.for_stmt.initializer) {
-            pre_compute_stack_usage(gen, stmt->as.for_stmt.initializer);
-        }
-        pre_compute_stack_usage(gen, stmt->as.for_stmt.body);
-        gen->symbol_table->current->next_local_offset = MAX(save, gen->symbol_table->current->next_local_offset);
-        break;
-    }
-    default:
-        break;
-    }
 }
 
 void code_gen_function(CodeGen *gen, FunctionStmt *stmt) {
     char *old_function = gen->current_function;
     Type *old_return_type = gen->current_return_type;
-    if (stmt->name.length < 256) {
-        gen->current_function = arena_alloc(gen->arena, stmt->name.length + 1);
-        if (gen->current_function == NULL) {
-            exit(1);
-        }
-        strncpy(gen->current_function, stmt->name.start, stmt->name.length);
-        gen->current_function[stmt->name.length] = '\0';
-    } else {
-        exit(1);
-    }
+    gen->current_function = get_var_name(gen->arena, stmt->name);
     gen->current_return_type = stmt->return_type;
+    bool is_main = strcmp(gen->current_function, "main") == 0;
+    // Special case for main: always use "int" return type in C for standard entry point.
+    const char *ret_c = is_main ? "int" : get_c_type(gen->current_return_type);
     symbol_table_push_scope(gen->symbol_table);
     for (int i = 0; i < stmt->param_count; i++) {
         symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->params[i].name, stmt->params[i].type, SYMBOL_PARAM);
     }
-    for (int i = 0; i < stmt->body_count; i++) {
-        pre_compute_stack_usage(gen, stmt->body[i]);
+    fprintf(gen->output, "%s %s(", ret_c, gen->current_function);
+    for (int i = 0; i < stmt->param_count; i++) {
+        const char *param_type_c = get_c_type(stmt->params[i].type);
+        char *param_name = get_var_name(gen->arena, stmt->params[i].name);
+        fprintf(gen->output, "%s %s", param_type_c, param_name);
+        if (i < stmt->param_count - 1) {
+            fprintf(gen->output, ", ");
+        }
     }
-    int locals_size = gen->symbol_table->current->next_local_offset - LOCAL_BASE_OFFSET;
-    gen->symbol_table->current->next_local_offset = LOCAL_BASE_OFFSET;
-    int saved_size = CALLEE_SAVED_SPACE;
-    int stack_space = locals_size + saved_size;
-    stack_space = ((stack_space + 15) / 16) * 16;
-    if (stack_space < 128) stack_space = 128;
-    fprintf(gen->output, "%s:\n", gen->current_function);
-    fprintf(gen->output, "    push rbp\n");
-    fprintf(gen->output, "    mov rbp, rsp\n");
-    fprintf(gen->output, "    sub rsp, %d\n", stack_space);
-    fprintf(gen->output, "    mov [rbp - 8], rbx\n");
-    fprintf(gen->output, "    mov [rbp -16], r12\n");
-    fprintf(gen->output, "    mov [rbp -24], r13\n");
-    fprintf(gen->output, "    mov [rbp -32], r14\n");
-    fprintf(gen->output, "    mov [rbp -40], r15\n");
-    const char *param_regs[] = {"rdi", "rsi", "rdx", "rcx", "r8", "r9"};
-    for (int i = 0; i < stmt->param_count && i < 6; i++) {
-        int offset = symbol_table_get_symbol_offset(gen->symbol_table, stmt->params[i].name);
-        fprintf(gen->output, "    mov [rbp + %d], %s\n", offset, param_regs[i]);
+    fprintf(gen->output, ") {\n");
+    // Add _return_value if there is a return type or if this is main (default to 0 for main).
+    if (gen->current_return_type || is_main) {
+        const char *default_val = is_main ? "0" : get_default_value(gen->current_return_type);
+        fprintf(gen->output, "    %s _return_value = %s;\n", ret_c, default_val);
     }
     for (int i = 0; i < stmt->body_count; i++) {
         code_gen_statement(gen, stmt->body[i]);
     }
-    if (strcmp(gen->current_function, "main") == 0) {
-        fprintf(gen->output, "main_return:\n");
+    fprintf(gen->output, "goto %s_return;\n", gen->current_function);
+    fprintf(gen->output, "%s_return:\n", gen->current_function);
+    code_gen_free_locals(gen, gen->symbol_table->current, true);
+    // Return _return_value if there is a return type or if this is main; otherwise just return.
+    if (gen->current_return_type || is_main) {
+        fprintf(gen->output, "    return _return_value;\n");
     } else {
-        fprintf(gen->output, "%s_return:\n", gen->current_function);
+        fprintf(gen->output, "    return;\n");
     }
-    Scope *scope = gen->symbol_table->current;
-    Symbol *sym = scope->symbols;
-    int label_base = code_gen_new_label(gen);
-    int free_idx = 0;
-    while (sym) {
-        if (sym->type && sym->type->kind == TYPE_STRING && sym->kind == SYMBOL_LOCAL) {
-            int label = label_base + free_idx++;
-            fprintf(gen->output, "    mov rdi, [rbp + %d]\n", sym->offset);
-            fprintf(gen->output, "    test rdi, rdi\n");
-            fprintf(gen->output, "    jz .no_free_%d\n", label);
-            if (gen->current_return_type && gen->current_return_type->kind == TYPE_STRING) {
-                fprintf(gen->output, "    cmp rdi, rax\n");
-                fprintf(gen->output, "    je .no_free_%d\n", label);
-            }
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_free_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-            fprintf(gen->output, ".no_free_%d:\n", label);
-        }
-        sym = sym->next;
-    }
-    fprintf(gen->output, "    mov rbx, [rbp - 8]\n");
-    fprintf(gen->output, "    mov r12, [rbp -16]\n");
-    fprintf(gen->output, "    mov r13, [rbp -24]\n");
-    fprintf(gen->output, "    mov r14, [rbp -32]\n");
-    fprintf(gen->output, "    mov r15, [rbp -40]\n");
-    fprintf(gen->output, "    mov rsp, rbp\n");
-    fprintf(gen->output, "    pop rbp\n");
-    fprintf(gen->output, "    ret\n");
+    fprintf(gen->output, "}\n\n");
     symbol_table_pop_scope(gen->symbol_table);
     gen->current_function = old_function;
     gen->current_return_type = old_return_type;
 }
 
-void code_gen_return_statement(CodeGen *gen, ReturnStmt *stmt)
-{
-    if (stmt->value != NULL)
-    {
-        code_gen_expression(gen, stmt->value);
+void code_gen_return_statement(CodeGen *gen, ReturnStmt *stmt) {
+    if (stmt->value) {
+        char *value_str = code_gen_expression(gen, stmt->value);
+        fprintf(gen->output, "_return_value = %s;\n", value_str);
     }
-    else
-    {
-        fprintf(gen->output, "    xor rax, rax\n");
-    }
-    if (gen->current_function && strcmp(gen->current_function, "main") == 0)
-    {
-        fprintf(gen->output, "    jmp main_return\n");
-    }
-    else
-    {
-        fprintf(gen->output, "    jmp %s_return\n", gen->current_function);
-    }
+    fprintf(gen->output, "goto %s_return;\n", gen->current_function);
 }
 
-void code_gen_if_statement(CodeGen *gen, IfStmt *stmt)
-{
-    int else_label = code_gen_new_label(gen);
-    int end_label = code_gen_new_label(gen);
-    code_gen_expression(gen, stmt->condition);
-    fprintf(gen->output, "    test rax, rax\n");
-    fprintf(gen->output, "    jz .L%d\n", else_label);
+void code_gen_if_statement(CodeGen *gen, IfStmt *stmt) {
+    char *cond_str = code_gen_expression(gen, stmt->condition);
+    fprintf(gen->output, "if (%s) {\n", cond_str);
     code_gen_statement(gen, stmt->then_branch);
-    if (stmt->else_branch != NULL)
-    {
-        fprintf(gen->output, "    jmp .L%d\n", end_label);
-    }
-    fprintf(gen->output, ".L%d:\n", else_label);
-    if (stmt->else_branch != NULL)
-    {
+    fprintf(gen->output, "}\n");
+    if (stmt->else_branch) {
+        fprintf(gen->output, "else {\n");
         code_gen_statement(gen, stmt->else_branch);
-    }
-    if (stmt->else_branch != NULL)
-    {
-        fprintf(gen->output, ".L%d:\n", end_label);
+        fprintf(gen->output, "}\n");
     }
 }
 
-void code_gen_while_statement(CodeGen *gen, WhileStmt *stmt)
-{
-    int loop_start = code_gen_new_label(gen);
-    int loop_end = code_gen_new_label(gen);
-    fprintf(gen->output, ".L%d:\n", loop_start);
-    code_gen_expression(gen, stmt->condition);
-    fprintf(gen->output, "    test rax, rax\n");
-    fprintf(gen->output, "    jz .L%d\n", loop_end);
-    if (stmt->body->type == STMT_BLOCK)
-    {
-        code_gen_block(gen, &stmt->body->as.block);
-    }
-    else
-    {
-        code_gen_statement(gen, stmt->body);
-    }
-    fprintf(gen->output, "    jmp .L%d\n", loop_start);
-    fprintf(gen->output, ".L%d:\n", loop_end);
+void code_gen_while_statement(CodeGen *gen, WhileStmt *stmt) {
+    char *cond_str = code_gen_expression(gen, stmt->condition);
+    fprintf(gen->output, "while (%s) {\n", cond_str);
+    code_gen_statement(gen, stmt->body);
+    fprintf(gen->output, "}\n");
 }
 
 void code_gen_for_statement(CodeGen *gen, ForStmt *stmt) {
-    int loop_start = code_gen_new_label(gen);
-    int loop_end = code_gen_new_label(gen);
     symbol_table_push_scope(gen->symbol_table);
-    if (stmt->initializer != NULL) {
+    fprintf(gen->output, "{\n");
+    if (stmt->initializer) {
         code_gen_statement(gen, stmt->initializer);
     }
-    fprintf(gen->output, ".L%d:\n", loop_start);
-    if (stmt->condition != NULL) {
-        code_gen_expression(gen, stmt->condition);
-        fprintf(gen->output, "    test rax, rax\n");
-        fprintf(gen->output, "    jz .L%d\n", loop_end);
+    char *cond_str = NULL;
+    if (stmt->condition) {
+        cond_str = code_gen_expression(gen, stmt->condition);
     }
+    fprintf(gen->output, "while (%s) {\n", cond_str ? cond_str : "1");
     code_gen_statement(gen, stmt->body);
-    if (stmt->increment != NULL) {
-        code_gen_expression(gen, stmt->increment);
+    if (stmt->increment) {
+        char *inc_str = code_gen_expression(gen, stmt->increment);
+        fprintf(gen->output, "%s;\n", inc_str);
     }
-    fprintf(gen->output, "    jmp .L%d\n", loop_start);
-    fprintf(gen->output, ".L%d:\n", loop_end);
-    Scope *scope = gen->symbol_table->current;
-    Symbol *sym = scope->symbols;
-    int label_base = code_gen_new_label(gen);
-    int free_idx = 0;
-    while (sym) {
-        if (sym->type && sym->type->kind == TYPE_STRING && sym->kind == SYMBOL_LOCAL) {
-            int label = label_base + free_idx++;
-            fprintf(gen->output, "    mov rdi, [rbp + %d]\n", sym->offset);
-            fprintf(gen->output, "    test rdi, rdi\n");
-            fprintf(gen->output, "    jz .no_free_%d\n", label);
-            fprintf(gen->output, "    mov r15, rsp\n");
-            fprintf(gen->output, "    and r15, 15\n");
-            fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call rt_free_string\n");
-            fprintf(gen->output, "    add rsp, r15\n");
-            fprintf(gen->output, ".no_free_%d:\n", label);
-        }
-        sym = sym->next;
-    }
+    fprintf(gen->output, "}\n");
+    code_gen_free_locals(gen, gen->symbol_table->current, false);
+    fprintf(gen->output, "}\n");
     symbol_table_pop_scope(gen->symbol_table);
 }
 
-void code_gen_statement(CodeGen *gen, Stmt *stmt)
-{
-    switch (stmt->type)
-    {
+void code_gen_statement(CodeGen *gen, Stmt *stmt) {
+    switch (stmt->type) {
     case STMT_EXPR:
         code_gen_expression_statement(gen, &stmt->as.expression);
         break;
@@ -1496,18 +745,23 @@ void code_gen_statement(CodeGen *gen, Stmt *stmt)
     }
 }
 
-void code_gen_footer(CodeGen *gen)
-{
-    fprintf(gen->output, "\nsection .note.GNU-stack noalloc noexec nowrite progbits\n");
-}
-
-void code_gen_module(CodeGen *gen, Module *module)
-{
-    code_gen_text_section(gen);
-    for (int i = 0; i < module->count; i++)
-    {
+void code_gen_module(CodeGen *gen, Module *module) {
+    code_gen_headers(gen);
+    code_gen_externs(gen);
+    bool has_main = false;
+    for (int i = 0; i < module->count; i++) {
+        if (module->statements[i]->type == STMT_FUNCTION) {
+            char *name = get_var_name(gen->arena, module->statements[i]->as.function.name);
+            if (strcmp(name, "main") == 0) {
+                has_main = true;
+            }
+        }
         code_gen_statement(gen, module->statements[i]);
     }
-    code_gen_data_section(gen);
-    code_gen_footer(gen);
+    if (!has_main) {
+        // If no main is defined, add a dummy int main() for valid C program entry point.
+        fprintf(gen->output, "int main() {\n");
+        fprintf(gen->output, "    return 0;\n");
+        fprintf(gen->output, "}\n");
+    }
 }

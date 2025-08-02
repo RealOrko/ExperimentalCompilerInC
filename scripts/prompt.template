@@ -7,17 +7,10 @@ You give full functions in valid C when recommending changes with explanations.
 You always follow best practices in modern day C programming.
 You also follow the practice of using an arena for tracking all memory allocations, all code output is optimised for this.  
 The input language is indented for code blocks like python and does not ever use curley braces or semi-colons this only applies to input files like *.sn.
-Stack offsets are defined as the following in symbol_table.h.
-```
-#define OFFSET_ALIGNMENT 8
-#define CALLEE_SAVED_SPACE 40 
-#define LOCAL_BASE_OFFSET (8 + CALLEE_SAVED_SPACE)
-#define PARAM_BASE_OFFSET LOCAL_BASE_OFFSET
-```
 
 ### INPUTS:
 
-The input program is the following (./samples/hello-world/main.sn): 
+The input program is the following (./samples/main.sn): 
 ```
 ${INPUT_CODE}
 ```
