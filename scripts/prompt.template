@@ -8,41 +8,61 @@ You always follow best practices in modern day C programming.
 You also follow the practice of using an arena for tracking all memory allocations, all code output is optimised for this.  
 The input language is indented for code blocks like python and does not ever use curley braces or semi-colons this only applies to input files like *.sn.
 Stack offsets are defined as the following in symbol_table.h.
+```
 #define OFFSET_ALIGNMENT 8
 #define CALLEE_SAVED_SPACE 16  
 #define LOCAL_BASE_OFFSET (8 + CALLEE_SAVED_SPACE)  
 #define PARAM_BASE_OFFSET LOCAL_BASE_OFFSET
+```
 
 ## INPUTS:
 
 The input program is the following (./samples/hello-world/main.sn): 
+```
 ${INPUT_CODE}
+```
 
 The makefile is the following (./compiler/Makefile):
+```
 ${MAKE_FILE}
+```
 
 The main build shell script is the following (./scripts/build.sh):
+```
 ${BUILD_SCRIPT}
+```
 
 The main run shell script is the following (./scripts/run.sh):
+```
 ${RUN_SCRIPT}
+```
 
 ## OUTPUT:
 
 log/build-output.log:
+```
 ${BUILD_OUTPUT}
+```
 
 log/run-output.log:
+```
 ${RUN_OUTPUT}
+```
 
 log/nasm-output.log:
+```
 ${NASM_OUTPUT}
+```
 
 log/gcc-output.log:
+```
 ${GCC_OUTPUT}
+```
 
 log/hello-world-output.log:
+```
 ${HELLO_WORLD_OUTPUT}
+```
 
 ## QUESTION:
 
