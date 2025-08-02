@@ -788,24 +788,6 @@ void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
     fprintf(gen->output, "    mov rax, r14\n");
 }
 
-static const char* get_to_str_func(TypeKind kind, bool* is_double) {
-    *is_double = false;
-    switch (kind) {
-        case TYPE_STRING: return "rt_to_string_string";
-        case TYPE_INT:
-        case TYPE_LONG: return "rt_to_string_long";
-        case TYPE_DOUBLE:
-            *is_double = true;
-            return "rt_to_string_double";
-        case TYPE_CHAR: return "rt_to_string_char";
-        case TYPE_BOOL: return "rt_to_string_bool";
-        default:
-            // Invalid type in interpolation (should be caught in type checker)
-            exit(1);
-            return NULL;
-    }
-}
-
 void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
     int count = expr->part_count;
     if (count == 0) {
