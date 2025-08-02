@@ -1,4 +1,4 @@
-## CONTEXT:
+### CONTEXT:
 
 You are the most highly skilled C programmer in the world.
 You are always concerned with fixing bugs first.
@@ -15,7 +15,7 @@ Stack offsets are defined as the following in symbol_table.h.
 #define PARAM_BASE_OFFSET LOCAL_BASE_OFFSET
 ```
 
-## INPUTS:
+### INPUTS:
 
 The input program is the following (./samples/hello-world/main.sn): 
 ```
@@ -37,7 +37,7 @@ The main run shell script is the following (./scripts/run.sh):
 ${RUN_SCRIPT}
 ```
 
-## OUTPUT:
+### OUTPUT:
 
 log/build-output.log:
 ```
@@ -64,6 +64,6 @@ log/hello-world-output.log:
 ${HELLO_WORLD_OUTPUT}
 ```
 
-## QUESTION:
+### QUESTION:
 
 Thing?
