@@ -1,0 +1,378 @@
+fn factorial(n: int): int =>
+  print($"factorial: n={n}\n")
+  if n <= 1 =>
+    print($"factorial: n <= 1 returning 1\n")
+    return 1
+  var j: int = n * factorial(n - 1)
+  print($"factorial: j={j}\n")
+  return j
+fn is_prime(num: int): bool =>
+  if num <= 1 =>
+    print($"is_prime: num={num}\n")
+    return false
+  var i: int = 2
+  print($"is_prime: i={i}\n")
+  while i * i <= num =>
+    if num % i == 0 =>
+      print($"is_prime: num % i == 0, returning false\n")
+      return false
+    i = i + 1
+    print($"is_prime: i={i} (after increment)\n")
+  return true
+fn repeat_string(text: str, count: int): str =>
+  var result: str = ""
+  for var j: int = 0; j < count; j++ =>
+    print($"repeat_string: j={j}\n")
+    print($"repeat_string: count={count}\n")
+    result = result + text
+  return result
+fn main(): void =>
+  print("Starting main method ... \n")
+  var num: int = 5
+  var fact: int = factorial(num)
+  print($"Factorial of {num} is {fact}\n")
+  if is_prime(7) =>
+    print("7 is prime\n")
+  else =>
+    print("7 is not prime\n")
+  var repeated: str = repeat_string("hello ", 3)
+  print(repeated + "world!\n")
+  var sum: int = 0
+  for var k: int = 1; k <= 10; k++ =>
+    sum = sum + k
+  print($"Sum 1 to 10: {sum}\n")
+  var pi_approx: double = 3.14159
+  print($"Pi approx: {pi_approx}\n")
+  var ch: char = 'A'
+  print($"Char: {ch}\n")
+  var flag: bool = true
+  print($"Flag: {flag}\n")
+  var any: str = $"This is a thing {num}\n"
+  print(any)
+  any = $"This is a thing {fact}\n"
+  print(any)
+  any = $"This is a thing {sum}\n"
+  print(any)
+  any = $"This is a thing {pi_approx}\n"
+  print(any)
+  any = $"This is a thing {ch}\n"
+  print(any)
+  any = $"This is a thing {flag}\n"
+  print(any)
+  print("Starting array tests ...\n")
+  // Int array tests
+  var int_arr: int[] = {1, 2, 3}
+  print($"Int array length: {len(int_arr)}\n")
+  print("Int array contents:")
+  for var idx: int = 0; idx < len(int_arr); idx++ =>
+    print($" {int_arr[idx]}")
+  print("\n")
+  int_arr = push(4, int_arr)
+  print($"After push 4, length: {len(int_arr)}\n")
+  print("Contents after push:")
+  for var idx: int = 0; idx < len(int_arr); idx++ =>
+    print($" {int_arr[idx]}")
+  print("\n")
+  int_arr = push(5, int_arr)
+  print($"After push 5, length: {len(int_arr)}\n")
+  print("Contents after push:")
+  for var idx: int = 0; idx < len(int_arr); idx++ =>
+    print($" {int_arr[idx]}")
+  print("\n")
+  int_arr = pop(int_arr)
+  print($"After pop, length: {len(int_arr)}\n")
+  print("Contents after pop:")
+  for var idx: int = 0; idx < len(int_arr); idx++ =>
+    print($" {int_arr[idx]}")
+  print("\n")
+  int_arr = rev(int_arr)
+  print($"After rev, length: {len(int_arr)}\n")
+  print("Contents after rev:")
+  for var idx: int = 0; idx < len(int_arr); idx++ =>
+    print($" {int_arr[idx]}")
+  print("\n")
+  int_arr = rem(1, int_arr)
+  print($"After rem index 1, length: {len(int_arr)}\n")
+  print("Contents after rem:")
+  for var idx: int = 0; idx < len(int_arr); idx++ =>
+    print($" {int_arr[idx]}")
+  print("\n")
+  int_arr = ins(2, 1, int_arr)
+  print($"After ins 2 at index 1, length: {len(int_arr)}\n")
+  print("Contents after ins:")
+  for var idx: int = 0; idx < len(int_arr); idx++ =>
+    print($" {int_arr[idx]}")
+  print("\n")
+  int_arr = ins(0, 0, int_arr)
+  print($"After ins 0 at index 0, length: {len(int_arr)}\n")
+  print("Contents after ins:")
+  for var idx: int = 0; idx < len(int_arr); idx++ =>
+    print($" {int_arr[idx]}")
+  print("\n")
+  int_arr = ins(6, len(int_arr), int_arr)
+  print($"After ins 6 at end, length: {len(int_arr)}\n")
+  print("Contents after ins:")
+  for var idx: int = 0; idx < len(int_arr); idx++ =>
+    print($" {int_arr[idx]}")
+  print("\n")
+  var int_slice: int[] = int_arr[1..3]
+  print($"Int slice [1..3], length: {len(int_slice)}\n")
+  print("Slice contents:")
+  for var idx: int = 0; idx < len(int_slice); idx++ =>
+    print($" {int_slice[idx]}")
+  print("\n")
+  int_slice = int_arr[2..]
+  print($"Int slice [2..], length: {len(int_slice)}\n")
+  print("Slice contents:")
+  for var idx: int = 0; idx < len(int_slice); idx++ =>
+    print($" {int_slice[idx]}")
+  print("\n")
+  int_slice = int_arr[..2]
+  print($"Int slice [..2], length: {len(int_slice)}\n")
+  print("Slice contents:")
+  for var idx: int = 0; idx < len(int_slice); idx++ =>
+    print($" {int_slice[idx]}")
+  print("\n")
+  // Empty int array tests
+  var empty_int: int[] = {}
+  print($"Empty int array length: {len(empty_int)}\n")
+  empty_int = push(10, empty_int)
+  print($"After push to empty, length: {len(empty_int)}\n")
+  print("Contents:")
+  for var idx: int = 0; idx < len(empty_int); idx++ =>
+    print($" {empty_int[idx]}")
+  print("\n")
+  empty_int = rev(empty_int)
+  print($"After rev empty (post-push), length: {len(empty_int)}\n")
+  // Char array tests
+  var char_arr: char[] = {'x', 'y', 'z'}
+  print($"Char array length: {len(char_arr)}\n")
+  print("Char array contents:")
+  for var idx: int = 0; idx < len(char_arr); idx++ =>
+    print($" {char_arr[idx]}")
+  print("\n")
+  char_arr = push('a', char_arr)
+  print($"After push 'a', length: {len(char_arr)}\n")
+  print("Contents after push:")
+  for var idx: int = 0; idx < len(char_arr); idx++ =>
+    print($" {char_arr[idx]}")
+  print("\n")
+  char_arr = pop(char_arr)
+  print($"After pop, length: {len(char_arr)}\n")
+  print("Contents after pop:")
+  for var idx: int = 0; idx < len(char_arr); idx++ =>
+    print($" {char_arr[idx]}")
+  print("\n")
+  char_arr = rev(char_arr)
+  print($"After rev, length: {len(char_arr)}\n")
+  print("Contents after rev:")
+  for var idx: int = 0; idx < len(char_arr); idx++ =>
+    print($" {char_arr[idx]}")
+  print("\n")
+  char_arr = rem(0, char_arr)
+  print($"After rem index 0, length: {len(char_arr)}\n")
+  print("Contents after rem:")
+  for var idx: int = 0; idx < len(char_arr); idx++ =>
+    print($" {char_arr[idx]}")
+  print("\n")
+  char_arr = ins('b', 0, char_arr)
+  print($"After ins 'b' at 0, length: {len(char_arr)}\n")
+  print("Contents after ins:")
+  for var idx: int = 0; idx < len(char_arr); idx++ =>
+    print($" {char_arr[idx]}")
+  print("\n")
+  var char_slice: char[] = char_arr[0..1]
+  print($"Char slice [0..1], length: {len(char_slice)}\n")
+  print("Slice contents:")
+  for var idx: int = 0; idx < len(char_slice); idx++ =>
+    print($" {char_slice[idx]}")
+  print("\n")
+  char_slice = char_arr[..]
+  print($"Char slice [..], length: {len(char_slice)}\n")
+  print("Slice contents:")
+  for var idx: int = 0; idx < len(char_slice); idx++ =>
+    print($" {char_slice[idx]}")
+  print("\n")
+  // Double array tests
+  var double_arr: double[] = {1.1, 2.2, 3.3}
+  print($"Double array length: {len(double_arr)}\n")
+  print("Double array contents:")
+  for var idx: int = 0; idx < len(double_arr); idx++ =>
+    print($" {double_arr[idx]}")
+  print("\n")
+  double_arr = push(4.4, double_arr)
+  print($"After push 4.4, length: {len(double_arr)}\n")
+  print("Contents after push:")
+  for var idx: int = 0; idx < len(double_arr); idx++ =>
+    print($" {double_arr[idx]}")
+  print("\n")
+  double_arr = pop(double_arr)
+  print($"After pop, length: {len(double_arr)}\n")
+  print("Contents after pop:")
+  for var idx: int = 0; idx < len(double_arr); idx++ =>
+    print($" {double_arr[idx]}")
+  print("\n")
+  double_arr = rev(double_arr)
+  print($"After rev, length: {len(double_arr)}\n")
+  print("Contents after rev:")
+  for var idx: int = 0; idx < len(double_arr); idx++ =>
+    print($" {double_arr[idx]}")
+  print("\n")
+  double_arr = rem(2, double_arr)
+  print($"After rem index 2, length: {len(double_arr)}\n")
+  print("Contents after rem:")
+  for var idx: int = 0; idx < len(double_arr); idx++ =>
+    print($" {double_arr[idx]}")
+  print("\n")
+  double_arr = ins(0.0, 1, double_arr)
+  print($"After ins 0.0 at 1, length: {len(double_arr)}\n")
+  print("Contents after ins:")
+  for var idx: int = 0; idx < len(double_arr); idx++ =>
+    print($" {double_arr[idx]}")
+  print("\n")
+  var double_slice: double[] = double_arr[1..2]
+  print($"Double slice [1..2], length: {len(double_slice)}\n")
+  print("Slice contents:")
+  for var idx: int = 0; idx < len(double_slice); idx++ =>
+    print($" {double_slice[idx]}")
+  print("\n")
+  double_slice = double_arr[0..]
+  print($"Double slice [0..], length: {len(double_slice)}\n")
+  print("Slice contents:")
+  for var idx: int = 0; idx < len(double_slice); idx++ =>
+    print($" {double_slice[idx]}")
+  print("\n")
+  // Bool array tests
+  var bool_arr: bool[] = {true, false, true}
+  print($"Bool array length: {len(bool_arr)}\n")
+  print("Bool array contents:")
+  for var idx: int = 0; idx < len(bool_arr); idx++ =>
+    print($" {bool_arr[idx]}")
+  print("\n")
+  bool_arr = push(false, bool_arr)
+  print($"After push false, length: {len(bool_arr)}\n")
+  print("Contents after push:")
+  for var idx: int = 0; idx < len(bool_arr); idx++ =>
+    print($" {bool_arr[idx]}")
+  print("\n")
+  bool_arr = pop(bool_arr)
+  print($"After pop, length: {len(bool_arr)}\n")
+  print("Contents after pop:")
+  for var idx: int = 0; idx < len(bool_arr); idx++ =>
+    print($" {bool_arr[idx]}")
+  print("\n")
+  bool_arr = rev(bool_arr)
+  print($"After rev, length: {len(bool_arr)}\n")
+  print("Contents after rev:")
+  for var idx: int = 0; idx < len(bool_arr); idx++ =>
+    print($" {bool_arr[idx]}")
+  print("\n")
+  bool_arr = rem(0, bool_arr)
+  print($"After rem index 0, length: {len(bool_arr)}\n")
+  print("Contents after rem:")
+  for var idx: int = 0; idx < len(bool_arr); idx++ =>
+    print($" {bool_arr[idx]}")
+  print("\n")
+  bool_arr = ins(true, 1, bool_arr)
+  print($"After ins true at 1, length: {len(bool_arr)}\n")
+  print("Contents after ins:")
+  for var idx: int = 0; idx < len(bool_arr); idx++ =>
+    print($" {bool_arr[idx]}")
+  print("\n")
+  var bool_slice: bool[] = bool_arr[..1]
+  print($"Bool slice [..1], length: {len(bool_slice)}\n")
+  print("Slice contents:")
+  for var idx: int = 0; idx < len(bool_slice); idx++ =>
+    print($" {bool_slice[idx]}")
+  print("\n")
+  // Str array tests
+  var str_arr: str[] = {"hello", "world", "test"}
+  print($"Str array length: {len(str_arr)}\n")
+  print("Str array contents:")
+  for var idx: int = 0; idx < len(str_arr); idx++ =>
+    print($" {str_arr[idx]}")
+  print("\n")
+  str_arr = push("extra", str_arr)
+  print($"After push \"extra\", length: {len(str_arr)}\n")
+  print("Contents after push:")
+  for var idx: int = 0; idx < len(str_arr); idx++ =>
+    print($" {str_arr[idx]}")
+  print("\n")
+  str_arr = pop(str_arr)
+  print($"After pop, length: {len(str_arr)}\n")
+  print("Contents after pop:")
+  for var idx: int = 0; idx < len(str_arr); idx++ =>
+    print($" {str_arr[idx]}")
+  print("\n")
+  str_arr = rev(str_arr)
+  print($"After rev, length: {len(str_arr)}\n")
+  print("Contents after rev:")
+  for var idx: int = 0; idx < len(str_arr); idx++ =>
+    print($" {str_arr[idx]}")
+  print("\n")
+  str_arr = rem(1, str_arr)
+  print($"After rem index 1, length: {len(str_arr)}\n")
+  print("Contents after rem:")
+  for var idx: int = 0; idx < len(str_arr); idx++ =>
+    print($" {str_arr[idx]}")
+  print("\n")
+  str_arr = ins("inserted", 0, str_arr)
+  print($"After ins \"inserted\" at 0, length: {len(str_arr)}\n")
+  print("Contents after ins:")
+  for var idx: int = 0; idx < len(str_arr); idx++ =>
+    print($" {str_arr[idx]}")
+  print("\n")
+  var str_slice: str[] = str_arr[1..2]
+  print($"Str slice [1..2], length: {len(str_slice)}\n")
+  print("Slice contents:")
+  for var idx: int = 0; idx < len(str_slice); idx++ =>
+    print($" {str_slice[idx]}")
+  print("\n")
+  str_slice = str_arr[..1]
+  print($"Str slice [..1], length: {len(str_slice)}\n")
+  print("Slice contents:")
+  for var idx: int = 0; idx < len(str_slice); idx++ =>
+    print($" {str_slice[idx]}")
+  print("\n")
+  // String treated as char array tests
+  var test_str: str = "abc"
+  print($"String \"abc\" length: {len(test_str)}\n")
+  print($"String contents: {test_str}\n")
+  test_str = push('d', test_str)
+  print($"After push 'd', length: {len(test_str)}\n")
+  print($"String contents: {test_str}\n")
+  test_str = pop(test_str)
+  print($"After pop, length: {len(test_str)}\n")
+  print($"String contents: {test_str}\n")
+  test_str = rev(test_str)
+  print($"After rev, length: {len(test_str)}\n")
+  print($"String contents: {test_str}\n")
+  test_str = rem(1, test_str)
+  print($"After rem index 1, length: {len(test_str)}\n")
+  print($"String contents: {test_str}\n")
+  test_str = ins('x', 0, test_str)
+  print($"After ins 'x' at 0, length: {len(test_str)}\n")
+  print($"String contents: {test_str}\n")
+  test_str = ins('y', len(test_str), test_str)
+  print($"After ins 'y' at end, length: {len(test_str)}\n")
+  print($"String contents: {test_str}\n")
+  var str_sub: str = test_str[1..2]
+  print($"String slice [1..2], length: {len(str_sub)}\n")
+  print($"Slice contents: {str_sub}\n")
+  str_sub = test_str[2..]
+  print($"String slice [2..], length: {len(str_sub)}\n")
+  print($"Slice contents: {str_sub}\n")
+  str_sub = test_str[..1]
+  print($"String slice [..1], length: {len(str_sub)}\n")
+  print($"Slice contents: {str_sub}\n")
+  // Empty string tests
+  var empty_str: str = ""
+  print($"Empty string length: {len(empty_str)}\n")
+  empty_str = push('z', empty_str)
+  print($"After push to empty string, length: {len(empty_str)}\n")
+  print($"String contents: {empty_str}\n")
+  empty_str = rev(empty_str)
+  print($"After rev, length: {len(empty_str)}\n")
+  print($"String contents: {empty_str}\n")
+  print("Array tests complete ...\n")
+  print("Complete main method ... \n")
