@@ -10,9 +10,14 @@ The input language is indented for code blocks like python and does not ever use
 
 ### INPUTS:
 
-The input program is the following (./samples/main.sn): 
+The input program is the following (./samples/test.sn): 
 ```
 ${INPUT_CODE}
+```
+
+The input program imported is the following (./samples/testimport.sn): 
+```
+${INPUT_CODE_IMPORT}
 ```
 
 The makefile is the following (./compiler/Makefile):
@@ -40,11 +45,6 @@ ${BUILD_OUTPUT}
 log/run-output.log:
 ```
 ${RUN_OUTPUT}
-```
-
-log/nasm-output.log:
-```
-${NASM_OUTPUT}
 ```
 
 log/gcc-output.log:
