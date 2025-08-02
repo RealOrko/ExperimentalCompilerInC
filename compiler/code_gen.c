@@ -204,6 +204,7 @@ void code_gen_text_section(CodeGen *gen)
     fprintf(gen->output, "    extern rt_le_string\n");
     fprintf(gen->output, "    extern rt_gt_string\n");
     fprintf(gen->output, "    extern rt_ge_string\n");
+    fprintf(gen->output, "    extern rt_free_string\n");
     fprintf(gen->output, "    extern free\n\n");
 }
 
@@ -257,7 +258,7 @@ void code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
                 fprintf(gen->output, "    mov r15, rsp\n");
                 fprintf(gen->output, "    and r15, 15\n");
                 fprintf(gen->output, "    sub rsp, r15\n");
-                fprintf(gen->output, "    call free\n");
+                fprintf(gen->output, "    call rt_free_string\n");
                 fprintf(gen->output, "    add rsp, r15\n");
             }
             if (free_right)
@@ -767,7 +768,7 @@ void code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
         fprintf(gen->output, "    mov r15, rsp\n");
         fprintf(gen->output, "    and r15, 15\n");
         fprintf(gen->output, "    sub rsp, r15\n");
-        fprintf(gen->output, "    call free\n");
+        fprintf(gen->output, "    call rt_free_string\n");
         fprintf(gen->output, "    add rsp, r15\n");
         fprintf(gen->output, ".no_free_%d:\n", label);
     }
@@ -868,7 +869,7 @@ void code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
             fprintf(gen->output, "    mov r15, rsp\n");
             fprintf(gen->output, "    and r15, 15\n");
             fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call free\n");
+            fprintf(gen->output, "    call rt_free_string\n");
             fprintf(gen->output, "    add rsp, r15\n");
         }
         fprintf(gen->output, "    mov rbx, r14\n");
@@ -923,7 +924,7 @@ static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr) {
             fprintf(gen->output, "    mov r15, rsp\n");
             fprintf(gen->output, "    and r15, 15\n");
             fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call free\n");
+            fprintf(gen->output, "    call rt_free_string\n");
             fprintf(gen->output, "    add rsp, r15\n");
         }
     }
@@ -1015,7 +1016,7 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
                     fprintf(gen->output, "    mov r15, rsp\n");
                     fprintf(gen->output, "    and r15, 15\n");
                     fprintf(gen->output, "    sub rsp, r15\n");
-                    fprintf(gen->output, "    call free\n");
+                    fprintf(gen->output, "    call rt_free_string\n");
                     fprintf(gen->output, "    add rsp, r15\n");
                 }
             }
@@ -1182,7 +1183,7 @@ void code_gen_block(CodeGen *gen, BlockStmt *stmt) {
             fprintf(gen->output, "    mov r15, rsp\n");
             fprintf(gen->output, "    and r15, 15\n");
             fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call free\n");
+            fprintf(gen->output, "    call rt_free_string\n");
             fprintf(gen->output, "    add rsp, r15\n");
             fprintf(gen->output, ".no_free_%d:\n", label);
         }
@@ -1305,7 +1306,7 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt) {
             fprintf(gen->output, "    mov r15, rsp\n");
             fprintf(gen->output, "    and r15, 15\n");
             fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call free\n");
+            fprintf(gen->output, "    call rt_free_string\n");
             fprintf(gen->output, "    add rsp, r15\n");
             fprintf(gen->output, ".no_free_%d:\n", label);
         }
@@ -1419,7 +1420,7 @@ void code_gen_for_statement(CodeGen *gen, ForStmt *stmt) {
             fprintf(gen->output, "    mov r15, rsp\n");
             fprintf(gen->output, "    and r15, 15\n");
             fprintf(gen->output, "    sub rsp, r15\n");
-            fprintf(gen->output, "    call free\n");
+            fprintf(gen->output, "    call rt_free_string\n");
             fprintf(gen->output, "    add rsp, r15\n");
             fprintf(gen->output, ".no_free_%d:\n", label);
         }

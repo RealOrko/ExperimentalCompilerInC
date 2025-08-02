@@ -4,6 +4,8 @@
 #include <math.h>
 #include <limits.h>
 
+static const char *null_str = "(null)";
+
 char *rt_str_concat(const char *left, const char *right) {
     const char *l = left ? left : "";
     const char *r = right ? right : "";
@@ -50,7 +52,7 @@ char *rt_to_string_bool(int val)
 char *rt_to_string_string(const char *val)
 {
     if (val == NULL) {
-        return strdup("(null)");
+        return (char *)null_str;
     }
     return strdup(val);
 }
@@ -305,4 +307,11 @@ int rt_gt_string(const char *a, const char *b) {
 
 int rt_ge_string(const char *a, const char *b) {
     return strcmp(a, b) >= 0;
+}
+
+void rt_free_string(char *s) {
+    if (s == NULL || s == null_str) {
+        return;
+    }
+    free(s);
 }
