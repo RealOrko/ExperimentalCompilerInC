@@ -1,8 +1,8 @@
 CC = gcc
-#CFLAGS = -Wall -Wextra -std=c99 -g -fsanitize=address -fno-omit-frame-pointer -MMD -MP -D_GNU_SOURCE
-CFLAGS = -Wall -Wextra -std=c99 -g -MMD -MP -D_GNU_SOURCE
-# LDFLAGS = -fsanitize=address
-LDFLAGS = 
+CFLAGS = -Wall -Wextra -std=c99 -g -fsanitize=address -fno-omit-frame-pointer -MMD -MP -D_GNU_SOURCE
+#CFLAGS = -Wall -Wextra -std=c99 -g -MMD -MP -D_GNU_SOURCE
+LDFLAGS = -fsanitize=address
+#LDFLAGS = 
 
 SRCDIR = .
 SRCS = arena.c runtime.c token.c lexer.c ast.c parser.c symbol_table.c code_gen.c compiler.c debug.c type_checker.c main.c
