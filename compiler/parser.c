@@ -1211,20 +1211,23 @@ Stmt *parser_import_statement(Parser *parser)
 {
     Token import_token = parser->previous;
     Token module_name;
-    if (parser_check(parser, TOKEN_IDENTIFIER))
+    if (parser_match(parser, TOKEN_STRING_LITERAL))
     {
-        module_name = parser->current;
-        parser_advance(parser);
-        module_name.start = arena_strndup(parser->arena, module_name.start, module_name.length);
+        module_name = parser->previous;
+        module_name.start = arena_strdup(parser->arena, parser->previous.literal.string_value);
         if (module_name.start == NULL)
         {
             parser_error_at_current(parser, "Out of memory");
             return NULL;
         }
+        module_name.length = strlen(module_name.start);
+        module_name.line = parser->previous.line;
+        module_name.filename = parser->previous.filename;
+        module_name.type = TOKEN_STRING_LITERAL;
     }
     else
     {
-        parser_error_at_current(parser, "Expected module name");
+        parser_error_at_current(parser, "Expected module name as string");
         module_name = parser->current;
         parser_advance(parser);
         module_name.start = arena_strndup(parser->arena, module_name.start, module_name.length);
@@ -1235,7 +1238,14 @@ Stmt *parser_import_statement(Parser *parser)
         }
     }
 
-    parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' after import statement");
+    if (!parser_match(parser, TOKEN_SEMICOLON) && !parser_check(parser, TOKEN_NEWLINE) && !parser_is_at_end(parser))
+    {
+        parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' or newline after import statement");
+    }
+    else if (parser_match(parser, TOKEN_SEMICOLON))
+    {
+    }
+
     return ast_create_import_stmt(parser->arena, module_name, &import_token);
 }
 
