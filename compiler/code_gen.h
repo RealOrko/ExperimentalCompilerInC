@@ -1,6 +1,7 @@
 #ifndef CODE_GEN_H
 #define CODE_GEN_H
 
+#include "arena.h"
 #include "ast.h"
 #include "symbol_table.h"
 #include <stdio.h>
@@ -15,6 +16,7 @@ typedef struct StringLiteral
 typedef struct
 {
     int label_count;
+    Arena *arena;
     SymbolTable *symbol_table;
     FILE *output;
     char *current_function;
@@ -24,7 +26,7 @@ typedef struct
     char **function_stack;
 } CodeGen;
 
-void code_gen_init(CodeGen *gen, SymbolTable *symbol_table, const char *output_file);
+void code_gen_init(Arena *arena, CodeGen *gen, SymbolTable *symbol_table, const char *output_file);
 void code_gen_cleanup(CodeGen *gen);
 void code_gen_module(CodeGen *gen, Module *module);
 void code_gen_statement(CodeGen *gen, Stmt *stmt);

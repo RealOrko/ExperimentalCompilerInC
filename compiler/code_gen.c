@@ -3,6 +3,7 @@
 #include "parser.h"
 #include <stdlib.h>
 #include <string.h>
+#include "arena.h"
 
 static StringLiteral *string_literals = NULL;
 
@@ -10,7 +11,7 @@ void code_gen_init_function_stack(CodeGen *gen)
 {
     gen->function_stack_capacity = 8;
     gen->function_stack_size = 0;
-    gen->function_stack = malloc(gen->function_stack_capacity * sizeof(char *));
+    gen->function_stack = arena_alloc(gen->arena, gen->function_stack_capacity * sizeof(char *));
     if (gen->function_stack == NULL)
     {
         exit(1);
@@ -21,17 +22,19 @@ void code_gen_push_function_context(CodeGen *gen)
 {
     if (gen->function_stack_size >= gen->function_stack_capacity)
     {
+        size_t old_capacity = gen->function_stack_capacity;
         gen->function_stack_capacity *= 2;
-        gen->function_stack = realloc(gen->function_stack,
-                                      gen->function_stack_capacity * sizeof(char *));
-        if (gen->function_stack == NULL)
+        char **new_stack = arena_alloc(gen->arena, gen->function_stack_capacity * sizeof(char *));
+        if (new_stack == NULL)
         {
             exit(1);
         }
+        memcpy(new_stack, gen->function_stack, old_capacity * sizeof(char *));
+        gen->function_stack = new_stack;
     }
     if (gen->current_function != NULL)
     {
-        gen->function_stack[gen->function_stack_size] = strdup(gen->current_function);
+        gen->function_stack[gen->function_stack_size] = arena_strdup(gen->arena, gen->current_function);
         if (gen->function_stack[gen->function_stack_size] == NULL)
         {
             exit(1);
@@ -50,36 +53,20 @@ void code_gen_pop_function_context(CodeGen *gen)
     {
         return;
     }
-    if (gen->current_function != NULL)
-    {
-        free(gen->current_function);
-    }
+    gen->current_function = gen->function_stack[gen->function_stack_size - 1];
     gen->function_stack_size--;
-    gen->current_function = gen->function_stack[gen->function_stack_size];
-    gen->function_stack[gen->function_stack_size] = NULL;
 }
 
 void code_gen_free_function_stack(CodeGen *gen)
 {
-    if (gen->function_stack == NULL)
-    {
-        return;
-    }
-    for (int i = 0; i < gen->function_stack_size; i++)
-    {
-        if (gen->function_stack[i] != NULL)
-        {
-            free(gen->function_stack[i]);
-        }
-    }
-    free(gen->function_stack);
     gen->function_stack = NULL;
     gen->function_stack_size = 0;
     gen->function_stack_capacity = 0;
 }
 
-void code_gen_init(CodeGen *gen, SymbolTable *symbol_table, const char *output_file)
+void code_gen_init(Arena *arena, CodeGen *gen, SymbolTable *symbol_table, const char *output_file)
 {
+    gen->arena = arena;
     gen->label_count = 0;
     gen->symbol_table = symbol_table;
     gen->output = fopen(output_file, "w");
@@ -99,23 +86,8 @@ void code_gen_cleanup(CodeGen *gen)
     {
         fclose(gen->output);
     }
-    if (gen->current_function != NULL)
-    {
-        free(gen->current_function);
-        gen->current_function = NULL;
-    }
+    gen->current_function = NULL;
     code_gen_free_function_stack(gen);
-    StringLiteral *current = string_literals;
-    while (current != NULL)
-    {
-        StringLiteral *next = current->next;
-        if (current->string != NULL)
-        {
-            free((void *)current->string);
-        }
-        free(current);
-        current = next;
-    }
     string_literals = NULL;
 }
 
@@ -131,15 +103,14 @@ int code_gen_add_string_literal(CodeGen *gen, const char *string)
         return -1;
     }
     int label = code_gen_new_label(gen);
-    StringLiteral *literal = malloc(sizeof(StringLiteral));
+    StringLiteral *literal = arena_alloc(gen->arena, sizeof(StringLiteral));
     if (literal == NULL)
     {
         exit(1);
     }
-    literal->string = strdup(string);
+    literal->string = arena_strdup(gen->arena, string);
     if (literal->string == NULL)
     {
-        free(literal);
         exit(1);
     }
     literal->label = label;
@@ -1009,7 +980,7 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
     if (call->callee->type == EXPR_VARIABLE)
     {
         VariableExpr *var = &call->callee->as.variable;
-        char *name = malloc(var->name.length + 1);
+        char *name = arena_alloc(gen->arena, var->name.length + 1);
         if (name == NULL)
         {
             exit(1);
@@ -1028,7 +999,6 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
         if (arg->type == EXPR_INTERPOLATED)
         {
             code_gen_interpolated_print(gen, &arg->as.interpol);
-            free((void *)function_name);
             return;
         }
         else
@@ -1089,7 +1059,6 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
                     fprintf(gen->output, "    add rsp, r15\n");
                 }
             }
-            free((void *)function_name);
             return;
         }
     }
@@ -1110,7 +1079,6 @@ void code_gen_call_expression(CodeGen *gen, Expr *expr)
     fprintf(gen->output, "    sub rsp, r15\n");
     fprintf(gen->output, "    call %s\n", function_name);
     fprintf(gen->output, "    add rsp, r15\n");
-    free((void *)function_name);
 }
 
 void code_gen_array_expression(CodeGen *gen, ArrayExpr *expr)
@@ -1315,7 +1283,7 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt) {
     char *old_function = gen->current_function;
     Type *old_return_type = gen->current_return_type;
     if (stmt->name.length < 256) {
-        gen->current_function = malloc(stmt->name.length + 1);
+        gen->current_function = arena_alloc(gen->arena, stmt->name.length + 1);
         if (gen->current_function == NULL) {
             exit(1);
         }
@@ -1387,7 +1355,6 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt) {
     fprintf(gen->output, "    pop rbp\n");
     fprintf(gen->output, "    ret\n");
     symbol_table_pop_scope(gen->symbol_table);
-    free(gen->current_function);
     gen->current_function = old_function;
     gen->current_return_type = old_return_type;
 }

@@ -28,7 +28,7 @@ int main(int argc, char **argv)
     }
 
     CodeGen gen;
-    code_gen_init(&gen, options.parser.symbol_table, options.output_file);
+    code_gen_init(&options.arena, &gen, options.parser.symbol_table, options.output_file);
     code_gen_module(&gen, module);
     code_gen_cleanup(&gen);
 
