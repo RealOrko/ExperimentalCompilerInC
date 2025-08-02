@@ -10,8 +10,8 @@ The input language is indented for code blocks like python and does not ever use
 Stack offsets are defined as the following in symbol_table.h.
 ```
 #define OFFSET_ALIGNMENT 8
-#define CALLEE_SAVED_SPACE 16  
-#define LOCAL_BASE_OFFSET (8 + CALLEE_SAVED_SPACE)  
+#define CALLEE_SAVED_SPACE 40 
+#define LOCAL_BASE_OFFSET (8 + CALLEE_SAVED_SPACE)
 #define PARAM_BASE_OFFSET LOCAL_BASE_OFFSET
 ```
 
