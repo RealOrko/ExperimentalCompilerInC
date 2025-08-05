@@ -11,4 +11,5 @@ mkdir -p log/
 pushd compiler/
 make clean
 make &> ../log/build-output.log
+make tests &>> ../log/build-output.log
 popd

@@ -31,6 +31,20 @@ $(BIN_DIR)/%.o: %.c
 
 -include $(DEPS)
 
+# Tests
+TEST_SRCDIR = tests
+TEST_SRCS = $(TEST_SRCDIR)/arena_tests.c
+TEST_OBJS = $(addprefix $(BIN_DIR)/, $(notdir $(TEST_SRCS:.c=.o)))
+TEST_TARGET = $(BIN_DIR)/arena_tests
+
+tests: create-bin-dir $(TEST_TARGET)
+
+$(TEST_TARGET): $(TEST_OBJS) $(BIN_DIR)/arena.o $(BIN_DIR)/debug.o
+	$(CC) $(LDFLAGS) -o $@ $^
+
+$(BIN_DIR)/%.o: $(TEST_SRCDIR)/%.c
+	@mkdir -p $(@D)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 clean:
-	rm -f $(BIN_DIR)/*.o $(BIN_DIR)/*.d *.asm
-	rm -f $(TARGET)
+	rm -rf $(BIN_DIR)
