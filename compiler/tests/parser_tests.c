@@ -10,6 +10,8 @@
 #include "../symbol_table.h"
 
 void test_simple_program_parsing() {
+    printf("Testing parser_execute simple program...\n");
+
     Arena arena;
     arena_init(&arena, 4096);
 

@@ -33,13 +33,13 @@ $(BIN_DIR)/%.o: %.c
 
 # Tests
 TEST_SRCDIR = tests
-TEST_SRCS = $(TEST_SRCDIR)/_all_.c $(TEST_SRCDIR)/arena_tests.c $(TEST_SRCDIR)/parser_tests.c
+TEST_SRCS = $(TEST_SRCDIR)/_all_.c
 TEST_OBJS = $(addprefix $(BIN_DIR)/, $(notdir $(TEST_SRCS:.c=.o)))
 TEST_TARGET = $(BIN_DIR)/tests
 
 tests: create-bin-dir $(TEST_TARGET)
 
-$(TEST_TARGET): $(TEST_OBJS) $(BIN_DIR)/arena.o $(BIN_DIR)/debug.o
+$(TEST_TARGET): $(TEST_OBJS) $(BIN_DIR)/arena.o $(BIN_DIR)/debug.o $(BIN_DIR)/ast.o $(BIN_DIR)/lexer.o $(BIN_DIR)/parser.o $(BIN_DIR)/symbol_table.o $(BIN_DIR)/token.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
 $(BIN_DIR)/%.o: $(TEST_SRCDIR)/%.c
