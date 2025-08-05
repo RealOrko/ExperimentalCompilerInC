@@ -33,9 +33,9 @@ $(BIN_DIR)/%.o: %.c
 
 # Tests
 TEST_SRCDIR = tests
-TEST_SRCS = $(TEST_SRCDIR)/arena_tests.c
+TEST_SRCS = $(TEST_SRCDIR)/_all_.c $(TEST_SRCDIR)/arena_tests.c $(TEST_SRCDIR)/parser_tests.c
 TEST_OBJS = $(addprefix $(BIN_DIR)/, $(notdir $(TEST_SRCS:.c=.o)))
-TEST_TARGET = $(BIN_DIR)/arena_tests
+TEST_TARGET = $(BIN_DIR)/tests
 
 tests: create-bin-dir $(TEST_TARGET)
 

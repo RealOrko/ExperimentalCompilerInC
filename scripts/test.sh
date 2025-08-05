@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex
+set -e
 
-bin/arena_tests
+bin/tests
 

@@ -210,17 +210,3 @@ void test_arena_free() {
     assert(arena.first->size == 32);
     arena_free(&arena);
 }
-
-int main() {
-    test_arena_init();
-    test_arena_alloc_small();
-    test_arena_alloc_large();
-    test_arena_alloc_larger_than_double();
-    test_arena_alloc_zero();
-    test_arena_strdup();
-    test_arena_strndup();
-    test_arena_free();
-
-    printf("All tests passed!\n");
-    return 0;
-}

@@ -25,6 +25,11 @@ The main build shell script is the following (./scripts/build.sh):
 ${BUILD_SCRIPT}
 ```
 
+The main test shell script is the following (./scripts/test.sh):
+```
+${TEST_SCRIPT}
+```
+
 The main run shell script is the following (./scripts/run.sh):
 ```
 ${RUN_SCRIPT}

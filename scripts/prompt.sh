@@ -9,6 +9,7 @@ BEGIN {
     files["${INPUT_CODE_IMPORT}"] = "samples/testimport.sn"
     files["${MAKE_FILE}"] = "compiler/Makefile"
     files["${BUILD_SCRIPT}"] = "scripts/build.sh"
+    files["${TEST_SCRIPT}"] = "scripts/test.sh"
     files["${RUN_SCRIPT}"] = "scripts/run.sh"
     files["${BUILD_OUTPUT}"] = "log/build-output.log"
     files["${RUN_OUTPUT}"] = "log/run-output.log"

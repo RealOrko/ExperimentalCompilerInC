@@ -4,11 +4,3 @@ fn add(x:int, y:int):int =>
 fn main():void => 
   var z:int = add(6, 2) 
   print($"The answer is {z}\n")
-
-  for var j: int = 0; j < 5; j++ =>
-    print($"Hello {j+1}\n")
-
-  var i:int = 0
-  while i < 5 =>
-    print($"Count is {i+1}\n")
-    i = i + 1
