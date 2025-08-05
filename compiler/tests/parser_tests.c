@@ -1,3 +1,4 @@
+// Updated parser_tests.c with additional debugging for the two failing tests
 // tests/parser_tests.c
 #include <assert.h>
 #include <stdio.h>
@@ -107,6 +108,41 @@ void test_if_statement_parsing() {
     setup_parser(&arena, &lexer, &parser, source);
 
     Module *module = parser_execute(&parser, "test.sn");
+
+    // Added debugging logs to inspect parser state and AST
+    DEBUG_INFO("Parser had_error after execute: %d", parser.had_error);
+    DEBUG_INFO("Parser panic_mode: %d", parser.panic_mode);
+    DEBUG_INFO("Module pointer: %p", (void*)module);
+    if (module) {
+        DEBUG_INFO("Module count: %d", module->count);
+        DEBUG_INFO("Module filename: %s", module->filename);
+        if (module->count > 0) {
+            DEBUG_VERBOSE("Printing AST for first statement:");
+            ast_print_stmt(module->statements[0], 0);
+            Stmt *if_stmt = module->statements[0];
+            DEBUG_INFO("Statement type: %d (expected STMT_IF: %d)", if_stmt->type, STMT_IF);
+            if (if_stmt->type == STMT_IF) {
+                DEBUG_INFO("Condition type: %d (expected EXPR_BINARY: %d)", if_stmt->as.if_stmt.condition->type, EXPR_BINARY);
+                if (if_stmt->as.if_stmt.condition->type == EXPR_BINARY) {
+                    DEBUG_INFO("Binary operator: %d (expected TOKEN_GREATER: %d)", if_stmt->as.if_stmt.condition->as.binary.operator, TOKEN_GREATER);
+                    DEBUG_INFO("Left operand name: %s (expected 'x')", if_stmt->as.if_stmt.condition->as.binary.left->as.variable.name.start);
+                    DEBUG_INFO("Right operand int_value: %lld (expected 0)", (long long)if_stmt->as.if_stmt.condition->as.binary.right->as.literal.value.int_value);
+                }
+                DEBUG_INFO("Then branch type: %d (expected STMT_BLOCK: %d)", if_stmt->as.if_stmt.then_branch->type, STMT_BLOCK);
+                if (if_stmt->as.if_stmt.then_branch->type == STMT_BLOCK) {
+                    DEBUG_INFO("Then block count: %d (expected 1)", if_stmt->as.if_stmt.then_branch->as.block.count);
+                }
+                DEBUG_INFO("Else branch type: %d (expected STMT_BLOCK: %d)", if_stmt->as.if_stmt.else_branch->type, STMT_BLOCK);
+                if (if_stmt->as.if_stmt.else_branch->type == STMT_BLOCK) {
+                    DEBUG_INFO("Else block count: %d (expected 1)", if_stmt->as.if_stmt.else_branch->as.block.count);
+                }
+            }
+        } else {
+            DEBUG_WARNING("No statements parsed in module.");
+        }
+    } else {
+        DEBUG_ERROR("Module is NULL after parsing.");
+    }
 
     assert(module != NULL);
     assert(module->count == 1);
@@ -398,6 +434,21 @@ void test_full_program_parsing() {
 
     Module *module = parser_execute(&parser, "test.sn");
 
+    // Added debugging logs to inspect parser state and AST
+    DEBUG_INFO("Parser had_error after execute: %d", parser.had_error);
+    DEBUG_INFO("Parser panic_mode: %d", parser.panic_mode);
+    DEBUG_INFO("Module pointer: %p", (void*)module);
+    if (module) {
+        DEBUG_INFO("Module count: %d (expected 4 functions)", module->count);
+        DEBUG_INFO("Module filename: %s", module->filename);
+        for (int i = 0; i < module->count; i++) {
+            DEBUG_VERBOSE("Printing AST for statement %d:", i);
+            ast_print_stmt(module->statements[i], 0);
+        }
+    } else {
+        DEBUG_ERROR("Module is NULL after parsing.");
+    }
+
     assert(module != NULL);
     assert(module->count == 4);  // Four functions: factorial, is_prime, repeat_string, main
 
@@ -407,12 +458,15 @@ void test_full_program_parsing() {
     assert(strcmp(fact_fn->as.function.name.start, "factorial") == 0);
     assert(fact_fn->as.function.param_count == 1);
     assert(fact_fn->as.function.return_type->kind == TYPE_INT);
-    assert(fact_fn->as.function.body_count == 4);  // print, if, var j, print, return (but return is inside if, no: print, if, var, print, return
-
-    // Note: Due to indentation, body is print, if, var, print, return
-    // But in source, var and second print and return are at same level as if
-
-    // Similarly for others.
+    // Corrected body_count to 5 (print, if, var, print, return)
+    assert(fact_fn->as.function.body_count == 5);  
+    assert(fact_fn->as.function.body[0]->type == STMT_EXPR);  // print
+    assert(fact_fn->as.function.body[1]->type == STMT_IF);
+    assert(fact_fn->as.function.body[2]->type == STMT_VAR_DECL);  // var j
+    assert(fact_fn->as.function.body[3]->type == STMT_EXPR);  // print
+    assert(fact_fn->as.function.body[4]->type == STMT_RETURN);  // return j
+    // Added debug for factorial body
+    DEBUG_INFO("Factorial body_count: %d (expected 5)", fact_fn->as.function.body_count);
 
     // To keep it concise, assert key parts
     assert(fact_fn->as.function.body[0]->type == STMT_EXPR);  // print
@@ -459,6 +513,9 @@ void test_full_program_parsing() {
     assert(for_sum->type == STMT_FOR);
 
     // Etc. But since comprehensive, this is a start; in practice, add more asserts
+
+    // Added debug for main body count
+    DEBUG_INFO("Main body_count: %d", main_fn->as.function.body_count);
 
     cleanup_parser(&arena, &lexer, &parser);
 }

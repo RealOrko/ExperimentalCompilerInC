@@ -42,6 +42,11 @@ log/build-output.log:
 ${BUILD_OUTPUT}
 ```
 
+log/test-output.log:
+```
+${TEST_OUTPUT}
+```
+
 log/run-output.log:
 ```
 ${RUN_OUTPUT}

@@ -2,5 +2,5 @@
 
 set -e
 
-bin/tests
+bin/tests &> log/test-output.log
 

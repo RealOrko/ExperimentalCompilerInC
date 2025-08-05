@@ -3,6 +3,10 @@
 
 int main() {
 
+    // *** Debugging ***
+    printf("Running tests with debug level: %d\n", DEBUG_LEVEL_VERBOSE);
+    init_debug(DEBUG_LEVEL_VERBOSE);
+
     // *** Arena ***
 
     test_arena_init();
@@ -19,7 +23,7 @@ int main() {
     test_empty_program_parsing();
     test_var_decl_parsing();
     test_function_no_params_parsing();
-    //test_if_statement_parsing();
+    test_if_statement_parsing(); // NOT sure about this one, needs more debugging
     test_simple_program_parsing();
     test_while_loop_parsing();
     test_for_loop_parsing();
