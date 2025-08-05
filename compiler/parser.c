@@ -213,6 +213,12 @@ void parser_error_at(Parser *parser, Token *token, const char *message)
     fprintf(stderr, ": %s\n", message);
 
     parser->lexer->indent_size = 1;
+
+    // Advance if the error is at the current token to prevent infinite loops
+    // by skipping the offending token and allowing parsing to progress.
+    if (token == &parser->current) {
+        parser_advance(parser);
+    }
 }
 
 void parser_advance(Parser *parser)
@@ -269,6 +275,7 @@ static void synchronize(Parser *parser)
         case TOKEN_WHILE:
         case TOKEN_RETURN:
         case TOKEN_IMPORT:
+        case TOKEN_ELSE:  // Added to handle else clauses during synchronization
             return;
         case TOKEN_NEWLINE:
             parser_advance(parser);
