@@ -5,7 +5,7 @@ set -e
 awk '
 BEGIN {
     # Map placeholders (as they appear in the template) to their file paths
-    files["${INPUT_CODE}"] = "samples/test.sn"
+    files["${INPUT_CODE}"] = "samples/main.sn"
     files["${INPUT_CODE_IMPORT}"] = "samples/testimport.sn"
     files["${MAKE_FILE}"] = "compiler/Makefile"
     files["${BUILD_SCRIPT}"] = "scripts/build.sh"
