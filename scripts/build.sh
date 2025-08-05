@@ -1,6 +1,6 @@
 #!/bin/bash
 
-set -ex 
+set -e
 
 rm -f bin/*
 rm -f log/*
@@ -13,3 +13,5 @@ make clean
 make &> ../log/build-output.log
 make tests &>> ../log/build-output.log
 popd
+
+. $PWD/scripts/test.sh
