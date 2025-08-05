@@ -5,8 +5,8 @@ LDFLAGS = -fsanitize=address
 #LDFLAGS = 
 
 SRCDIR = .
-SRCS = arena.c runtime.c token.c lexer.c ast.c parser.c symbol_table.c code_gen.c compiler.c debug.c type_checker.c main.c
-HEADERS = arena.h runtime.h token.h lexer.h ast.h parser.h symbol_table.h code_gen.h compiler.h debug.h type_checker.h
+SRCS = arena.c file.c runtime.c token.c lexer.c ast.c parser.c symbol_table.c code_gen.c compiler.c debug.c type_checker.c main.c
+HEADERS = arena.h file.h runtime.h token.h lexer.h ast.h parser.h symbol_table.h code_gen.h compiler.h debug.h type_checker.h
 BIN_DIR = ../bin
 OBJS = $(addprefix $(BIN_DIR)/, $(notdir $(SRCS:.c=.o)))
 DEPS = $(OBJS:.o=.d)

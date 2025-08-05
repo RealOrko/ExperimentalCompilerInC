@@ -1,10 +1,11 @@
 #ifndef COMPILER_H
 #define COMPILER_H
 
+#include "arena.h"
+#include "file.h"
 #include "lexer.h"
 #include "parser.h"
 #include "code_gen.h"
-#include "arena.h"
 #include <stdio.h>
 
 typedef struct
@@ -22,6 +23,5 @@ typedef struct
 void compiler_init(CompilerOptions *options, int argc, char **argv);
 void compiler_cleanup(CompilerOptions *options);
 int compiler_parse_args(int argc, char **argv, CompilerOptions *options);
-char *compiler_read_file(Arena *arena, const char *path);
 
 #endif
