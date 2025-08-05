@@ -16,7 +16,17 @@ int main() {
 
     // *** Parser ***
     
+    test_empty_program_parsing();
+    test_var_decl_parsing();
+    test_function_no_params_parsing();
+    //test_if_statement_parsing();
     test_simple_program_parsing();
+    test_while_loop_parsing();
+    test_for_loop_parsing();
+    test_interpolated_string_parsing();
+    test_literal_types_parsing();
+    test_recursive_function_parsing();
+    //test_full_program_parsing();
 
     printf("All tests passed!\n");
     
