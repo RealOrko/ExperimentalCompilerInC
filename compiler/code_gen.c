@@ -454,10 +454,10 @@ static char *code_gen_call_expression(CodeGen *gen, Expr *expr) {
             const char *rt_func = get_rt_print_func(arg_type->kind);
             bool needs_free = (arg_type->kind == TYPE_STRING && expression_produces_temp(arg));
             if (needs_free) {
-                return arena_sprintf(gen->arena, "({ char *_arg = %s; %s(_arg); rt_free_string(_arg); 0L; })",
+                return arena_sprintf(gen->arena, "({ char *_arg = %s; %s(_arg); rt_free_string(_arg); })",
                                      arg_str, rt_func);
             } else {
-                return arena_sprintf(gen->arena, "({ %s(%s); 0L; })", rt_func, arg_str);
+                return arena_sprintf(gen->arena, "({ %s(%s); })", rt_func, arg_str);
             }
         }
     }
