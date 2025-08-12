@@ -8,7 +8,7 @@ int main()
 
     // *** Debugging ***
     printf("Running tests with debug level: %d\n", DEBUG_LEVEL_VERBOSE);
-    init_debug(DEBUG_LEVEL_ERROR);
+    init_debug(DEBUG_LEVEL_INFO);
 
     // *** Arena ***
 

@@ -111,7 +111,6 @@ void test_ast_create_function_type()
     printf("Testing ast_create_function_type...\n");
     Arena arena;
     setup_arena(&arena);
-
     Type *ret = ast_create_primitive_type(&arena, TYPE_VOID);
     Type *params[2];
     params[0] = ast_create_primitive_type(&arena, TYPE_INT);
@@ -123,7 +122,6 @@ void test_ast_create_function_type()
     assert(fn->as.function.param_count == 2);
     assert(ast_type_equals(fn->as.function.param_types[0], params[0]));
     assert(ast_type_equals(fn->as.function.param_types[1], params[1]));
-
     // Complex params: array type
     Type *arr_param = ast_create_array_type(&arena, params[0]);
     Type *complex_params[1] = {arr_param};
@@ -131,24 +129,18 @@ void test_ast_create_function_type()
     assert(complex_fn != NULL);
     assert(complex_fn->as.function.param_count == 1);
     assert(ast_type_equals(complex_fn->as.function.param_types[0], arr_param));
-
     // Empty params
     Type *fn_empty = ast_create_function_type(&arena, ret, NULL, 0);
     assert(fn_empty != NULL);
     assert(fn_empty->as.function.param_count == 0);
     assert(fn_empty->as.function.param_types == NULL);
-
     // NULL return
     Type *fn_null_ret = ast_create_function_type(&arena, NULL, params, 2);
     assert(fn_null_ret != NULL);
     assert(fn_null_ret->as.function.return_type == NULL);
-
-    // NULL params with count > 0 (should handle gracefully, but according to code, it clones NULL)
+    // NULL params with count > 0 (should handle gracefully by returning NULL)
     Type *fn_null_params = ast_create_function_type(&arena, ret, NULL, 2);
-    assert(fn_null_params != NULL);
-    assert(fn_null_params->as.function.param_count == 2);
-    assert(fn_null_params->as.function.param_types != NULL); // Allocated, but cloned from NULL?
-
+    assert(fn_null_params == NULL);
     cleanup_arena(&arena);
 }
 
@@ -293,6 +285,9 @@ void test_ast_type_to_string()
 
     // Array
     Type *arr = ast_create_array_type(&arena, ast_create_primitive_type(&arena, TYPE_CHAR));
+    const char *actual = ast_type_to_string(&arena, arr);
+    printf("Actual type string: '%s'\n", actual);
+    assert(strcmp(actual, "array<char>") == 0);
     assert(strcmp(ast_type_to_string(&arena, arr), "array<char>") == 0);
 
     // Nested array

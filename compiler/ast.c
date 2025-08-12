@@ -367,6 +367,12 @@ Type *ast_create_function_type(Arena *arena, Type *return_type, Type **param_typ
             DEBUG_ERROR("Out of memory");
             exit(1);
         }
+        if (param_types == NULL && param_count > 0)
+        {
+            DEBUG_ERROR("Cannot create function type: param_types is NULL but param_count > 0");
+            // Optionally free allocated memory and return NULL, or exit(1) as in other error paths.
+            return NULL;
+        }
         for (int i = 0; i < param_count; i++)
         {
             type->as.function.param_types[i] = ast_clone_type(arena, param_types[i]);
@@ -409,87 +415,102 @@ int ast_type_equals(Type *a, Type *b)
     }
 }
 
-const char *ast_type_to_string(Arena *arena, Type *type) {
-    if (type == NULL) {
+const char *ast_type_to_string(Arena *arena, Type *type)
+{
+    if (type == NULL)
+    {
         return arena_strdup(arena, "unknown");
     }
 
-    switch (type->kind) {
-        case TYPE_INT:
-            return arena_strdup(arena, "int");
-        case TYPE_LONG:
-            return arena_strdup(arena, "long");
-        case TYPE_DOUBLE:
-            return arena_strdup(arena, "double");
-        case TYPE_CHAR:
-            return arena_strdup(arena, "char");
-        case TYPE_STRING:
-            return arena_strdup(arena, "string");
-        case TYPE_BOOL:
-            return arena_strdup(arena, "bool");
-        case TYPE_VOID:
-            return arena_strdup(arena, "void");
-        case TYPE_NIL:
-            return arena_strdup(arena, "nil");
-        case TYPE_ANY:
-            return arena_strdup(arena, "any");
+    switch (type->kind)
+    {
+    case TYPE_INT:
+        return arena_strdup(arena, "int");
+    case TYPE_LONG:
+        return arena_strdup(arena, "long");
+    case TYPE_DOUBLE:
+        return arena_strdup(arena, "double");
+    case TYPE_CHAR:
+        return arena_strdup(arena, "char");
+    case TYPE_STRING:
+        return arena_strdup(arena, "string");
+    case TYPE_BOOL:
+        return arena_strdup(arena, "bool");
+    case TYPE_VOID:
+        return arena_strdup(arena, "void");
+    case TYPE_NIL:
+        return arena_strdup(arena, "nil");
+    case TYPE_ANY:
+        return arena_strdup(arena, "any");
 
-        case TYPE_ARRAY: {
-            const char *elem_str = ast_type_to_string(arena, type->as.array.element_type);
-            size_t len = strlen("array of ") + strlen(elem_str) + 1;
-            char *str = arena_alloc(arena, len);
-            if (str == NULL) {
-                DEBUG_ERROR("Out of memory");
-                exit(1);
+    case TYPE_ARRAY:
+    {
+        const char *elem_str = ast_type_to_string(arena, type->as.array.element_type);
+        size_t len = strlen("array of ") + strlen(elem_str) + 1;
+        char *str = arena_alloc(arena, len);
+        if (str == NULL)
+        {
+            DEBUG_ERROR("Out of memory");
+            exit(1);
+        }
+        snprintf(str, len, "array of %s", elem_str);
+        return str;
+    }
+
+    case TYPE_FUNCTION:
+    {
+        size_t params_len = 0;
+        for (int i = 0; i < type->as.function.param_count; i++)
+        {
+            const char *param_str = ast_type_to_string(arena, type->as.function.param_types[i]);
+            params_len += strlen(param_str);
+            if (i < type->as.function.param_count - 1)
+            {
+                params_len += 2; // for ", "
             }
-            snprintf(str, len, "array of %s", elem_str);
-            return str;
         }
 
-        case TYPE_FUNCTION: {
-            size_t params_len = 0;
-            for (int i = 0; i < type->as.function.param_count; i++) {
-                const char *param_str = ast_type_to_string(arena, type->as.function.param_types[i]);
-                params_len += strlen(param_str);
-                if (i < type->as.function.param_count - 1) {
-                    params_len += 2;  // for ", "
-                }
+        char *params_buf = arena_alloc(arena, params_len + 1);
+        if (params_buf == NULL && type->as.function.param_count > 0)
+        {
+            DEBUG_ERROR("Out of memory");
+            exit(1);
+        }
+        char *ptr = params_buf;
+        for (int i = 0; i < type->as.function.param_count; i++)
+        {
+            const char *param_str = ast_type_to_string(arena, type->as.function.param_types[i]);
+            strcpy(ptr, param_str);
+            ptr += strlen(param_str);
+            if (i < type->as.function.param_count - 1)
+            {
+                strcpy(ptr, ", ");
+                ptr += 2;
             }
-
-            char *params_buf = arena_alloc(arena, params_len + 1);
-            if (params_buf == NULL && type->as.function.param_count > 0) {
-                DEBUG_ERROR("Out of memory");
-                exit(1);
-            }
-            char *ptr = params_buf;
-            for (int i = 0; i < type->as.function.param_count; i++) {
-                const char *param_str = ast_type_to_string(arena, type->as.function.param_types[i]);
-                strcpy(ptr, param_str);
-                ptr += strlen(param_str);
-                if (i < type->as.function.param_count - 1) {
-                    strcpy(ptr, ", ");
-                    ptr += 2;
-                }
-            }
-            if (params_buf != NULL) {
-                *ptr = '\0';
-            } else {
-                params_buf = arena_strdup(arena, "");
-            }
-
-            const char *ret_str = ast_type_to_string(arena, type->as.function.return_type);
-            size_t total_len = strlen("function(") + strlen(params_buf) + strlen(") -> ") + strlen(ret_str) + 1;
-            char *str = arena_alloc(arena, total_len);
-            if (str == NULL) {
-                DEBUG_ERROR("Out of memory");
-                exit(1);
-            }
-            snprintf(str, total_len, "function(%s) -> %s", params_buf, ret_str);
-            return str;
+        }
+        if (params_buf != NULL)
+        {
+            *ptr = '\0';
+        }
+        else
+        {
+            params_buf = arena_strdup(arena, "");
         }
 
-        default:
-            return arena_strdup(arena, "unknown");
+        const char *ret_str = ast_type_to_string(arena, type->as.function.return_type);
+        size_t total_len = strlen("function(") + strlen(params_buf) + strlen(") -> ") + strlen(ret_str) + 1;
+        char *str = arena_alloc(arena, total_len);
+        if (str == NULL)
+        {
+            DEBUG_ERROR("Out of memory");
+            exit(1);
+        }
+        snprintf(str, total_len, "function(%s) -> %s", params_buf, ret_str);
+        return str;
+    }
+
+    default:
+        return arena_strdup(arena, "unknown");
     }
 }
 
