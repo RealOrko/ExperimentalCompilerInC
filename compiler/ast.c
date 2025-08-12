@@ -439,7 +439,7 @@ const char *ast_type_to_string(Type *type)
     case TYPE_ARRAY:
     {
         const char *elem_str = ast_type_to_string(type->as.array.element_type);
-        char temp[256];
+        char temp[1024];
         strncpy(temp, elem_str, sizeof(temp) - 1);
         temp[sizeof(temp) - 1] = '\0';
         snprintf(buffer, sizeof(buffer), "array<%s>", temp);
@@ -447,7 +447,7 @@ const char *ast_type_to_string(Type *type)
     }
     case TYPE_FUNCTION:
     {
-        char params_str[256] = {0};
+        char params_str[1024] = {0};
         for (int i = 0; i < type->as.function.param_count; i++)
         {
             const char *param_type = ast_type_to_string(type->as.function.param_types[i]);
@@ -458,7 +458,7 @@ const char *ast_type_to_string(Type *type)
             strcat(params_str, param_type);
         }
         const char *ret_str = ast_type_to_string(type->as.function.return_type);
-        char temp[256];
+        char temp[1024];
         strncpy(temp, ret_str, sizeof(temp) - 1);
         temp[sizeof(temp) - 1] = '\0';
         snprintf(buffer, sizeof(buffer), "fn(%s) -> %s", params_str, temp);
