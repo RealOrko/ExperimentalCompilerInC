@@ -630,6 +630,14 @@ Token lexer_scan_token(Lexer *lexer)
         }
         DEBUG_VERBOSE("Line %d: Emitting LESS", lexer->line);
         return lexer_make_token(lexer, TOKEN_LESS);
+    case '>':
+        if (lexer_match(lexer, '='))
+        {
+            DEBUG_VERBOSE("Line %d: Emitting GREATER_EQUAL", lexer->line);
+            return lexer_make_token(lexer, TOKEN_GREATER_EQUAL);
+        }
+        DEBUG_VERBOSE("Line %d: Emitting GREATER", lexer->line);
+        return lexer_make_token(lexer, TOKEN_GREATER);
     case ',':
         DEBUG_VERBOSE("Line %d: Emitting COMMA", lexer->line);
         return lexer_make_token(lexer, TOKEN_COMMA);

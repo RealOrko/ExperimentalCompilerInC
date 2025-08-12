@@ -11,27 +11,18 @@
 #include "../symbol_table.h"
 
 static void setup_parser(Arena *arena, Lexer *lexer, Parser *parser, const char *source) {
-    DEBUG_INFO("Setting up parser with source length: %zu", strlen(source));
     arena_init(arena, 4096);
-    DEBUG_VERBOSE("Arena initialized");
     lexer_init(arena, lexer, source, "test.sn");
-    DEBUG_VERBOSE("Lexer initialized");
     parser_init(arena, parser, lexer);
-    DEBUG_VERBOSE("Parser initialized");
 }
 
 static void cleanup_parser(Arena *arena, Lexer *lexer, Parser *parser) {
-    DEBUG_INFO("Cleaning up parser");
     parser_cleanup(parser);
-    DEBUG_VERBOSE("Parser cleaned up");
     lexer_cleanup(lexer);
-    DEBUG_VERBOSE("Lexer cleaned up");
     arena_free(arena);
-    DEBUG_VERBOSE("Arena freed");
 }
 
 void test_empty_program_parsing() {
-    DEBUG_INFO("Starting test_empty_program_parsing");
     printf("Testing parser_execute empty program...\n");
 
     Arena arena;
@@ -39,24 +30,18 @@ void test_empty_program_parsing() {
     Parser parser;
     setup_parser(&arena, &lexer, &parser, "");
 
-    DEBUG_VERBOSE("Executing parser on empty source");
     Module *module = parser_execute(&parser, "test.sn");
 
-    DEBUG_VERBOSE("Module: %p", module);
     if (module) {
-        DEBUG_VERBOSE("Module count: %d", module->count);
-        DEBUG_VERBOSE("Module filename: %s", module->filename);
     }
     assert(module != NULL);
     assert(module->count == 0);
     assert(strcmp(module->filename, "test.sn") == 0);
 
     cleanup_parser(&arena, &lexer, &parser);
-    DEBUG_INFO("Finished test_empty_program_parsing");
 }
 
 void test_var_decl_parsing() {
-    DEBUG_INFO("Starting test_var_decl_parsing");
     printf("Testing parser_execute variable declaration...\n");
 
     Arena arena;
@@ -65,33 +50,23 @@ void test_var_decl_parsing() {
     const char *source = "var x:int = 42\n";
     setup_parser(&arena, &lexer, &parser, source);
 
-    DEBUG_VERBOSE("Executing parser on var decl source");
     Module *module = parser_execute(&parser, "test.sn");
 
-    DEBUG_VERBOSE("Module: %p", module);
     if (module) {
-        DEBUG_VERBOSE("Module count: %d", module->count);
     }
     assert(module != NULL);
     assert(module->count == 1);
     Stmt *stmt = module->statements[0];
-    DEBUG_VERBOSE("Statement type: %d", stmt->type);
     assert(stmt->type == STMT_VAR_DECL);
-    DEBUG_VERBOSE("Var name: %s", stmt->as.var_decl.name.start);
     assert(strcmp(stmt->as.var_decl.name.start, "x") == 0);
-    DEBUG_VERBOSE("Var type kind: %d", stmt->as.var_decl.type->kind);
     assert(stmt->as.var_decl.type->kind == TYPE_INT);
-    DEBUG_VERBOSE("Initializer type: %d", stmt->as.var_decl.initializer->type);
     assert(stmt->as.var_decl.initializer->type == EXPR_LITERAL);
-    DEBUG_VERBOSE("Initializer int_value: %lld", (long long)stmt->as.var_decl.initializer->as.literal.value.int_value);
     assert(stmt->as.var_decl.initializer->as.literal.value.int_value == 42);
 
     cleanup_parser(&arena, &lexer, &parser);
-    DEBUG_INFO("Finished test_var_decl_parsing");
 }
 
 void test_function_no_params_parsing() {
-    DEBUG_INFO("Starting test_function_no_params_parsing");
     printf("Testing parser_execute function no params...\n");
 
     Arena arena;
@@ -102,45 +77,30 @@ void test_function_no_params_parsing() {
         "  print(\"hello\\n\")\n";
     setup_parser(&arena, &lexer, &parser, source);
 
-    DEBUG_VERBOSE("Executing parser on function no params source");
     Module *module = parser_execute(&parser, "test.sn");
 
-    DEBUG_VERBOSE("Module: %p", module);
     if (module) {
-        DEBUG_VERBOSE("Module count: %d", module->count);
     }
     assert(module != NULL);
     assert(module->count == 1);
     Stmt *fn = module->statements[0];
-    DEBUG_VERBOSE("Function name: %s", fn->as.function.name.start);
     assert(fn->type == STMT_FUNCTION);
     assert(strcmp(fn->as.function.name.start, "main") == 0);
-    DEBUG_VERBOSE("Param count: %d", fn->as.function.param_count);
     assert(fn->as.function.param_count == 0);
-    DEBUG_VERBOSE("Return type kind: %d", fn->as.function.return_type->kind);
     assert(fn->as.function.return_type->kind == TYPE_VOID);
-    DEBUG_VERBOSE("Body count: %d", fn->as.function.body_count);
     assert(fn->as.function.body_count == 1);
     Stmt *print_stmt = fn->as.function.body[0];
-    DEBUG_VERBOSE("Print stmt type: %d", print_stmt->type);
     assert(print_stmt->type == STMT_EXPR);
-    DEBUG_VERBOSE("Expression type: %d", print_stmt->as.expression.expression->type);
     assert(print_stmt->as.expression.expression->type == EXPR_CALL);
-    DEBUG_VERBOSE("Callee name: %s", print_stmt->as.expression.expression->as.call.callee->as.variable.name.start);
     assert(strcmp(print_stmt->as.expression.expression->as.call.callee->as.variable.name.start, "print") == 0);
-    DEBUG_VERBOSE("Arg count: %d", print_stmt->as.expression.expression->as.call.arg_count);
     assert(print_stmt->as.expression.expression->as.call.arg_count == 1);
-    DEBUG_VERBOSE("Arg type: %d", print_stmt->as.expression.expression->as.call.arguments[0]->type);
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->type == EXPR_LITERAL);
-    DEBUG_VERBOSE("String value: %s", print_stmt->as.expression.expression->as.call.arguments[0]->as.literal.value.string_value);
     assert(strcmp(print_stmt->as.expression.expression->as.call.arguments[0]->as.literal.value.string_value, "hello\n") == 0);
 
     cleanup_parser(&arena, &lexer, &parser);
-    DEBUG_INFO("Finished test_function_no_params_parsing");
 }
 
 void test_if_statement_parsing() {
-    DEBUG_INFO("Starting test_if_statement_parsing");
     printf("Testing parser_execute if statement...\n");
 
     Arena arena;
@@ -153,35 +113,19 @@ void test_if_statement_parsing() {
         "  print(\"non-positive\\n\")\n";
     setup_parser(&arena, &lexer, &parser, source);
 
-    DEBUG_VERBOSE("Executing parser on if statement source");
     Module *module = parser_execute(&parser, "test.sn");
 
     // Added debugging logs to inspect parser state and AST
-    DEBUG_INFO("Parser had_error after execute: %d", parser.had_error);
-    DEBUG_INFO("Parser panic_mode: %d", parser.panic_mode);
-    DEBUG_INFO("Module pointer: %p", (void*)module);
     if (module) {
-        DEBUG_INFO("Module count: %d", module->count);
-        DEBUG_INFO("Module filename: %s", module->filename);
         if (module->count > 0) {
-            DEBUG_VERBOSE("Printing AST for first statement:");
             ast_print_stmt(module->statements[0], 0);
             Stmt *if_stmt = module->statements[0];
-            DEBUG_INFO("Statement type: %d (expected STMT_IF: %d)", if_stmt->type, STMT_IF);
             if (if_stmt->type == STMT_IF) {
-                DEBUG_INFO("Condition type: %d (expected EXPR_BINARY: %d)", if_stmt->as.if_stmt.condition->type, EXPR_BINARY);
                 if (if_stmt->as.if_stmt.condition->type == EXPR_BINARY) {
-                    DEBUG_INFO("Binary operator: %d (expected TOKEN_GREATER: %d)", if_stmt->as.if_stmt.condition->as.binary.operator, TOKEN_GREATER);
-                    DEBUG_INFO("Left operand name: %s (expected 'x')", if_stmt->as.if_stmt.condition->as.binary.left->as.variable.name.start);
-                    DEBUG_INFO("Right operand int_value: %lld (expected 0)", (long long)if_stmt->as.if_stmt.condition->as.binary.right->as.literal.value.int_value);
                 }
-                DEBUG_INFO("Then branch type: %d (expected STMT_BLOCK: %d)", if_stmt->as.if_stmt.then_branch->type, STMT_BLOCK);
                 if (if_stmt->as.if_stmt.then_branch->type == STMT_BLOCK) {
-                    DEBUG_INFO("Then block count: %d (expected 1)", if_stmt->as.if_stmt.then_branch->as.block.count);
                 }
-                DEBUG_INFO("Else branch type: %d (expected STMT_BLOCK: %d)", if_stmt->as.if_stmt.else_branch->type, STMT_BLOCK);
                 if (if_stmt->as.if_stmt.else_branch->type == STMT_BLOCK) {
-                    DEBUG_INFO("Else block count: %d (expected 1)", if_stmt->as.if_stmt.else_branch->as.block.count);
                 }
             }
         } else {
@@ -205,11 +149,9 @@ void test_if_statement_parsing() {
     assert(if_stmt->as.if_stmt.else_branch->as.block.count == 1);
 
     cleanup_parser(&arena, &lexer, &parser);
-    DEBUG_INFO("Finished test_if_statement_parsing");
 }
 
 void test_while_loop_parsing() {
-    DEBUG_INFO("Starting test_while_loop_parsing");
     printf("Testing parser_execute while loop...\n");
 
     Arena arena;
@@ -221,48 +163,31 @@ void test_while_loop_parsing() {
         "  print(i)\n";
     setup_parser(&arena, &lexer, &parser, source);
 
-    DEBUG_VERBOSE("Executing parser on while loop source");
     Module *module = parser_execute(&parser, "test.sn");
 
-    DEBUG_VERBOSE("Module: %p", module);
     if (module) {
-        DEBUG_VERBOSE("Module count: %d", module->count);
     }
     assert(module != NULL);
     assert(module->count == 1);
     Stmt *while_stmt = module->statements[0];
-    DEBUG_VERBOSE("While stmt type: %d", while_stmt->type);
     assert(while_stmt->type == STMT_WHILE);
-    DEBUG_VERBOSE("Condition type: %d", while_stmt->as.while_stmt.condition->type);
     assert(while_stmt->as.while_stmt.condition->type == EXPR_BINARY);
-    DEBUG_VERBOSE("Binary operator: %d", while_stmt->as.while_stmt.condition->as.binary.operator);
     assert(while_stmt->as.while_stmt.condition->as.binary.operator == TOKEN_LESS);
-    DEBUG_VERBOSE("Left name: %s", while_stmt->as.while_stmt.condition->as.binary.left->as.variable.name.start);
     assert(strcmp(while_stmt->as.while_stmt.condition->as.binary.left->as.variable.name.start, "i") == 0);
-    DEBUG_VERBOSE("Right int_value: %lld", (long long)while_stmt->as.while_stmt.condition->as.binary.right->as.literal.value.int_value);
     assert(while_stmt->as.while_stmt.condition->as.binary.right->as.literal.value.int_value == 10);
-    DEBUG_VERBOSE("Body type: %d", while_stmt->as.while_stmt.body->type);
     assert(while_stmt->as.while_stmt.body->type == STMT_BLOCK);
-    DEBUG_VERBOSE("Block count: %d", while_stmt->as.while_stmt.body->as.block.count);
     assert(while_stmt->as.while_stmt.body->as.block.count == 2);
     Stmt *assign = while_stmt->as.while_stmt.body->as.block.statements[0];
-    DEBUG_VERBOSE("Assign type: %d", assign->type);
     assert(assign->type == STMT_EXPR);
-    DEBUG_VERBOSE("Expression type: %d", assign->as.expression.expression->type);
     assert(assign->as.expression.expression->type == EXPR_ASSIGN);
-    DEBUG_VERBOSE("Assign name: %s", assign->as.expression.expression->as.assign.name.start);
     assert(strcmp(assign->as.expression.expression->as.assign.name.start, "i") == 0);
-    DEBUG_VERBOSE("Value type: %d", assign->as.expression.expression->as.assign.value->type);
     assert(assign->as.expression.expression->as.assign.value->type == EXPR_BINARY);
-    DEBUG_VERBOSE("Binary operator: %d", assign->as.expression.expression->as.assign.value->as.binary.operator);
     assert(assign->as.expression.expression->as.assign.value->as.binary.operator == TOKEN_PLUS);
 
     cleanup_parser(&arena, &lexer, &parser);
-    DEBUG_INFO("Finished test_while_loop_parsing");
 }
 
 void test_for_loop_parsing() {
-    DEBUG_INFO("Starting test_for_loop_parsing");
     printf("Testing parser_execute for loop...\n");
 
     Arena arena;
@@ -273,45 +198,29 @@ void test_for_loop_parsing() {
         "  print(j)\n";
     setup_parser(&arena, &lexer, &parser, source);
 
-    DEBUG_VERBOSE("Executing parser on for loop source");
     Module *module = parser_execute(&parser, "test.sn");
 
-    DEBUG_VERBOSE("Module: %p", module);
     if (module) {
-        DEBUG_VERBOSE("Module count: %d", module->count);
     }
     assert(module != NULL);
     assert(module->count == 1);
     Stmt *for_stmt = module->statements[0];
-    DEBUG_VERBOSE("For stmt type: %d", for_stmt->type);
     assert(for_stmt->type == STMT_FOR);
-    DEBUG_VERBOSE("Initializer type: %d", for_stmt->as.for_stmt.initializer->type);
     assert(for_stmt->as.for_stmt.initializer->type == STMT_VAR_DECL);
-    DEBUG_VERBOSE("Var name: %s", for_stmt->as.for_stmt.initializer->as.var_decl.name.start);
     assert(strcmp(for_stmt->as.for_stmt.initializer->as.var_decl.name.start, "j") == 0);
-    DEBUG_VERBOSE("Var type kind: %d", for_stmt->as.for_stmt.initializer->as.var_decl.type->kind);
     assert(for_stmt->as.for_stmt.initializer->as.var_decl.type->kind == TYPE_INT);
-    DEBUG_VERBOSE("Initializer int_value: %lld", (long long)for_stmt->as.for_stmt.initializer->as.var_decl.initializer->as.literal.value.int_value);
     assert(for_stmt->as.for_stmt.initializer->as.var_decl.initializer->as.literal.value.int_value == 0);
-    DEBUG_VERBOSE("Condition type: %d", for_stmt->as.for_stmt.condition->type);
     assert(for_stmt->as.for_stmt.condition->type == EXPR_BINARY);
-    DEBUG_VERBOSE("Binary operator: %d", for_stmt->as.for_stmt.condition->as.binary.operator);
     assert(for_stmt->as.for_stmt.condition->as.binary.operator == TOKEN_LESS);
-    DEBUG_VERBOSE("Increment type: %d", for_stmt->as.for_stmt.increment->type);
     assert(for_stmt->as.for_stmt.increment->type == EXPR_INCREMENT);
-    DEBUG_VERBOSE("Operand name: %s", for_stmt->as.for_stmt.increment->as.operand->as.variable.name.start);
     assert(strcmp(for_stmt->as.for_stmt.increment->as.operand->as.variable.name.start, "j") == 0);
-    DEBUG_VERBOSE("Body type: %d", for_stmt->as.for_stmt.body->type);
     assert(for_stmt->as.for_stmt.body->type == STMT_BLOCK);
-    DEBUG_VERBOSE("Block count: %d", for_stmt->as.for_stmt.body->as.block.count);
     assert(for_stmt->as.for_stmt.body->as.block.count == 1);
 
     cleanup_parser(&arena, &lexer, &parser);
-    DEBUG_INFO("Finished test_for_loop_parsing");
 }
 
 void test_interpolated_string_parsing() {
-    DEBUG_INFO("Starting test_interpolated_string_parsing");
     printf("Testing parser_execute interpolated string...\n");
 
     Arena arena;
@@ -320,60 +229,37 @@ void test_interpolated_string_parsing() {
     const char *source = "print($\"Value is {x} and {y * 2}\\n\")\n";
     setup_parser(&arena, &lexer, &parser, source);
 
-    DEBUG_VERBOSE("Executing parser on interpolated string source");
     Module *module = parser_execute(&parser, "test.sn");
 
-    DEBUG_VERBOSE("Module: %p", module);
     if (module) {
-        DEBUG_VERBOSE("Module count: %d", module->count);
     }
     assert(module != NULL);
     assert(module->count == 1);
     Stmt *print_stmt = module->statements[0];
-    DEBUG_VERBOSE("Print stmt type: %d", print_stmt->type);
     assert(print_stmt->type == STMT_EXPR);
-    DEBUG_VERBOSE("Expression type: %d", print_stmt->as.expression.expression->type);
     assert(print_stmt->as.expression.expression->type == EXPR_CALL);
-    DEBUG_VERBOSE("Callee name: %s", print_stmt->as.expression.expression->as.call.callee->as.variable.name.start);
     assert(strcmp(print_stmt->as.expression.expression->as.call.callee->as.variable.name.start, "print") == 0);
-    DEBUG_VERBOSE("Arg count: %d", print_stmt->as.expression.expression->as.call.arg_count);
     assert(print_stmt->as.expression.expression->as.call.arg_count == 1);
     Expr *arg = print_stmt->as.expression.expression->as.call.arguments[0];
-    DEBUG_VERBOSE("Arg type: %d", arg->type);
     assert(arg->type == EXPR_INTERPOLATED);
-    DEBUG_VERBOSE("Part count: %d", arg->as.interpol.part_count);
     assert(arg->as.interpol.part_count == 5);
-    DEBUG_VERBOSE("Part 0 type: %d", arg->as.interpol.parts[0]->type);
     assert(arg->as.interpol.parts[0]->type == EXPR_LITERAL);
-    DEBUG_VERBOSE("Part 0 string: %s", arg->as.interpol.parts[0]->as.literal.value.string_value);
     assert(strcmp(arg->as.interpol.parts[0]->as.literal.value.string_value, "Value is ") == 0);
-    DEBUG_VERBOSE("Part 1 type: %d", arg->as.interpol.parts[1]->type);
     assert(arg->as.interpol.parts[1]->type == EXPR_VARIABLE);
-    DEBUG_VERBOSE("Part 1 name: %s", arg->as.interpol.parts[1]->as.variable.name.start);
     assert(strcmp(arg->as.interpol.parts[1]->as.variable.name.start, "x") == 0);
-    DEBUG_VERBOSE("Part 2 type: %d", arg->as.interpol.parts[2]->type);
     assert(arg->as.interpol.parts[2]->type == EXPR_LITERAL);
-    DEBUG_VERBOSE("Part 2 string: %s", arg->as.interpol.parts[2]->as.literal.value.string_value);
     assert(strcmp(arg->as.interpol.parts[2]->as.literal.value.string_value, " and ") == 0);
-    DEBUG_VERBOSE("Part 3 type: %d", arg->as.interpol.parts[3]->type);
     assert(arg->as.interpol.parts[3]->type == EXPR_BINARY);
-    DEBUG_VERBOSE("Part 3 operator: %d", arg->as.interpol.parts[3]->as.binary.operator);
     assert(arg->as.interpol.parts[3]->as.binary.operator == TOKEN_STAR);
-    DEBUG_VERBOSE("Part 3 left name: %s", arg->as.interpol.parts[3]->as.binary.left->as.variable.name.start);
     assert(strcmp(arg->as.interpol.parts[3]->as.binary.left->as.variable.name.start, "y") == 0);
-    DEBUG_VERBOSE("Part 3 right int_value: %lld", (long long)arg->as.interpol.parts[3]->as.binary.right->as.literal.value.int_value);
     assert(arg->as.interpol.parts[3]->as.binary.right->as.literal.value.int_value == 2);
-    DEBUG_VERBOSE("Part 4 type: %d", arg->as.interpol.parts[4]->type);
     assert(arg->as.interpol.parts[4]->type == EXPR_LITERAL);
-    DEBUG_VERBOSE("Part 4 string: %s", arg->as.interpol.parts[4]->as.literal.value.string_value);
     assert(strcmp(arg->as.interpol.parts[4]->as.literal.value.string_value, "\n") == 0);
 
     cleanup_parser(&arena, &lexer, &parser);
-    DEBUG_INFO("Finished test_interpolated_string_parsing");
 }
 
 void test_literal_types_parsing() {
-    DEBUG_INFO("Starting test_literal_types_parsing");
     printf("Testing parser_execute various literals...\n");
 
     Arena arena;
@@ -388,76 +274,53 @@ void test_literal_types_parsing() {
         "var s:str = \"hello\"\n";
     setup_parser(&arena, &lexer, &parser, source);
 
-    DEBUG_VERBOSE("Executing parser on literal types source");
     Module *module = parser_execute(&parser, "test.sn");
 
-    DEBUG_VERBOSE("Module: %p", module);
     if (module) {
-        DEBUG_VERBOSE("Module count: %d", module->count);
     }
     assert(module != NULL);
     assert(module->count == 6);
 
     // int
     Stmt *stmt1 = module->statements[0];
-    DEBUG_VERBOSE("Stmt1 type: %d", stmt1->type);
     assert(stmt1->type == STMT_VAR_DECL);
-    DEBUG_VERBOSE("Stmt1 type kind: %d", stmt1->as.var_decl.type->kind);
     assert(stmt1->as.var_decl.type->kind == TYPE_INT);
-    DEBUG_VERBOSE("Stmt1 int_value: %lld", (long long)stmt1->as.var_decl.initializer->as.literal.value.int_value);
     assert(stmt1->as.var_decl.initializer->as.literal.value.int_value == 42);
 
     // long (assuming int_value is long)
     Stmt *stmt2 = module->statements[1];
-    DEBUG_VERBOSE("Stmt2 type: %d", stmt2->type);
     assert(stmt2->type == STMT_VAR_DECL);
-    DEBUG_VERBOSE("Stmt2 type kind: %d", stmt2->as.var_decl.type->kind);
     assert(stmt2->as.var_decl.type->kind == TYPE_LONG);
-    DEBUG_VERBOSE("Stmt2 int_value: %lld", (long long)stmt2->as.var_decl.initializer->as.literal.value.int_value);
     assert(stmt2->as.var_decl.initializer->as.literal.value.int_value == 123456789012LL);
 
     // double
     Stmt *stmt3 = module->statements[2];
-    DEBUG_VERBOSE("Stmt3 type: %d", stmt3->type);
     assert(stmt3->type == STMT_VAR_DECL);
-    DEBUG_VERBOSE("Stmt3 type kind: %d", stmt3->as.var_decl.type->kind);
     assert(stmt3->as.var_decl.type->kind == TYPE_DOUBLE);
-    DEBUG_VERBOSE("Stmt3 double_value: %f", stmt3->as.var_decl.initializer->as.literal.value.double_value);
     assert(stmt3->as.var_decl.initializer->as.literal.value.double_value == 3.14159);
 
     // char
     Stmt *stmt4 = module->statements[3];
-    DEBUG_VERBOSE("Stmt4 type: %d", stmt4->type);
     assert(stmt4->type == STMT_VAR_DECL);
-    DEBUG_VERBOSE("Stmt4 type kind: %d", stmt4->as.var_decl.type->kind);
     assert(stmt4->as.var_decl.type->kind == TYPE_CHAR);
-    DEBUG_VERBOSE("Stmt4 char_value: %c", stmt4->as.var_decl.initializer->as.literal.value.char_value);
     assert(stmt4->as.var_decl.initializer->as.literal.value.char_value == 'A');
 
     // bool
     Stmt *stmt5 = module->statements[4];
-    DEBUG_VERBOSE("Stmt5 type: %d", stmt5->type);
     assert(stmt5->type == STMT_VAR_DECL);
-    DEBUG_VERBOSE("Stmt5 type kind: %d", stmt5->as.var_decl.type->kind);
     assert(stmt5->as.var_decl.type->kind == TYPE_BOOL);
-    DEBUG_VERBOSE("Stmt5 bool_value: %d", stmt5->as.var_decl.initializer->as.literal.value.bool_value);
     assert(stmt5->as.var_decl.initializer->as.literal.value.bool_value == 1);  // true
 
     // string
     Stmt *stmt6 = module->statements[5];
-    DEBUG_VERBOSE("Stmt6 type: %d", stmt6->type);
     assert(stmt6->type == STMT_VAR_DECL);
-    DEBUG_VERBOSE("Stmt6 type kind: %d", stmt6->as.var_decl.type->kind);
     assert(stmt6->as.var_decl.type->kind == TYPE_STRING);
-    DEBUG_VERBOSE("Stmt6 string_value: %s", stmt6->as.var_decl.initializer->as.literal.value.string_value);
     assert(strcmp(stmt6->as.var_decl.initializer->as.literal.value.string_value, "hello") == 0);
 
     cleanup_parser(&arena, &lexer, &parser);
-    DEBUG_INFO("Finished test_literal_types_parsing");
 }
 
 void test_recursive_function_parsing() {
-    DEBUG_INFO("Starting test_recursive_function_parsing");
     printf("Testing parser_execute recursive function...\n");
 
     Arena arena;
@@ -470,57 +333,36 @@ void test_recursive_function_parsing() {
         "  return n * factorial(n - 1)\n";
     setup_parser(&arena, &lexer, &parser, source);
 
-    DEBUG_VERBOSE("Executing parser on recursive function source");
     Module *module = parser_execute(&parser, "test.sn");
 
-    DEBUG_VERBOSE("Module: %p", module);
     if (module) {
-        DEBUG_VERBOSE("Module count: %d", module->count);
     }
     assert(module != NULL);
     assert(module->count == 1);
     Stmt *fn = module->statements[0];
-    DEBUG_VERBOSE("Function type: %d", fn->type);
     assert(fn->type == STMT_FUNCTION);
-    DEBUG_VERBOSE("Function name: %s", fn->as.function.name.start);
     assert(strcmp(fn->as.function.name.start, "factorial") == 0);
-    DEBUG_VERBOSE("Param count: %d", fn->as.function.param_count);
     assert(fn->as.function.param_count == 1);
-    DEBUG_VERBOSE("Param 0 name: %s", fn->as.function.params[0].name.start);
     assert(strcmp(fn->as.function.params[0].name.start, "n") == 0);
-    DEBUG_VERBOSE("Param 0 type kind: %d", fn->as.function.params[0].type->kind);
     assert(fn->as.function.params[0].type->kind == TYPE_INT);
-    DEBUG_VERBOSE("Return type kind: %d", fn->as.function.return_type->kind);
     assert(fn->as.function.return_type->kind == TYPE_INT);
-    DEBUG_VERBOSE("Body count: %d", fn->as.function.body_count);
     assert(fn->as.function.body_count == 2);
     Stmt *if_stmt = fn->as.function.body[0];
-    DEBUG_VERBOSE("If stmt type: %d", if_stmt->type);
     assert(if_stmt->type == STMT_IF);
-    DEBUG_VERBOSE("Condition operator: %d", if_stmt->as.if_stmt.condition->as.binary.operator);
     assert(if_stmt->as.if_stmt.condition->as.binary.operator == TOKEN_LESS_EQUAL);
-    DEBUG_VERBOSE("Then block count: %d", if_stmt->as.if_stmt.then_branch->as.block.count);
     assert(if_stmt->as.if_stmt.then_branch->as.block.count == 1);
-    DEBUG_VERBOSE("Then stmt 0 type: %d", if_stmt->as.if_stmt.then_branch->as.block.statements[0]->type);
     assert(if_stmt->as.if_stmt.then_branch->as.block.statements[0]->type == STMT_RETURN);
     Stmt *return_stmt = fn->as.function.body[1];
-    DEBUG_VERBOSE("Return stmt type: %d", return_stmt->type);
     assert(return_stmt->type == STMT_RETURN);
-    DEBUG_VERBOSE("Value type: %d", return_stmt->as.return_stmt.value->type);
     assert(return_stmt->as.return_stmt.value->type == EXPR_BINARY);
-    DEBUG_VERBOSE("Binary operator: %d", return_stmt->as.return_stmt.value->as.binary.operator);
     assert(return_stmt->as.return_stmt.value->as.binary.operator == TOKEN_STAR);
-    DEBUG_VERBOSE("Right type: %d", return_stmt->as.return_stmt.value->as.binary.right->type);
     assert(return_stmt->as.return_stmt.value->as.binary.right->type == EXPR_CALL);
-    DEBUG_VERBOSE("Call callee name: %s", return_stmt->as.return_stmt.value->as.binary.right->as.call.callee->as.variable.name.start);
     assert(strcmp(return_stmt->as.return_stmt.value->as.binary.right->as.call.callee->as.variable.name.start, "factorial") == 0);
 
     cleanup_parser(&arena, &lexer, &parser);
-    DEBUG_INFO("Finished test_recursive_function_parsing");
 }
 
 void test_full_program_parsing() {
-    DEBUG_INFO("Starting test_full_program_parsing");
     printf("Testing parser_execute full program...\n");
 
     Arena arena;
@@ -591,18 +433,11 @@ void test_full_program_parsing() {
         "  print(\"Complete main method ... \\n\")\n";
     setup_parser(&arena, &lexer, &parser, source);
 
-    DEBUG_VERBOSE("Executing parser on full program source");
     Module *module = parser_execute(&parser, "test.sn");
 
     // Added debugging logs to inspect parser state and AST
-    DEBUG_INFO("Parser had_error after execute: %d", parser.had_error);
-    DEBUG_INFO("Parser panic_mode: %d", parser.panic_mode);
-    DEBUG_INFO("Module pointer: %p", (void*)module);
     if (module) {
-        DEBUG_INFO("Module count: %d (expected 4 functions)", module->count);
-        DEBUG_INFO("Module filename: %s", module->filename);
         for (int i = 0; i < module->count; i++) {
-            DEBUG_VERBOSE("Printing AST for statement %d:", i);
             ast_print_stmt(module->statements[i], 0);
         }
     } else {
@@ -614,29 +449,18 @@ void test_full_program_parsing() {
 
     // factorial
     Stmt *fact_fn = module->statements[0];
-    DEBUG_VERBOSE("Fact fn type: %d", fact_fn->type);
     assert(fact_fn->type == STMT_FUNCTION);
-    DEBUG_VERBOSE("Fact fn name: %s", fact_fn->as.function.name.start);
     assert(strcmp(fact_fn->as.function.name.start, "factorial") == 0);
-    DEBUG_VERBOSE("Fact param count: %d", fact_fn->as.function.param_count);
     assert(fact_fn->as.function.param_count == 1);
-    DEBUG_VERBOSE("Fact return type kind: %d", fact_fn->as.function.return_type->kind);
     assert(fact_fn->as.function.return_type->kind == TYPE_INT);
     // Corrected body_count to 5 (print, if, var, print, return)
-    DEBUG_VERBOSE("Fact body count: %d", fact_fn->as.function.body_count);
     assert(fact_fn->as.function.body_count == 5);  
-    DEBUG_VERBOSE("Fact body[0] type: %d", fact_fn->as.function.body[0]->type);
     assert(fact_fn->as.function.body[0]->type == STMT_EXPR);  // print
-    DEBUG_VERBOSE("Fact body[1] type: %d", fact_fn->as.function.body[1]->type);
     assert(fact_fn->as.function.body[1]->type == STMT_IF);
-    DEBUG_VERBOSE("Fact body[2] type: %d", fact_fn->as.function.body[2]->type);
     assert(fact_fn->as.function.body[2]->type == STMT_VAR_DECL);  // var j
-    DEBUG_VERBOSE("Fact body[3] type: %d", fact_fn->as.function.body[3]->type);
     assert(fact_fn->as.function.body[3]->type == STMT_EXPR);  // print
-    DEBUG_VERBOSE("Fact body[4] type: %d", fact_fn->as.function.body[4]->type);
     assert(fact_fn->as.function.body[4]->type == STMT_RETURN);  // return j
     // Added debug for factorial body
-    DEBUG_INFO("Factorial body_count: %d (expected 5)", fact_fn->as.function.body_count);
 
     // To keep it concise, assert key parts
     assert(fact_fn->as.function.body[0]->type == STMT_EXPR);  // print
@@ -657,54 +481,40 @@ void test_full_program_parsing() {
 
     // Since exhaustive, but to avoid too long, assert module count and function names
     Stmt *prime_fn = module->statements[1];
-    DEBUG_VERBOSE("Prime fn name: %s", prime_fn->as.function.name.start);
     assert(strcmp(prime_fn->as.function.name.start, "is_prime") == 0);
-    DEBUG_VERBOSE("Prime return type kind: %d", prime_fn->as.function.return_type->kind);
     assert(prime_fn->as.function.return_type->kind == TYPE_BOOL);
 
     Stmt *repeat_fn = module->statements[2];
-    DEBUG_VERBOSE("Repeat fn name: %s", repeat_fn->as.function.name.start);
     assert(strcmp(repeat_fn->as.function.name.start, "repeat_string") == 0);
-    DEBUG_VERBOSE("Repeat return type kind: %d", repeat_fn->as.function.return_type->kind);
     assert(repeat_fn->as.function.return_type->kind == TYPE_STRING);
 
     Stmt *main_fn = module->statements[3];
-    DEBUG_VERBOSE("Main fn name: %s", main_fn->as.function.name.start);
     assert(strcmp(main_fn->as.function.name.start, "main") == 0);
-    DEBUG_VERBOSE("Main return type kind: %d", main_fn->as.function.return_type->kind);
     assert(main_fn->as.function.return_type->kind == TYPE_VOID);
     // Count body statements, e.g., 20+ 
 
     // Assert one interpolated in main
     Stmt *print_fact = main_fn->as.function.body[3];  // print Factorial of...
-    DEBUG_VERBOSE("Print fact type: %d", print_fact->type);
     assert(print_fact->type == STMT_EXPR);
     Expr *call = print_fact->as.expression.expression;
-    DEBUG_VERBOSE("Call type: %d", call->type);
     assert(call->type == EXPR_CALL);
     Expr *arg = call->as.call.arguments[0];
-    DEBUG_VERBOSE("Arg type: %d", arg->type);
     assert(arg->type == EXPR_INTERPOLATED);
-    DEBUG_VERBOSE("Part count: %d", arg->as.interpol.part_count);
     assert(arg->as.interpol.part_count == 5);  // "Factorial of ", {num}, " is ", {fact}, "\n"
 
     // Similarly, check for loop in main
     Stmt *for_sum = main_fn->as.function.body[10];  // adjust index
-    DEBUG_VERBOSE("For sum type: %d", for_sum->type);
     assert(for_sum->type == STMT_FOR);
 
     // Etc. But since comprehensive, this is a start; in practice, add more asserts
 
     // Added debug for main body count
-    DEBUG_INFO("Main body_count: %d", main_fn->as.function.body_count);
 
     cleanup_parser(&arena, &lexer, &parser);
-    DEBUG_INFO("Finished test_full_program_parsing");
 }
 
 void test_simple_program_parsing() {
     // Existing test, kept as is
-    DEBUG_INFO("Starting test_simple_program_parsing");
     printf("Testing parser_execute simple program...\n");
 
     Arena arena;
@@ -723,14 +533,10 @@ void test_simple_program_parsing() {
     Parser parser;
     parser_init(&arena, &parser, &lexer);
 
-    DEBUG_VERBOSE("Executing parser on simple program source");
     Module *module = parser_execute(&parser, "test.sn");
 
     // Basic assertions on the parsed module
-    DEBUG_VERBOSE("Module: %p", module);
     if (module) {
-        DEBUG_VERBOSE("Module count: %d", module->count);
-        DEBUG_VERBOSE("Module filename: %s", module->filename);
     }
     assert(module != NULL);
     assert(module->count == 2);  // Two function declarations: add and main
@@ -738,113 +544,65 @@ void test_simple_program_parsing() {
 
     // First statement: fn add
     Stmt *add_fn = module->statements[0];
-    DEBUG_VERBOSE("Add fn: %p", add_fn);
     assert(add_fn != NULL);
-    DEBUG_VERBOSE("Add fn type: %d", add_fn->type);
     assert(add_fn->type == STMT_FUNCTION);
-    DEBUG_VERBOSE("Add fn name: %s", add_fn->as.function.name.start);
     assert(strcmp(add_fn->as.function.name.start, "add") == 0);
-    DEBUG_VERBOSE("Add param count: %d", add_fn->as.function.param_count);
     assert(add_fn->as.function.param_count == 2);
-    DEBUG_VERBOSE("Param 0 name: %s", add_fn->as.function.params[0].name.start);
     assert(strcmp(add_fn->as.function.params[0].name.start, "x") == 0);
-    DEBUG_VERBOSE("Param 0 type kind: %d", add_fn->as.function.params[0].type->kind);
     assert(add_fn->as.function.params[0].type->kind == TYPE_INT);
-    DEBUG_VERBOSE("Param 1 name: %s", add_fn->as.function.params[1].name.start);
     assert(strcmp(add_fn->as.function.params[1].name.start, "y") == 0);
-    DEBUG_VERBOSE("Param 1 type kind: %d", add_fn->as.function.params[1].type->kind);
     assert(add_fn->as.function.params[1].type->kind == TYPE_INT);
-    DEBUG_VERBOSE("Add return type kind: %d", add_fn->as.function.return_type->kind);
     assert(add_fn->as.function.return_type->kind == TYPE_INT);
-    DEBUG_VERBOSE("Add body count: %d", add_fn->as.function.body_count);
     assert(add_fn->as.function.body_count == 1);  // One return statement in body
 
     Stmt *add_body = add_fn->as.function.body[0];
-    DEBUG_VERBOSE("Add body type: %d", add_body->type);
     assert(add_body->type == STMT_RETURN);
-    DEBUG_VERBOSE("Return value type: %d", add_body->as.return_stmt.value->type);
     assert(add_body->as.return_stmt.value->type == EXPR_BINARY);
-    DEBUG_VERBOSE("Binary operator: %d", add_body->as.return_stmt.value->as.binary.operator);
     assert(add_body->as.return_stmt.value->as.binary.operator == TOKEN_PLUS);
-    DEBUG_VERBOSE("Left type: %d", add_body->as.return_stmt.value->as.binary.left->type);
     assert(add_body->as.return_stmt.value->as.binary.left->type == EXPR_VARIABLE);
-    DEBUG_VERBOSE("Left name: %s", add_body->as.return_stmt.value->as.binary.left->as.variable.name.start);
     assert(strcmp(add_body->as.return_stmt.value->as.binary.left->as.variable.name.start, "x") == 0);
-    DEBUG_VERBOSE("Right type: %d", add_body->as.return_stmt.value->as.binary.right->type);
     assert(add_body->as.return_stmt.value->as.binary.right->type == EXPR_VARIABLE);
-    DEBUG_VERBOSE("Right name: %s", add_body->as.return_stmt.value->as.binary.right->as.variable.name.start);
     assert(strcmp(add_body->as.return_stmt.value->as.binary.right->as.variable.name.start, "y") == 0);
 
     // Second statement: fn main
     Stmt *main_fn = module->statements[1];
-    DEBUG_VERBOSE("Main fn: %p", main_fn);
     assert(main_fn != NULL);
-    DEBUG_VERBOSE("Main fn type: %d", main_fn->type);
     assert(main_fn->type == STMT_FUNCTION);
-    DEBUG_VERBOSE("Main fn name: %s", main_fn->as.function.name.start);
     assert(strcmp(main_fn->as.function.name.start, "main") == 0);
-    DEBUG_VERBOSE("Main param count: %d", main_fn->as.function.param_count);
     assert(main_fn->as.function.param_count == 0);
-    DEBUG_VERBOSE("Main return type kind: %d", main_fn->as.function.return_type->kind);
     assert(main_fn->as.function.return_type->kind == TYPE_VOID);
-    DEBUG_VERBOSE("Main body count: %d", main_fn->as.function.body_count);
     assert(main_fn->as.function.body_count == 2);  // Var decl and print call
 
     Stmt *var_decl = main_fn->as.function.body[0];
-    DEBUG_VERBOSE("Var decl type: %d", var_decl->type);
     assert(var_decl->type == STMT_VAR_DECL);
-    DEBUG_VERBOSE("Var name: %s", var_decl->as.var_decl.name.start);
     assert(strcmp(var_decl->as.var_decl.name.start, "z") == 0);
-    DEBUG_VERBOSE("Var type kind: %d", var_decl->as.var_decl.type->kind);
     assert(var_decl->as.var_decl.type->kind == TYPE_INT);
-    DEBUG_VERBOSE("Initializer type: %d", var_decl->as.var_decl.initializer->type);
     assert(var_decl->as.var_decl.initializer->type == EXPR_CALL);
-    DEBUG_VERBOSE("Callee type: %d", var_decl->as.var_decl.initializer->as.call.callee->type);
     assert(var_decl->as.var_decl.initializer->as.call.callee->type == EXPR_VARIABLE);
-    DEBUG_VERBOSE("Callee name: %s", var_decl->as.var_decl.initializer->as.call.callee->as.variable.name.start);
     assert(strcmp(var_decl->as.var_decl.initializer->as.call.callee->as.variable.name.start, "add") == 0);
-    DEBUG_VERBOSE("Arg count: %d", var_decl->as.var_decl.initializer->as.call.arg_count);
     assert(var_decl->as.var_decl.initializer->as.call.arg_count == 2);
-    DEBUG_VERBOSE("Arg 0 type: %d", var_decl->as.var_decl.initializer->as.call.arguments[0]->type);
     assert(var_decl->as.var_decl.initializer->as.call.arguments[0]->type == EXPR_LITERAL);
-    DEBUG_VERBOSE("Arg 0 int_value: %lld", (long long)var_decl->as.var_decl.initializer->as.call.arguments[0]->as.literal.value.int_value);
     assert(var_decl->as.var_decl.initializer->as.call.arguments[0]->as.literal.value.int_value == 6);
-    DEBUG_VERBOSE("Arg 1 type: %d", var_decl->as.var_decl.initializer->as.call.arguments[1]->type);
     assert(var_decl->as.var_decl.initializer->as.call.arguments[1]->type == EXPR_LITERAL);
-    DEBUG_VERBOSE("Arg 1 int_value: %lld", (long long)var_decl->as.var_decl.initializer->as.call.arguments[1]->as.literal.value.int_value);
     assert(var_decl->as.var_decl.initializer->as.call.arguments[1]->as.literal.value.int_value == 2);
 
     Stmt *print_stmt = main_fn->as.function.body[1];
-    DEBUG_VERBOSE("Print stmt type: %d", print_stmt->type);
     assert(print_stmt->type == STMT_EXPR);
-    DEBUG_VERBOSE("Expression type: %d", print_stmt->as.expression.expression->type);
     assert(print_stmt->as.expression.expression->type == EXPR_CALL);
-    DEBUG_VERBOSE("Callee type: %d", print_stmt->as.expression.expression->as.call.callee->type);
     assert(print_stmt->as.expression.expression->as.call.callee->type == EXPR_VARIABLE);
-    DEBUG_VERBOSE("Callee name: %s", print_stmt->as.expression.expression->as.call.callee->as.variable.name.start);
     assert(strcmp(print_stmt->as.expression.expression->as.call.callee->as.variable.name.start, "print") == 0);
-    DEBUG_VERBOSE("Arg count: %d", print_stmt->as.expression.expression->as.call.arg_count);
     assert(print_stmt->as.expression.expression->as.call.arg_count == 1);
-    DEBUG_VERBOSE("Arg 0 type: %d", print_stmt->as.expression.expression->as.call.arguments[0]->type);
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->type == EXPR_INTERPOLATED);
-    DEBUG_VERBOSE("Part count: %d", print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.part_count);
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.part_count == 3);  // "The answer is ", {z}, "\n"
-    DEBUG_VERBOSE("Part 0 type: %d", print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[0]->type);
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[0]->type == EXPR_LITERAL);
-    DEBUG_VERBOSE("Part 0 string: %s", print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[0]->as.literal.value.string_value);
     assert(strcmp(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[0]->as.literal.value.string_value, "The answer is ") == 0);
-    DEBUG_VERBOSE("Part 1 type: %d", print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[1]->type);
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[1]->type == EXPR_VARIABLE);
-    DEBUG_VERBOSE("Part 1 name: %s", print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[1]->as.variable.name.start);
     assert(strcmp(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[1]->as.variable.name.start, "z") == 0);
-    DEBUG_VERBOSE("Part 2 type: %d", print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[2]->type);
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[2]->type == EXPR_LITERAL);
-    DEBUG_VERBOSE("Part 2 string: %s", print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[2]->as.literal.value.string_value);
     assert(strcmp(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[2]->as.literal.value.string_value, "\n") == 0);
 
     // Cleanup
     parser_cleanup(&parser);
     lexer_cleanup(&lexer);
     arena_free(&arena);
-    DEBUG_INFO("Finished test_simple_program_parsing");
 }
