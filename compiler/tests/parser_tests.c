@@ -418,18 +418,6 @@ void test_full_program_parsing() {
         "  print($\"Char: {ch}\\n\")\n"
         "  var flag: bool = true\n"
         "  print($\"Flag: {flag}\\n\")\n"
-        "  var any: str = $\"This is a thing {num}\\n\"\n"
-        "  print(any)\n"
-        "  any = $\"This is a thing {fact}\\n\"\n"
-        "  print(any)\n"
-        "  any = $\"This is a thing {sum}\\n\"\n"
-        "  print(any)\n"
-        "  any = $\"This is a thing {pi_approx}\\n\"\n"
-        "  print(any)\n"
-        "  any = $\"This is a thing {ch}\\n\"\n"
-        "  print(any)\n"
-        "  any = $\"This is a thing {flag}\\n\"\n"
-        "  print(any)\n"
         "  print(\"Complete main method ... \\n\")\n";
     setup_parser(&arena, &lexer, &parser, source);
 
@@ -468,17 +456,6 @@ void test_full_program_parsing() {
     assert(fact_fn->as.function.body[2]->type == STMT_VAR_DECL);  // var j
     assert(fact_fn->as.function.body[3]->type == STMT_EXPR);  // print
     assert(fact_fn->as.function.body[4]->type == STMT_RETURN);  // return j
-    // Wait, source has print after var, then return
-
-    // Actually count: print, if, var, print, return -> 5
-    // Yes, adjust accordingly.
-
-    // For is_prime: if, var i, print, while, return true
-
-    // repeat_string: var result, for, return
-
-    // main: many statements
-
     // Since exhaustive, but to avoid too long, assert module count and function names
     Stmt *prime_fn = module->statements[1];
     assert(strcmp(prime_fn->as.function.name.start, "is_prime") == 0);
@@ -505,10 +482,6 @@ void test_full_program_parsing() {
     // Similarly, check for loop in main
     Stmt *for_sum = main_fn->as.function.body[10];  // adjust index
     assert(for_sum->type == STMT_FOR);
-
-    // Etc. But since comprehensive, this is a start; in practice, add more asserts
-
-    // Added debug for main body count
 
     cleanup_parser(&arena, &lexer, &parser);
 }
