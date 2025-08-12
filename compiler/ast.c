@@ -382,7 +382,7 @@ Type *ast_create_function_type(Arena *arena, Type *return_type, Type **param_typ
 
 int ast_type_equals(Type *a, Type *b)
 {
-    if (a == b)
+    if (a == NULL && b == NULL)
         return 1;
     if (a == NULL || b == NULL)
         return 0;
@@ -391,49 +391,22 @@ int ast_type_equals(Type *a, Type *b)
 
     switch (a->kind)
     {
-    case TYPE_INT:
-    case TYPE_LONG:
-    case TYPE_DOUBLE:
-    case TYPE_CHAR:
-    case TYPE_STRING:
-    case TYPE_BOOL:
-    case TYPE_VOID:
-    case TYPE_NIL:
-    case TYPE_ANY:
-        return 1;
-
     case TYPE_ARRAY:
         return ast_type_equals(a->as.array.element_type, b->as.array.element_type);
-
     case TYPE_FUNCTION:
-    {
         if (!ast_type_equals(a->as.function.return_type, b->as.function.return_type))
-        {
             return 0;
-        }
-
         if (a->as.function.param_count != b->as.function.param_count)
-        {
             return 0;
-        }
-
         for (int i = 0; i < a->as.function.param_count; i++)
         {
-            if (a->as.function.param_types[i] == NULL || b->as.function.param_types[i] == NULL)
-            {
-                continue;
-            }
             if (!ast_type_equals(a->as.function.param_types[i], b->as.function.param_types[i]))
-            {
                 return 0;
-            }
         }
-
+        return 1;
+    default:
         return 1;
     }
-    }
-
-    return 0;
 }
 
 const char *ast_type_to_string(Type *type)
@@ -498,6 +471,11 @@ const char *ast_type_to_string(Type *type)
 
 Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr *right, const Token *loc_token)
 {
+    if (left == NULL || right == NULL)
+    {
+        return NULL;
+    }
+
     Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
@@ -516,6 +494,11 @@ Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr 
 
 Expr *ast_create_unary_expr(Arena *arena, TokenType operator, Expr *operand, const Token *loc_token)
 {
+    if (operand == NULL)
+    {
+        return NULL;
+    }
+
     Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
@@ -533,6 +516,11 @@ Expr *ast_create_unary_expr(Arena *arena, TokenType operator, Expr *operand, con
 
 Expr *ast_create_literal_expr(Arena *arena, LiteralValue value, Type *type, bool is_interpolated, const Token *loc_token)
 {
+    if (type == NULL)
+    {
+        return NULL;
+    }
+
     Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
@@ -544,7 +532,7 @@ Expr *ast_create_literal_expr(Arena *arena, LiteralValue value, Type *type, bool
     expr->as.literal.value = value;
     expr->as.literal.type = type;
     expr->as.literal.is_interpolated = is_interpolated;
-    expr->expr_type = ast_clone_type(arena, type);
+    expr->expr_type = NULL;
     expr->token = (Token *)loc_token;
     return expr;
 }
@@ -577,6 +565,10 @@ Expr *ast_create_variable_expr(Arena *arena, Token name, const Token *loc_token)
 
 Expr *ast_create_assign_expr(Arena *arena, Token name, Expr *value, const Token *loc_token)
 {
+    if (value == NULL)
+    {
+        return NULL;
+    }
     Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
@@ -604,6 +596,10 @@ Expr *ast_create_assign_expr(Arena *arena, Token name, Expr *value, const Token 
 
 Expr *ast_create_call_expr(Arena *arena, Expr *callee, Expr **arguments, int arg_count, const Token *loc_token)
 {
+    if (callee == NULL)
+    {
+        return NULL;
+    }
     Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
@@ -639,6 +635,10 @@ Expr *ast_create_array_expr(Arena *arena, Expr **elements, int element_count, co
 
 Expr *ast_create_array_access_expr(Arena *arena, Expr *array, Expr *index, const Token *loc_token)
 {
+    if (array == NULL || index == NULL)
+    {
+        return NULL;
+    }
     Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
@@ -656,6 +656,10 @@ Expr *ast_create_array_access_expr(Arena *arena, Expr *array, Expr *index, const
 
 Expr *ast_create_increment_expr(Arena *arena, Expr *operand, const Token *loc_token)
 {
+    if (operand == NULL)
+    {
+        return NULL;
+    }
     Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
@@ -672,6 +676,10 @@ Expr *ast_create_increment_expr(Arena *arena, Expr *operand, const Token *loc_to
 
 Expr *ast_create_decrement_expr(Arena *arena, Expr *operand, const Token *loc_token)
 {
+    if (operand == NULL)
+    {
+        return NULL;
+    }
     Expr *expr = arena_alloc(arena, sizeof(Expr));
     if (expr == NULL)
     {
@@ -705,6 +713,10 @@ Expr *ast_create_interpolated_expr(Arena *arena, Expr **parts, int part_count, c
 
 Stmt *ast_create_expr_stmt(Arena *arena, Expr *expression, const Token *loc_token)
 {
+    if (expression == NULL)
+    {
+        return NULL;
+    }
     Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
@@ -720,6 +732,10 @@ Stmt *ast_create_expr_stmt(Arena *arena, Expr *expression, const Token *loc_toke
 
 Stmt *ast_create_var_decl_stmt(Arena *arena, Token name, Type *type, Expr *initializer, const Token *loc_token)
 {
+    if (type == NULL)
+    {
+        return NULL;
+    }
     Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
@@ -836,6 +852,10 @@ Stmt *ast_create_block_stmt(Arena *arena, Stmt **statements, int count, const To
 
 Stmt *ast_create_if_stmt(Arena *arena, Expr *condition, Stmt *then_branch, Stmt *else_branch, const Token *loc_token)
 {
+    if (condition == NULL || then_branch == NULL)
+    {
+        return NULL;
+    }
     Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
@@ -853,6 +873,10 @@ Stmt *ast_create_if_stmt(Arena *arena, Expr *condition, Stmt *then_branch, Stmt 
 
 Stmt *ast_create_while_stmt(Arena *arena, Expr *condition, Stmt *body, const Token *loc_token)
 {
+    if (condition == NULL || body == NULL)
+    {
+        return NULL;
+    }
     Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
@@ -869,6 +893,10 @@ Stmt *ast_create_while_stmt(Arena *arena, Expr *condition, Stmt *body, const Tok
 
 Stmt *ast_create_for_stmt(Arena *arena, Stmt *initializer, Expr *condition, Expr *increment, Stmt *body, const Token *loc_token)
 {
+    if (body == NULL)
+    {
+        return NULL;
+    }
     Stmt *stmt = arena_alloc(arena, sizeof(Stmt));
     if (stmt == NULL)
     {
