@@ -62,7 +62,7 @@ void symbol_table_print(SymbolTable *table, const char *where)
         {
             DEBUG_VERBOSE("    Symbol: '%s', Type: %s, Kind: %d, Offset: %d",
                           token_to_string(symbol->name),
-                          ast_type_to_string(symbol->type),
+                          ast_type_to_string(table->arena, symbol->type),
                           symbol->kind,
                           symbol->offset);
             symbol = symbol->next;

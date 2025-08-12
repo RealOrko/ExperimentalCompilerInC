@@ -5,7 +5,7 @@
 #include <string.h>
 #include <stdio.h>
 
-void ast_print_stmt(Stmt *stmt, int indent_level)
+void ast_print_stmt(Arena *arena, Stmt *stmt, int indent_level)
 {
     if (stmt == NULL)
     {
@@ -16,18 +16,18 @@ void ast_print_stmt(Stmt *stmt, int indent_level)
     {
     case STMT_EXPR:
         DEBUG_VERBOSE_INDENT(indent_level, "ExpressionStmt:");
-        ast_print_expr(stmt->as.expression.expression, indent_level + 1);
+        ast_print_expr(arena, stmt->as.expression.expression, indent_level + 1);
         break;
 
     case STMT_VAR_DECL:
         DEBUG_VERBOSE_INDENT(indent_level, "VarDecl: %.*s (type: %s)",
                              stmt->as.var_decl.name.length,
                              stmt->as.var_decl.name.start,
-                             ast_type_to_string(stmt->as.var_decl.type));
+                             ast_type_to_string(arena, stmt->as.var_decl.type));
         if (stmt->as.var_decl.initializer)
         {
             DEBUG_VERBOSE_INDENT(indent_level + 1, "Initializer:");
-            ast_print_expr(stmt->as.var_decl.initializer, indent_level + 2);
+            ast_print_expr(arena, stmt->as.var_decl.initializer, indent_level + 2);
         }
         break;
 
@@ -35,7 +35,7 @@ void ast_print_stmt(Stmt *stmt, int indent_level)
         DEBUG_VERBOSE_INDENT(indent_level, "Function: %.*s (return: %s)",
                              stmt->as.function.name.length,
                              stmt->as.function.name.start,
-                             ast_type_to_string(stmt->as.function.return_type));
+                             ast_type_to_string(arena, stmt->as.function.return_type));
         if (stmt->as.function.param_count > 0)
         {
             DEBUG_VERBOSE_INDENT(indent_level + 1, "Parameters:");
@@ -44,13 +44,13 @@ void ast_print_stmt(Stmt *stmt, int indent_level)
                 DEBUG_VERBOSE_INDENT(indent_level + 1, "%.*s: %s",
                                      stmt->as.function.params[i].name.length,
                                      stmt->as.function.params[i].name.start,
-                                     ast_type_to_string(stmt->as.function.params[i].type));
+                                     ast_type_to_string(arena, stmt->as.function.params[i].type));
             }
         }
         DEBUG_VERBOSE_INDENT(indent_level + 1, "Body:");
         for (int i = 0; i < stmt->as.function.body_count; i++)
         {
-            ast_print_stmt(stmt->as.function.body[i], indent_level + 2);
+            ast_print_stmt(arena, stmt->as.function.body[i], indent_level + 2);
         }
         break;
 
@@ -58,7 +58,7 @@ void ast_print_stmt(Stmt *stmt, int indent_level)
         DEBUG_VERBOSE_INDENT(indent_level + 1, "Return:");
         if (stmt->as.return_stmt.value)
         {
-            ast_print_expr(stmt->as.return_stmt.value, indent_level + 1);
+            ast_print_expr(arena, stmt->as.return_stmt.value, indent_level + 1);
         }
         break;
 
@@ -66,29 +66,29 @@ void ast_print_stmt(Stmt *stmt, int indent_level)
         DEBUG_VERBOSE_INDENT(indent_level, "Block:");
         for (int i = 0; i < stmt->as.block.count; i++)
         {
-            ast_print_stmt(stmt->as.block.statements[i], indent_level + 1);
+            ast_print_stmt(arena, stmt->as.block.statements[i], indent_level + 1);
         }
         break;
 
     case STMT_IF:
         DEBUG_VERBOSE_INDENT(indent_level, "If:");
         DEBUG_VERBOSE_INDENT(indent_level + 1, "Condition:");
-        ast_print_expr(stmt->as.if_stmt.condition, indent_level + 2);
+        ast_print_expr(arena, stmt->as.if_stmt.condition, indent_level + 2);
         DEBUG_VERBOSE_INDENT(indent_level + 1, "Then:");
-        ast_print_stmt(stmt->as.if_stmt.then_branch, indent_level + 2);
+        ast_print_stmt(arena, stmt->as.if_stmt.then_branch, indent_level + 2);
         if (stmt->as.if_stmt.else_branch)
         {
             DEBUG_VERBOSE_INDENT(indent_level + 1, "Else:");
-            ast_print_stmt(stmt->as.if_stmt.else_branch, indent_level + 2);
+            ast_print_stmt(arena, stmt->as.if_stmt.else_branch, indent_level + 2);
         }
         break;
 
     case STMT_WHILE:
         DEBUG_VERBOSE_INDENT(indent_level, "While:");
         DEBUG_VERBOSE_INDENT(indent_level + 1, "Condition:");
-        ast_print_expr(stmt->as.while_stmt.condition, indent_level + 2);
+        ast_print_expr(arena, stmt->as.while_stmt.condition, indent_level + 2);
         DEBUG_VERBOSE_INDENT(indent_level + 1, "Body:");
-        ast_print_stmt(stmt->as.while_stmt.body, indent_level + 2);
+        ast_print_stmt(arena, stmt->as.while_stmt.body, indent_level + 2);
         break;
 
     case STMT_FOR:
@@ -96,20 +96,20 @@ void ast_print_stmt(Stmt *stmt, int indent_level)
         if (stmt->as.for_stmt.initializer)
         {
             DEBUG_VERBOSE_INDENT(indent_level + 1, "Initializer:");
-            ast_print_stmt(stmt->as.for_stmt.initializer, indent_level + 2);
+            ast_print_stmt(arena, stmt->as.for_stmt.initializer, indent_level + 2);
         }
         if (stmt->as.for_stmt.condition)
         {
             DEBUG_VERBOSE_INDENT(indent_level + 1, "Condition:");
-            ast_print_expr(stmt->as.for_stmt.condition, indent_level + 2);
+            ast_print_expr(arena, stmt->as.for_stmt.condition, indent_level + 2);
         }
         if (stmt->as.for_stmt.increment)
         {
             DEBUG_VERBOSE_INDENT(indent_level + 1, "Increment:");
-            ast_print_expr(stmt->as.for_stmt.increment, indent_level + 2);
+            ast_print_expr(arena, stmt->as.for_stmt.increment, indent_level + 2);
         }
         DEBUG_VERBOSE_INDENT(indent_level + 1, "Body:");
-        ast_print_stmt(stmt->as.for_stmt.body, indent_level + 2);
+        ast_print_stmt(arena, stmt->as.for_stmt.body, indent_level + 2);
         break;
 
     case STMT_IMPORT:
@@ -120,7 +120,7 @@ void ast_print_stmt(Stmt *stmt, int indent_level)
     }
 }
 
-void ast_print_expr(Expr *expr, int indent_level)
+void ast_print_expr(Arena *arena, Expr *expr, int indent_level)
 {
     if (expr == NULL)
     {
@@ -131,13 +131,13 @@ void ast_print_expr(Expr *expr, int indent_level)
     {
     case EXPR_BINARY:
         DEBUG_VERBOSE_INDENT(indent_level, "Binary: %d", expr->as.binary.operator);
-        ast_print_expr(expr->as.binary.left, indent_level + 1);
-        ast_print_expr(expr->as.binary.right, indent_level + 1);
+        ast_print_expr(arena, expr->as.binary.left, indent_level + 1);
+        ast_print_expr(arena, expr->as.binary.right, indent_level + 1);
         break;
 
     case EXPR_UNARY:
         DEBUG_VERBOSE_INDENT(indent_level, "Unary: %d", expr->as.unary.operator);
-        ast_print_expr(expr->as.unary.operand, indent_level + 1);
+        ast_print_expr(arena, expr->as.unary.operand, indent_level + 1);
         break;
 
     case EXPR_LITERAL:
@@ -162,7 +162,7 @@ void ast_print_expr(Expr *expr, int indent_level)
         default:
             DEBUG_VERBOSE_INDENT(indent_level, "unknown");
         }
-        DEBUG_VERBOSE_INDENT(indent_level, " (%s)", ast_type_to_string(expr->as.literal.type));
+        DEBUG_VERBOSE_INDENT(indent_level, " (%s)", ast_type_to_string(arena, expr->as.literal.type));
         break;
 
     case EXPR_VARIABLE:
@@ -175,18 +175,18 @@ void ast_print_expr(Expr *expr, int indent_level)
         DEBUG_VERBOSE_INDENT(indent_level, "Assign: %.*s",
                              expr->as.assign.name.length,
                              expr->as.assign.name.start);
-        ast_print_expr(expr->as.assign.value, indent_level + 1);
+        ast_print_expr(arena, expr->as.assign.value, indent_level + 1);
         break;
 
     case EXPR_CALL:
         DEBUG_VERBOSE_INDENT(indent_level, "Call:");
-        ast_print_expr(expr->as.call.callee, indent_level + 1);
+        ast_print_expr(arena, expr->as.call.callee, indent_level + 1);
         if (expr->as.call.arg_count > 0)
         {
             DEBUG_VERBOSE_INDENT(indent_level + 1, "Arguments:");
             for (int i = 0; i < expr->as.call.arg_count; i++)
             {
-                ast_print_expr(expr->as.call.arguments[i], indent_level + 2);
+                ast_print_expr(arena, expr->as.call.arguments[i], indent_level + 2);
             }
         }
         break;
@@ -195,31 +195,31 @@ void ast_print_expr(Expr *expr, int indent_level)
         DEBUG_VERBOSE_INDENT(indent_level, "Array:");
         for (int i = 0; i < expr->as.array.element_count; i++)
         {
-            ast_print_expr(expr->as.array.elements[i], indent_level + 1);
+            ast_print_expr(arena, expr->as.array.elements[i], indent_level + 1);
         }
         break;
 
     case EXPR_ARRAY_ACCESS:
         DEBUG_VERBOSE_INDENT(indent_level, "ArrayAccess:");
-        ast_print_expr(expr->as.array_access.array, indent_level + 1);
-        ast_print_expr(expr->as.array_access.index, indent_level + 1);
+        ast_print_expr(arena, expr->as.array_access.array, indent_level + 1);
+        ast_print_expr(arena, expr->as.array_access.index, indent_level + 1);
         break;
 
     case EXPR_INCREMENT:
         DEBUG_VERBOSE_INDENT(indent_level, "Increment:");
-        ast_print_expr(expr->as.operand, indent_level + 1);
+        ast_print_expr(arena, expr->as.operand, indent_level + 1);
         break;
 
     case EXPR_DECREMENT:
         DEBUG_VERBOSE_INDENT(indent_level, "Decrement:");
-        ast_print_expr(expr->as.operand, indent_level + 1);
+        ast_print_expr(arena, expr->as.operand, indent_level + 1);
         break;
 
     case EXPR_INTERPOLATED:
         DEBUG_VERBOSE_INDENT(indent_level, "Interpolated String:");
         for (int i = 0; i < expr->as.interpol.part_count; i++)
         {
-            ast_print_expr(expr->as.interpol.parts[i], indent_level + 1);
+            ast_print_expr(arena, expr->as.interpol.parts[i], indent_level + 1);
         }
         break;
     }
@@ -409,12 +409,12 @@ int ast_type_equals(Type *a, Type *b)
     }
 }
 
-const char *ast_type_to_string(Type *type)
+const char *ast_type_to_string(Arena *arena, Type *type)
 {
     if (type == NULL)
         return NULL;
 
-    static char buffer[256];
+    static char buffer[8192];
 
     switch (type->kind)
     {
@@ -438,8 +438,8 @@ const char *ast_type_to_string(Type *type)
         return "any";
     case TYPE_ARRAY:
     {
-        const char *elem_str = ast_type_to_string(type->as.array.element_type);
-        char temp[1024];
+        const char *elem_str = ast_type_to_string(arena, type->as.array.element_type);
+        char temp[8192];
         strncpy(temp, elem_str, sizeof(temp) - 1);
         temp[sizeof(temp) - 1] = '\0';
         snprintf(buffer, sizeof(buffer), "array<%s>", temp);
@@ -447,18 +447,18 @@ const char *ast_type_to_string(Type *type)
     }
     case TYPE_FUNCTION:
     {
-        char params_str[1024] = {0};
+        char params_str[8192] = {0};
         for (int i = 0; i < type->as.function.param_count; i++)
         {
-            const char *param_type = ast_type_to_string(type->as.function.param_types[i]);
+            const char *param_type = ast_type_to_string(arena, type->as.function.param_types[i]);
             if (i > 0)
             {
                 strcat(params_str, ", ");
             }
             strcat(params_str, param_type);
         }
-        const char *ret_str = ast_type_to_string(type->as.function.return_type);
-        char temp[1024];
+        const char *ret_str = ast_type_to_string(arena, type->as.function.return_type);
+        char temp[8192];
         strncpy(temp, ret_str, sizeof(temp) - 1);
         temp[sizeof(temp) - 1] = '\0';
         snprintf(buffer, sizeof(buffer), "fn(%s) -> %s", params_str, temp);

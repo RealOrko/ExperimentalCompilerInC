@@ -118,7 +118,7 @@ void test_if_statement_parsing() {
     // Added debugging logs to inspect parser state and AST
     if (module) {
         if (module->count > 0) {
-            ast_print_stmt(module->statements[0], 0);
+            ast_print_stmt(&arena, module->statements[0], 0);
             Stmt *if_stmt = module->statements[0];
             if (if_stmt->type == STMT_IF) {
                 if (if_stmt->as.if_stmt.condition->type == EXPR_BINARY) {
@@ -425,7 +425,7 @@ void test_full_program_parsing() {
     // Added debugging logs to inspect parser state and AST
     if (module) {
         for (int i = 0; i < module->count; i++) {
-            ast_print_stmt(module->statements[i], 0);
+            ast_print_stmt(&arena, module->statements[i], 0);
         }
     } else {
         DEBUG_ERROR("Module is NULL after parsing.");

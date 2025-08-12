@@ -1273,7 +1273,7 @@ Module *parser_execute(Parser *parser, const char *filename)
         if (stmt != NULL)
         {
             ast_module_add_statement(parser->arena, module, stmt);
-            ast_print_stmt(stmt, 0);
+            ast_print_stmt(parser->arena, stmt, 0);
         }
 
         if (parser->panic_mode)

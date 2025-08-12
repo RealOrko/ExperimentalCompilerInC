@@ -245,8 +245,8 @@ typedef struct
     const char *filename;
 } Module;
 
-void ast_print_stmt(Stmt *stmt, int indent_level);
-void ast_print_expr(Expr *expr, int indent_level);
+void ast_print_stmt(Arena *arena, Stmt *stmt, int indent_level);
+void ast_print_expr(Arena *arena, Expr *expr, int indent_level);
 
 Token *ast_clone_token(Arena *arena, const Token *src);
 
@@ -255,7 +255,7 @@ Type *ast_create_primitive_type(Arena *arena, TypeKind kind);
 Type *ast_create_array_type(Arena *arena, Type *element_type);
 Type *ast_create_function_type(Arena *arena, Type *return_type, Type **param_types, int param_count);
 int ast_type_equals(Type *a, Type *b);
-const char *ast_type_to_string(Type *type);
+const char *ast_type_to_string(Arena *arena, Type *type);
 
 Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr *right, const Token *loc_token);
 Expr *ast_create_unary_expr(Arena *arena, TokenType operator, Expr *operand, const Token *loc_token);

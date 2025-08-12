@@ -281,50 +281,50 @@ void test_ast_type_to_string()
     setup_arena(&arena);
 
     // Primitives
-    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_INT)), "int") == 0);
-    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_LONG)), "long") == 0);
-    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_DOUBLE)), "double") == 0);
-    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_CHAR)), "char") == 0);
-    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_STRING)), "string") == 0);
-    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_BOOL)), "bool") == 0);
-    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_VOID)), "void") == 0);
-    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_NIL)), "nil") == 0);
-    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_ANY)), "any") == 0);
+    assert(strcmp(ast_type_to_string(&arena, ast_create_primitive_type(&arena, TYPE_INT)), "int") == 0);
+    assert(strcmp(ast_type_to_string(&arena, ast_create_primitive_type(&arena, TYPE_LONG)), "long") == 0);
+    assert(strcmp(ast_type_to_string(&arena, ast_create_primitive_type(&arena, TYPE_DOUBLE)), "double") == 0);
+    assert(strcmp(ast_type_to_string(&arena, ast_create_primitive_type(&arena, TYPE_CHAR)), "char") == 0);
+    assert(strcmp(ast_type_to_string(&arena, ast_create_primitive_type(&arena, TYPE_STRING)), "string") == 0);
+    assert(strcmp(ast_type_to_string(&arena, ast_create_primitive_type(&arena, TYPE_BOOL)), "bool") == 0);
+    assert(strcmp(ast_type_to_string(&arena, ast_create_primitive_type(&arena, TYPE_VOID)), "void") == 0);
+    assert(strcmp(ast_type_to_string(&arena, ast_create_primitive_type(&arena, TYPE_NIL)), "nil") == 0);
+    assert(strcmp(ast_type_to_string(&arena, ast_create_primitive_type(&arena, TYPE_ANY)), "any") == 0);
 
     // Array
     Type *arr = ast_create_array_type(&arena, ast_create_primitive_type(&arena, TYPE_CHAR));
-    assert(strcmp(ast_type_to_string(arr), "array<char>") == 0);
+    assert(strcmp(ast_type_to_string(&arena, arr), "array<char>") == 0);
 
     // Nested array
     Type *nested_arr = ast_create_array_type(&arena, arr);
-    assert(strcmp(ast_type_to_string(nested_arr), "array<array<char>>") == 0);
+    assert(strcmp(ast_type_to_string(&arena, nested_arr), "array<array<char>>") == 0);
 
     // Function
     Type *params[1] = {ast_create_primitive_type(&arena, TYPE_BOOL)};
     Type *fn = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_STRING), params, 1);
-    assert(strcmp(ast_type_to_string(fn), "fn(bool) -> string") == 0);
+    assert(strcmp(ast_type_to_string(&arena, fn), "fn(bool) -> string") == 0);
 
     // Function with multiple params
     Type *params_multi[2] = {ast_create_primitive_type(&arena, TYPE_INT), ast_create_primitive_type(&arena, TYPE_DOUBLE)};
     Type *fn_multi = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_VOID), params_multi, 2);
-    assert(strcmp(ast_type_to_string(fn_multi), "fn(int, double) -> void") == 0);
+    assert(strcmp(ast_type_to_string(&arena, fn_multi), "fn(int, double) -> void") == 0);
 
     // Function with array param
     Type *params_arr[1] = {arr};
     Type *fn_arr = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_INT), params_arr, 1);
-    assert(strcmp(ast_type_to_string(fn_arr), "fn(array<char>) -> int") == 0);
+    assert(strcmp(ast_type_to_string(&arena, fn_arr), "fn(array<char>) -> int") == 0);
 
     // Empty function
     Type *fn_empty = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_VOID), NULL, 0);
-    assert(strcmp(ast_type_to_string(fn_empty), "fn() -> void") == 0);
+    assert(strcmp(ast_type_to_string(&arena, fn_empty), "fn() -> void") == 0);
 
     // Unknown kind
     Type *unknown = arena_alloc(&arena, sizeof(Type));
     unknown->kind = -1; // Invalid
-    assert(strcmp(ast_type_to_string(unknown), "unknown") == 0);
+    assert(strcmp(ast_type_to_string(&arena, unknown), "unknown") == 0);
 
     // NULL
-    assert(ast_type_to_string(NULL) == NULL);
+    assert(ast_type_to_string(&arena, NULL) == NULL);
 
     cleanup_arena(&arena);
 }
@@ -1210,26 +1210,26 @@ void test_ast_print()
                                         TOKEN_PLUS,
                                         ast_create_literal_expr(&arena, (LiteralValue){.int_value = 2}, ast_create_primitive_type(&arena, TYPE_INT), false, loc),
                                         loc);
-    ast_print_expr(expr, 0);
+    ast_print_expr(&arena, expr, 0);
 
     Stmt *stmt = ast_create_if_stmt(&arena,
                                     expr,
                                     ast_create_block_stmt(&arena, NULL, 0, loc),
                                     NULL,
                                     loc);
-    ast_print_stmt(stmt, 0);
+    ast_print_stmt(&arena, stmt, 0);
 
     // NULL
-    ast_print_expr(NULL, 0);
-    ast_print_stmt(NULL, 0);
+    ast_print_expr(&arena, NULL, 0);
+    ast_print_stmt(&arena, NULL, 0);
 
     // More complex expr
     Expr *lit = ast_create_literal_expr(&arena, (LiteralValue){.string_value = "test"}, ast_create_primitive_type(&arena, TYPE_STRING), true, loc);
-    ast_print_expr(lit, 0);
+    ast_print_expr(&arena, lit, 0);
 
     // Complex stmt
     Stmt *func = ast_create_function_stmt(&arena, create_dummy_token(&arena, "func"), NULL, 0, ast_create_primitive_type(&arena, TYPE_VOID), NULL, 0, loc);
-    ast_print_stmt(func, 0);
+    ast_print_stmt(&arena, func, 0);
 
     cleanup_arena(&arena);
 }
