@@ -192,9 +192,6 @@ void test_file_read_special_characters() {
     DEBUG_INFO("Starting test_file_read_special_characters");
     printf("Testing file_read with special characters...\n");
 
-    const char *content = "Special: \0\n\t\r\\\"\b"; // Includes null, but since fwrite, null is written
-    size_t len = strlen(content) + 1; // Include embedded null? Wait, strlen stops at null.
-    // Better: binary data
     const char special_data[] = {'A', '\0', 'B', '\n', '\t', '\r', '\\', '"', '\b', 0}; // Extra null for string, but fwrite len-1
     size_t data_len = sizeof(special_data) - 1; // Without trailing null
 
