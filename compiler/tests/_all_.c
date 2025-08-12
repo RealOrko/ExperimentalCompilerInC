@@ -1,7 +1,9 @@
 #include "arena_tests.c"
+#include "ast_tests.c"
 #include "parser_tests.c"
 
-int main() {
+int main()
+{
 
     // *** Debugging ***
     printf("Running tests with debug level: %d\n", DEBUG_LEVEL_VERBOSE);
@@ -18,8 +20,42 @@ int main() {
     test_arena_strndup();
     test_arena_free();
 
+    // *** AST ***
+
+    test_ast_create_primitive_type();
+    test_ast_create_array_type();
+    test_ast_create_function_type();
+    test_ast_clone_type();
+    test_ast_type_equals();
+    test_ast_type_to_string();
+    test_ast_create_binary_expr();
+    test_ast_create_unary_expr();
+    test_ast_create_literal_expr();
+    test_ast_create_variable_expr();
+    test_ast_create_assign_expr();
+    test_ast_create_call_expr();
+    test_ast_create_array_expr();
+    test_ast_create_array_access_expr();
+    test_ast_create_increment_expr();
+    test_ast_create_decrement_expr();
+    test_ast_create_interpolated_expr();
+    test_ast_create_comparison_expr();
+    test_ast_create_expr_stmt();
+    test_ast_create_var_decl_stmt();
+    test_ast_create_function_stmt();
+    test_ast_create_return_stmt();
+    test_ast_create_block_stmt();
+    test_ast_create_if_stmt();
+    test_ast_create_while_stmt();
+    test_ast_create_for_stmt();
+    test_ast_create_import_stmt();
+    test_ast_init_module();
+    test_ast_module_add_statement();
+    test_ast_clone_token();
+    test_ast_print();
+
     // *** Parser ***
-    
+
     test_empty_program_parsing();
     test_var_decl_parsing();
     test_function_no_params_parsing();
@@ -30,9 +66,9 @@ int main() {
     test_interpolated_string_parsing();
     test_literal_types_parsing();
     test_recursive_function_parsing();
-    //test_full_program_parsing();
+    // test_full_program_parsing();
 
     printf("All tests passed!\n");
-    
+
     return 0;
 }

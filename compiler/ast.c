@@ -438,18 +438,10 @@ int ast_type_equals(Type *a, Type *b)
 
 const char *ast_type_to_string(Type *type)
 {
-    static char buffer[1024];
-
     if (type == NULL)
-    {
-        return "NULL";
-    }
+        return NULL;
 
-    if (type->kind < TYPE_INT || type->kind > TYPE_ANY)
-    {
-        DEBUG_ERROR("Invalid TypeKind: %d", type->kind);
-        return "INVALID";
-    }
+    static char buffer[256];
 
     switch (type->kind)
     {
@@ -462,7 +454,7 @@ const char *ast_type_to_string(Type *type)
     case TYPE_CHAR:
         return "char";
     case TYPE_STRING:
-        return "str";
+        return "string";
     case TYPE_BOOL:
         return "bool";
     case TYPE_VOID:
@@ -471,47 +463,37 @@ const char *ast_type_to_string(Type *type)
         return "nil";
     case TYPE_ANY:
         return "any";
-
     case TYPE_ARRAY:
     {
-        const char *element_type_str = ast_type_to_string(type->as.array.element_type);
-        snprintf(buffer, sizeof(buffer), "%s[]", element_type_str);
+        const char *elem_str = ast_type_to_string(type->as.array.element_type);
+        char temp[256];
+        strncpy(temp, elem_str, sizeof(temp) - 1);
+        temp[sizeof(temp) - 1] = '\0';
+        snprintf(buffer, sizeof(buffer), "array<%s>", temp);
         return buffer;
     }
-
     case TYPE_FUNCTION:
     {
-        const char *return_type_str = ast_type_to_string(type->as.function.return_type);
-
-        char *ptr = buffer;
-        int remaining = sizeof(buffer);
-        int n;
-
-        n = snprintf(ptr, remaining, "fn(");
-        ptr += n;
-        remaining -= n;
-
+        char params_str[256] = {0};
         for (int i = 0; i < type->as.function.param_count; i++)
         {
+            const char *param_type = ast_type_to_string(type->as.function.param_types[i]);
             if (i > 0)
             {
-                n = snprintf(ptr, remaining, ", ");
-                ptr += n;
-                remaining -= n;
+                strcat(params_str, ", ");
             }
-
-            const char *param_type_str = ast_type_to_string(type->as.function.param_types[i]);
-            n = snprintf(ptr, remaining, "%s", param_type_str);
-            ptr += n;
-            remaining -= n;
+            strcat(params_str, param_type);
         }
-
-        snprintf(ptr, remaining, "):%s", return_type_str);
+        const char *ret_str = ast_type_to_string(type->as.function.return_type);
+        char temp[256];
+        strncpy(temp, ret_str, sizeof(temp) - 1);
+        temp[sizeof(temp) - 1] = '\0';
+        snprintf(buffer, sizeof(buffer), "fn(%s) -> %s", params_str, temp);
         return buffer;
     }
+    default:
+        return "unknown";
     }
-
-    return "UNKNOWN";
 }
 
 Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr *right, const Token *loc_token)
@@ -528,7 +510,7 @@ Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr 
     expr->as.binary.right = right;
     expr->as.binary.operator = operator;
     expr->expr_type = NULL;
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -545,7 +527,7 @@ Expr *ast_create_unary_expr(Arena *arena, TokenType operator, Expr *operand, con
     expr->as.unary.operator = operator;
     expr->as.unary.operand = operand;
     expr->expr_type = NULL;
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -563,7 +545,7 @@ Expr *ast_create_literal_expr(Arena *arena, LiteralValue value, Type *type, bool
     expr->as.literal.type = type;
     expr->as.literal.is_interpolated = is_interpolated;
     expr->expr_type = ast_clone_type(arena, type);
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -589,7 +571,7 @@ Expr *ast_create_variable_expr(Arena *arena, Token name, const Token *loc_token)
     expr->as.variable.name.type = name.type;
     expr->as.variable.name.filename = name.filename;
     expr->expr_type = NULL;
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -616,7 +598,7 @@ Expr *ast_create_assign_expr(Arena *arena, Token name, Expr *value, const Token 
     expr->as.assign.name.filename = name.filename;
     expr->as.assign.value = value;
     expr->expr_type = NULL;
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -634,7 +616,7 @@ Expr *ast_create_call_expr(Arena *arena, Expr *callee, Expr **arguments, int arg
     expr->as.call.arguments = arguments;
     expr->as.call.arg_count = arg_count;
     expr->expr_type = NULL;
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -651,7 +633,7 @@ Expr *ast_create_array_expr(Arena *arena, Expr **elements, int element_count, co
     expr->as.array.elements = elements;
     expr->as.array.element_count = element_count;
     expr->expr_type = NULL;
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -668,7 +650,7 @@ Expr *ast_create_array_access_expr(Arena *arena, Expr *array, Expr *index, const
     expr->as.array_access.array = array;
     expr->as.array_access.index = index;
     expr->expr_type = NULL;
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -684,7 +666,7 @@ Expr *ast_create_increment_expr(Arena *arena, Expr *operand, const Token *loc_to
     expr->type = EXPR_INCREMENT;
     expr->as.operand = operand;
     expr->expr_type = NULL;
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -700,7 +682,7 @@ Expr *ast_create_decrement_expr(Arena *arena, Expr *operand, const Token *loc_to
     expr->type = EXPR_DECREMENT;
     expr->as.operand = operand;
     expr->expr_type = NULL;
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -717,7 +699,7 @@ Expr *ast_create_interpolated_expr(Arena *arena, Expr **parts, int part_count, c
     expr->as.interpol.parts = parts;
     expr->as.interpol.part_count = part_count;
     expr->expr_type = NULL;
-    expr->token = ast_clone_token(arena, loc_token);
+    expr->token = (Token *)loc_token;
     return expr;
 }
 
@@ -732,7 +714,7 @@ Stmt *ast_create_expr_stmt(Arena *arena, Expr *expression, const Token *loc_toke
     memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_EXPR;
     stmt->as.expression.expression = expression;
-    stmt->token = ast_clone_token(arena, loc_token);
+    stmt->token = (Token *)loc_token;
     return stmt;
 }
 
@@ -756,10 +738,10 @@ Stmt *ast_create_var_decl_stmt(Arena *arena, Token name, Type *type, Expr *initi
     stmt->as.var_decl.name.length = name.length;
     stmt->as.var_decl.name.line = name.line;
     stmt->as.var_decl.name.type = name.type;
-    stmt->as.var_decl.name.filename = name.filename;  // Added for location reporting.
+    stmt->as.var_decl.name.filename = name.filename; // Added for location reporting.
     stmt->as.var_decl.type = type;
     stmt->as.var_decl.initializer = initializer;
-    stmt->token = ast_clone_token(arena, loc_token);
+    stmt->token = (Token *)loc_token;
     return stmt;
 }
 
@@ -784,7 +766,7 @@ Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int 
     stmt->as.function.name.length = name.length;
     stmt->as.function.name.line = name.line;
     stmt->as.function.name.type = name.type;
-    stmt->as.function.name.filename = name.filename;  // Added for location reporting.
+    stmt->as.function.name.filename = name.filename; // Added for location reporting.
 
     Parameter *new_params = arena_alloc(arena, sizeof(Parameter) * param_count);
     if (new_params == NULL && param_count > 0)
@@ -804,7 +786,7 @@ Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int 
         new_params[i].name.length = params[i].name.length;
         new_params[i].name.line = params[i].name.line;
         new_params[i].name.type = params[i].name.type;
-        new_params[i].name.filename = params[i].name.filename;  // Added for location reporting.
+        new_params[i].name.filename = params[i].name.filename; // Added for location reporting.
         new_params[i].type = params[i].type;
     }
     stmt->as.function.params = new_params;
@@ -812,7 +794,7 @@ Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int 
     stmt->as.function.return_type = return_type;
     stmt->as.function.body = body;
     stmt->as.function.body_count = body_count;
-    stmt->token = ast_clone_token(arena, loc_token);
+    stmt->token = (Token *)loc_token;
     return stmt;
 }
 
@@ -830,9 +812,9 @@ Stmt *ast_create_return_stmt(Arena *arena, Token keyword, Expr *value, const Tok
     stmt->as.return_stmt.keyword.length = keyword.length;
     stmt->as.return_stmt.keyword.line = keyword.line;
     stmt->as.return_stmt.keyword.type = keyword.type;
-    stmt->as.return_stmt.keyword.filename = keyword.filename;  // Added for location reporting.
+    stmt->as.return_stmt.keyword.filename = keyword.filename; // Added for location reporting.
     stmt->as.return_stmt.value = value;
-    stmt->token = ast_clone_token(arena, loc_token);
+    stmt->token = (Token *)loc_token;
     return stmt;
 }
 
@@ -848,7 +830,7 @@ Stmt *ast_create_block_stmt(Arena *arena, Stmt **statements, int count, const To
     stmt->type = STMT_BLOCK;
     stmt->as.block.statements = statements;
     stmt->as.block.count = count;
-    stmt->token = ast_clone_token(arena, loc_token);
+    stmt->token = (Token *)loc_token;
     return stmt;
 }
 
@@ -865,7 +847,7 @@ Stmt *ast_create_if_stmt(Arena *arena, Expr *condition, Stmt *then_branch, Stmt 
     stmt->as.if_stmt.condition = condition;
     stmt->as.if_stmt.then_branch = then_branch;
     stmt->as.if_stmt.else_branch = else_branch;
-    stmt->token = ast_clone_token(arena, loc_token);
+    stmt->token = (Token *)loc_token;
     return stmt;
 }
 
@@ -881,7 +863,7 @@ Stmt *ast_create_while_stmt(Arena *arena, Expr *condition, Stmt *body, const Tok
     stmt->type = STMT_WHILE;
     stmt->as.while_stmt.condition = condition;
     stmt->as.while_stmt.body = body;
-    stmt->token = ast_clone_token(arena, loc_token);
+    stmt->token = (Token *)loc_token;
     return stmt;
 }
 
@@ -899,7 +881,7 @@ Stmt *ast_create_for_stmt(Arena *arena, Stmt *initializer, Expr *condition, Expr
     stmt->as.for_stmt.condition = condition;
     stmt->as.for_stmt.increment = increment;
     stmt->as.for_stmt.body = body;
-    stmt->token = ast_clone_token(arena, loc_token);
+    stmt->token = (Token *)loc_token;
     return stmt;
 }
 
@@ -924,7 +906,7 @@ Stmt *ast_create_import_stmt(Arena *arena, Token module_name, const Token *loc_t
     stmt->as.import.module_name.line = module_name.line;
     stmt->as.import.module_name.type = module_name.type;
     stmt->as.import.module_name.filename = module_name.filename;
-    stmt->token = ast_clone_token(arena, loc_token);
+    stmt->token = (Token *)loc_token;
     return stmt;
 }
 

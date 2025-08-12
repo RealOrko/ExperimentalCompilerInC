@@ -364,7 +364,6 @@ void test_recursive_function_parsing() {
 
 void test_full_program_parsing() {
     printf("Testing parser_execute full program...\n");
-
     Arena arena;
     Lexer lexer;
     Parser parser;

@@ -8,7 +8,8 @@
 #include "../arena.h"
 #include "../debug.h"
 
-void test_arena_init() {
+void test_arena_init()
+{
     DEBUG_INFO("Starting test_arena_init");
     printf("Testing arena_init...\n");
     Arena arena;
@@ -30,11 +31,12 @@ void test_arena_init() {
     assert(arena.current_used == 0);
     assert(arena.block_size == initial_size);
     DEBUG_INFO("Cleaning up arena in test_arena_init");
-    arena_free(&arena);  // Clean up
+    arena_free(&arena); // Clean up
     DEBUG_INFO("Finished test_arena_init");
 }
 
-void test_arena_alloc_small() {
+void test_arena_alloc_small()
+{
     DEBUG_INFO("Starting test_arena_alloc_small");
     printf("Testing arena_alloc small allocations...\n");
     Arena arena;
@@ -67,7 +69,7 @@ void test_arena_alloc_small() {
     DEBUG_VERBOSE("Block size: %zu", arena.block_size);
     DEBUG_VERBOSE("Current used: %zu", arena.current_used);
     assert(arena.current == arena.first->next);
-    assert(arena.current->size == 32);  // Doubled from 16
+    assert(arena.current->size == 32); // Doubled from 16
     assert(arena.block_size == 32);
     assert(p3 == arena.current->data);
     assert(arena.current_used == 8);
@@ -77,7 +79,8 @@ void test_arena_alloc_small() {
     DEBUG_INFO("Finished test_arena_alloc_small");
 }
 
-void test_arena_alloc_large() {
+void test_arena_alloc_large()
+{
     DEBUG_INFO("Starting test_arena_alloc_large");
     printf("Testing arena_alloc large allocations...\n");
     Arena arena;
@@ -86,7 +89,7 @@ void test_arena_alloc_large() {
 
     // Allocate something small first
     DEBUG_VERBOSE("Allocating 4 bytes first");
-    arena_alloc(&arena, 4);  // Uses 8 bytes, 8 left
+    arena_alloc(&arena, 4); // Uses 8 bytes, 8 left
     DEBUG_VERBOSE("Current used after small alloc: %zu", arena.current_used);
 
     // Allocate 20 bytes (aligned to 24), 8 + 24 = 32 > 16, so new block
@@ -139,7 +142,8 @@ void test_arena_alloc_large() {
     DEBUG_INFO("Finished test_arena_alloc_large");
 }
 
-void test_arena_alloc_larger_than_double() {
+void test_arena_alloc_larger_than_double()
+{
     DEBUG_INFO("Starting test_arena_alloc_larger_than_double");
     printf("Testing arena_alloc larger than double...\n");
     Arena arena;
@@ -166,7 +170,8 @@ void test_arena_alloc_larger_than_double() {
     DEBUG_INFO("Finished test_arena_alloc_larger_than_double");
 }
 
-void test_arena_alloc_zero() {
+void test_arena_alloc_zero()
+{
     DEBUG_INFO("Starting test_arena_alloc_zero");
     printf("Testing arena_alloc zero size...\n");
     Arena arena;
@@ -179,7 +184,7 @@ void test_arena_alloc_zero() {
     DEBUG_VERBOSE("Allocated p1: %p", p1);
     DEBUG_VERBOSE("Current used: %zu", arena.current_used);
     assert(p1 == arena.current->data);
-    assert(arena.current_used == 0);  // No advance
+    assert(arena.current_used == 0); // No advance
 
     // Next alloc should be at same place
     DEBUG_VERBOSE("Allocating another 0 bytes");
@@ -202,7 +207,8 @@ void test_arena_alloc_zero() {
     DEBUG_INFO("Finished test_arena_alloc_zero");
 }
 
-void test_arena_strdup() {
+void test_arena_strdup()
+{
     DEBUG_INFO("Starting test_arena_strdup");
     printf("Testing arena_strdup...\n");
     Arena arena;
@@ -221,7 +227,7 @@ void test_arena_strdup() {
     DEBUG_VERBOSE("Result s2: %s", s2);
     DEBUG_VERBOSE("Current used: %zu", arena.current_used);
     assert(strcmp(s2, "") == 0);
-    assert(arena.current_used == 8);  // 1 byte aligned to 8
+    assert(arena.current_used == 8); // 1 byte aligned to 8
 
     // Normal string "hello" (6 bytes incl null, aligned 8)
     DEBUG_VERBOSE("strdup 'hello'");
@@ -229,7 +235,7 @@ void test_arena_strdup() {
     DEBUG_VERBOSE("Result s3: %s", s3);
     DEBUG_VERBOSE("Current used: %zu", arena.current_used);
     assert(strcmp(s3, "hello") == 0);
-    assert(arena.current_used == 16);  // 8 + 8 =16
+    assert(arena.current_used == 16); // 8 + 8 =16
 
     // Longer string to force new block "this is a longer string" (23+1=24, aligned 24)
     DEBUG_VERBOSE("strdup 'this is a longer string'");
@@ -246,7 +252,8 @@ void test_arena_strdup() {
     DEBUG_INFO("Finished test_arena_strdup");
 }
 
-void test_arena_strndup() {
+void test_arena_strndup()
+{
     DEBUG_INFO("Starting test_arena_strndup");
     printf("Testing arena_strndup...\n");
     Arena arena;
@@ -265,7 +272,7 @@ void test_arena_strndup() {
     DEBUG_VERBOSE("Result s2: %s", s2);
     DEBUG_VERBOSE("Current used: %zu", arena.current_used);
     assert(strcmp(s2, "") == 0);
-    assert(arena.current_used == 8);  // 1 byte aligned
+    assert(arena.current_used == 8); // 1 byte aligned
 
     // String "hello", n=3 -> "hel"
     DEBUG_VERBOSE("strndup 'hello', n=3");
@@ -273,7 +280,7 @@ void test_arena_strndup() {
     DEBUG_VERBOSE("Result s3: %s", s3);
     DEBUG_VERBOSE("Current used: %zu", arena.current_used);
     assert(strcmp(s3, "hel") == 0);
-    assert(arena.current_used == 16);  // 8 + 8 (4 bytes aligned)
+    assert(arena.current_used == 16); // 8 + 8 (4 bytes aligned)
 
     // String "hello", n=10 > len -> "hello"
     DEBUG_VERBOSE("strndup 'hello', n=10");
@@ -283,7 +290,7 @@ void test_arena_strndup() {
     DEBUG_VERBOSE("Current used: %zu", arena.current_used);
     assert(strcmp(s4, "hello") == 0);
     assert(arena.current == arena.first->next);
-    assert(arena.current_used == 8);  // 6 bytes aligned to 8
+    assert(arena.current_used == 8); // 6 bytes aligned to 8
 
     // String "abc", n=0 -> ""
     DEBUG_VERBOSE("strndup 'abc', n=0");
@@ -291,14 +298,15 @@ void test_arena_strndup() {
     DEBUG_VERBOSE("Result s5: %s", s5);
     DEBUG_VERBOSE("Current used: %zu", arena.current_used);
     assert(strcmp(s5, "") == 0);
-    assert(arena.current_used == 16);  // 8 + 8 (1 byte aligned)
+    assert(arena.current_used == 16); // 8 + 8 (1 byte aligned)
 
     DEBUG_INFO("Cleaning up arena in test_arena_strndup");
     arena_free(&arena);
     DEBUG_INFO("Finished test_arena_strndup");
 }
 
-void test_arena_free() {
+void test_arena_free()
+{
     DEBUG_INFO("Starting test_arena_free");
     printf("Testing arena_free...\n");
     Arena arena;
@@ -307,10 +315,10 @@ void test_arena_free() {
 
     // Allocate some stuff to create multiple blocks
     DEBUG_VERBOSE("Allocating 10 bytes");
-    arena_alloc(&arena, 10);  // 16 bytes used (aligned 16)
+    arena_alloc(&arena, 10); // 16 bytes used (aligned 16)
     DEBUG_VERBOSE("Current used: %zu", arena.current_used);
     DEBUG_VERBOSE("Allocating another 10 bytes, new block");
-    arena_alloc(&arena, 10);  // New block
+    arena_alloc(&arena, 10); // New block
     DEBUG_VERBOSE("Current used: %zu", arena.current_used);
     DEBUG_VERBOSE("strdup 'test'");
     arena_strdup(&arena, "test");
