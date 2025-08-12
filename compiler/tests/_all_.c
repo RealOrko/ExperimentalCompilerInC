@@ -1,5 +1,6 @@
 #include "arena_tests.c"
 #include "ast_tests.c"
+#include "file_tests.c"
 #include "parser_tests.c"
 
 int main()
@@ -53,6 +54,18 @@ int main()
     test_ast_module_add_statement();
     test_ast_clone_token();
     test_ast_print();
+
+    // *** File ***
+
+    test_file_read_null_arena();
+    test_file_read_null_path();
+    test_file_read_nonexistent_file();
+    test_file_read_empty_file();
+    test_file_read_small_file();
+    test_file_read_large_file();
+    test_file_read_seek_failure();
+    test_file_read_read_failure();
+    test_file_read_special_characters();
 
     // *** Parser ***
 
