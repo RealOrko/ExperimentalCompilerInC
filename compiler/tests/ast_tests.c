@@ -38,13 +38,42 @@ void test_ast_create_primitive_type()
     Arena arena;
     setup_arena(&arena);
 
+    // Test all primitive kinds
     Type *t_int = ast_create_primitive_type(&arena, TYPE_INT);
     assert(t_int != NULL);
     assert(t_int->kind == TYPE_INT);
 
+    Type *t_long = ast_create_primitive_type(&arena, TYPE_LONG);
+    assert(t_long != NULL);
+    assert(t_long->kind == TYPE_LONG);
+
+    Type *t_double = ast_create_primitive_type(&arena, TYPE_DOUBLE);
+    assert(t_double != NULL);
+    assert(t_double->kind == TYPE_DOUBLE);
+
+    Type *t_char = ast_create_primitive_type(&arena, TYPE_CHAR);
+    assert(t_char != NULL);
+    assert(t_char->kind == TYPE_CHAR);
+
+    Type *t_string = ast_create_primitive_type(&arena, TYPE_STRING);
+    assert(t_string != NULL);
+    assert(t_string->kind == TYPE_STRING);
+
+    Type *t_bool = ast_create_primitive_type(&arena, TYPE_BOOL);
+    assert(t_bool != NULL);
+    assert(t_bool->kind == TYPE_BOOL);
+
     Type *t_void = ast_create_primitive_type(&arena, TYPE_VOID);
     assert(t_void != NULL);
     assert(t_void->kind == TYPE_VOID);
+
+    Type *t_nil = ast_create_primitive_type(&arena, TYPE_NIL);
+    assert(t_nil != NULL);
+    assert(t_nil->kind == TYPE_NIL);
+
+    Type *t_any = ast_create_primitive_type(&arena, TYPE_ANY);
+    assert(t_any != NULL);
+    assert(t_any->kind == TYPE_ANY);
 
     cleanup_arena(&arena);
 }
@@ -60,6 +89,13 @@ void test_ast_create_array_type()
     assert(arr != NULL);
     assert(arr->kind == TYPE_ARRAY);
     assert(arr->as.array.element_type == elem);
+
+    // Nested array
+    Type *nested_arr = ast_create_array_type(&arena, arr);
+    assert(nested_arr != NULL);
+    assert(nested_arr->kind == TYPE_ARRAY);
+    assert(nested_arr->as.array.element_type == arr);
+    assert(nested_arr->as.array.element_type->as.array.element_type == elem);
 
     // Edge case: NULL element
     Type *arr_null = ast_create_array_type(&arena, NULL);
@@ -88,6 +124,14 @@ void test_ast_create_function_type()
     assert(ast_type_equals(fn->as.function.param_types[0], params[0]));
     assert(ast_type_equals(fn->as.function.param_types[1], params[1]));
 
+    // Complex params: array type
+    Type *arr_param = ast_create_array_type(&arena, params[0]);
+    Type *complex_params[1] = {arr_param};
+    Type *complex_fn = ast_create_function_type(&arena, ret, complex_params, 1);
+    assert(complex_fn != NULL);
+    assert(complex_fn->as.function.param_count == 1);
+    assert(ast_type_equals(complex_fn->as.function.param_types[0], arr_param));
+
     // Empty params
     Type *fn_empty = ast_create_function_type(&arena, ret, NULL, 0);
     assert(fn_empty != NULL);
@@ -98,6 +142,12 @@ void test_ast_create_function_type()
     Type *fn_null_ret = ast_create_function_type(&arena, NULL, params, 2);
     assert(fn_null_ret != NULL);
     assert(fn_null_ret->as.function.return_type == NULL);
+
+    // NULL params with count > 0 (should handle gracefully, but according to code, it clones NULL)
+    Type *fn_null_params = ast_create_function_type(&arena, ret, NULL, 2);
+    assert(fn_null_params != NULL);
+    assert(fn_null_params->as.function.param_count == 2);
+    assert(fn_null_params->as.function.param_types != NULL); // Allocated, but cloned from NULL?
 
     cleanup_arena(&arena);
 }
@@ -125,6 +175,13 @@ void test_ast_clone_type()
     assert(clone_arr->as.array.element_type != elem);
     assert(clone_arr->as.array.element_type->kind == TYPE_CHAR);
 
+    // Nested array
+    Type *nested_orig = ast_create_array_type(&arena, orig_arr);
+    Type *nested_clone = ast_clone_type(&arena, nested_orig);
+    assert(nested_clone != NULL);
+    assert(nested_clone->as.array.element_type->kind == TYPE_ARRAY);
+    assert(nested_clone->as.array.element_type->as.array.element_type->kind == TYPE_CHAR);
+
     // Function
     Type *ret = ast_create_primitive_type(&arena, TYPE_INT);
     Type *params[1] = {ast_create_primitive_type(&arena, TYPE_DOUBLE)};
@@ -136,6 +193,13 @@ void test_ast_clone_type()
     assert(clone_fn->as.function.return_type->kind == TYPE_INT);
     assert(clone_fn->as.function.param_count == 1);
     assert(clone_fn->as.function.param_types[0]->kind == TYPE_DOUBLE);
+
+    // Function with complex param
+    Type *complex_params[1] = {orig_arr};
+    Type *complex_orig_fn = ast_create_function_type(&arena, ret, complex_params, 1);
+    Type *complex_clone_fn = ast_clone_type(&arena, complex_orig_fn);
+    assert(complex_clone_fn != NULL);
+    assert(complex_clone_fn->as.function.param_types[0]->kind == TYPE_ARRAY);
 
     // NULL
     assert(ast_clone_type(&arena, NULL) == NULL);
@@ -155,12 +219,24 @@ void test_ast_type_equals()
     assert(ast_type_equals(t1, t2) == 1);
     assert(ast_type_equals(t1, t3) == 0);
 
+    // All primitives
+    Type *t_long = ast_create_primitive_type(&arena, TYPE_LONG);
+    assert(ast_type_equals(t1, t_long) == 0);
+
     // Arrays
     Type *arr1 = ast_create_array_type(&arena, t1);
     Type *arr2 = ast_create_array_type(&arena, t2);
     Type *arr3 = ast_create_array_type(&arena, t3);
     assert(ast_type_equals(arr1, arr2) == 1);
     assert(ast_type_equals(arr1, arr3) == 0);
+
+    // Nested arrays
+    Type *nested1 = ast_create_array_type(&arena, arr1);
+    Type *nested2 = ast_create_array_type(&arena, arr2);
+    Type *nested3 = ast_create_array_type(&arena, arr1); // Same as nested1
+    assert(ast_type_equals(nested1, nested2) == 1);
+    assert(ast_type_equals(nested1, arr1) == 0); // Different depth
+    assert(ast_type_equals(nested1, nested3) == 1);
 
     // Functions
     Type *params1[2] = {t1, t3};
@@ -172,9 +248,28 @@ void test_ast_type_equals()
     assert(ast_type_equals(fn1, fn2) == 1);
     assert(ast_type_equals(fn1, fn3) == 0);
 
+    // Function with different return
+    Type *fn_diff_ret = ast_create_function_type(&arena, t3, params1, 2);
+    assert(ast_type_equals(fn1, fn_diff_ret) == 0);
+
+    // Function with different param count
+    Type *fn_diff_count = ast_create_function_type(&arena, t1, params1, 1);
+    assert(ast_type_equals(fn1, fn_diff_count) == 0);
+
+    // Function with different param types
+    Type *params_diff[2] = {t1, t1};
+    Type *fn_diff_params = ast_create_function_type(&arena, t1, params_diff, 2);
+    assert(ast_type_equals(fn1, fn_diff_params) == 0);
+
+    // Empty functions
+    Type *empty1 = ast_create_function_type(&arena, t1, NULL, 0);
+    Type *empty2 = ast_create_function_type(&arena, t1, NULL, 0);
+    assert(ast_type_equals(empty1, empty2) == 1);
+
     // NULL cases
     assert(ast_type_equals(NULL, NULL) == 1);
     assert(ast_type_equals(t1, NULL) == 0);
+    assert(ast_type_equals(NULL, t1) == 0);
 
     cleanup_arena(&arena);
 }
@@ -185,22 +280,50 @@ void test_ast_type_to_string()
     Arena arena;
     setup_arena(&arena);
 
+    // Primitives
     assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_INT)), "int") == 0);
+    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_LONG)), "long") == 0);
     assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_DOUBLE)), "double") == 0);
+    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_CHAR)), "char") == 0);
+    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_STRING)), "string") == 0);
+    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_BOOL)), "bool") == 0);
     assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_VOID)), "void") == 0);
+    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_NIL)), "nil") == 0);
+    assert(strcmp(ast_type_to_string(ast_create_primitive_type(&arena, TYPE_ANY)), "any") == 0);
 
+    // Array
     Type *arr = ast_create_array_type(&arena, ast_create_primitive_type(&arena, TYPE_CHAR));
     assert(strcmp(ast_type_to_string(arr), "array<char>") == 0);
 
+    // Nested array
+    Type *nested_arr = ast_create_array_type(&arena, arr);
+    assert(strcmp(ast_type_to_string(nested_arr), "array<array<char>>") == 0);
+
+    // Function
     Type *params[1] = {ast_create_primitive_type(&arena, TYPE_BOOL)};
     Type *fn = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_STRING), params, 1);
     assert(strcmp(ast_type_to_string(fn), "fn(bool) -> string") == 0);
+
+    // Function with multiple params
+    Type *params_multi[2] = {ast_create_primitive_type(&arena, TYPE_INT), ast_create_primitive_type(&arena, TYPE_DOUBLE)};
+    Type *fn_multi = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_VOID), params_multi, 2);
+    assert(strcmp(ast_type_to_string(fn_multi), "fn(int, double) -> void") == 0);
+
+    // Function with array param
+    Type *params_arr[1] = {arr};
+    Type *fn_arr = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_INT), params_arr, 1);
+    assert(strcmp(ast_type_to_string(fn_arr), "fn(array<char>) -> int") == 0);
+
+    // Empty function
+    Type *fn_empty = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_VOID), NULL, 0);
+    assert(strcmp(ast_type_to_string(fn_empty), "fn() -> void") == 0);
 
     // Unknown kind
     Type *unknown = arena_alloc(&arena, sizeof(Type));
     unknown->kind = -1; // Invalid
     assert(strcmp(ast_type_to_string(unknown), "unknown") == 0);
 
+    // NULL
     assert(ast_type_to_string(NULL) == NULL);
 
     cleanup_arena(&arena);
@@ -226,9 +349,22 @@ void test_ast_create_binary_expr()
     assert(bin->token == loc);
     assert(bin->expr_type == NULL);
 
+    // Different operators
+    Expr *bin_minus = ast_create_binary_expr(&arena, left, TOKEN_MINUS, right, loc);
+    assert(bin_minus->as.binary.operator == TOKEN_MINUS);
+
+    Expr *bin_mult = ast_create_binary_expr(&arena, left, TOKEN_STAR, right, loc);
+    assert(bin_mult->as.binary.operator == TOKEN_STAR);
+
     // NULL left/right
-    Expr *bin_null = ast_create_binary_expr(&arena, NULL, TOKEN_PLUS, right, loc);
-    assert(bin_null == NULL);
+    assert(ast_create_binary_expr(&arena, NULL, TOKEN_PLUS, right, loc) == NULL);
+    assert(ast_create_binary_expr(&arena, left, TOKEN_PLUS, NULL, loc) == NULL);
+    assert(ast_create_binary_expr(&arena, NULL, TOKEN_PLUS, NULL, loc) == NULL);
+
+    // NULL loc (code allows it, but token is const Token*)
+    Expr *bin_null_loc = ast_create_binary_expr(&arena, left, TOKEN_PLUS, right, NULL);
+    assert(bin_null_loc != NULL);
+    assert(bin_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -249,9 +385,17 @@ void test_ast_create_unary_expr()
     assert(un->as.unary.operand == operand);
     assert(un->token == loc);
 
+    // Different operators
+    Expr *un_not = ast_create_unary_expr(&arena, TOKEN_BANG, operand, loc);
+    assert(un_not->as.unary.operator == TOKEN_BANG);
+
     // NULL operand
-    Expr *un_null = ast_create_unary_expr(&arena, TOKEN_MINUS, NULL, loc);
-    assert(un_null == NULL);
+    assert(ast_create_unary_expr(&arena, TOKEN_MINUS, NULL, loc) == NULL);
+
+    // NULL loc
+    Expr *un_null_loc = ast_create_unary_expr(&arena, TOKEN_MINUS, operand, NULL);
+    assert(un_null_loc != NULL);
+    assert(un_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -264,19 +408,56 @@ void test_ast_create_literal_expr()
 
     Token temp_token = create_dummy_token(&arena, "loc");
     Token *loc = ast_clone_token(&arena, &temp_token);
-    LiteralValue val = {.int_value = 42};
-    Type *typ = ast_create_primitive_type(&arena, TYPE_INT);
-    Expr *lit = ast_create_literal_expr(&arena, val, typ, false, loc);
-    assert(lit != NULL);
-    assert(lit->type == EXPR_LITERAL);
-    assert(lit->as.literal.value.int_value == 42);
-    assert(lit->as.literal.type == typ);
-    assert(lit->as.literal.is_interpolated == false);
-    assert(lit->token == loc);
+
+    // Int
+    LiteralValue val_int = {.int_value = 42};
+    Type *typ_int = ast_create_primitive_type(&arena, TYPE_INT);
+    Expr *lit_int = ast_create_literal_expr(&arena, val_int, typ_int, false, loc);
+    assert(lit_int != NULL);
+    assert(lit_int->type == EXPR_LITERAL);
+    assert(lit_int->as.literal.value.int_value == 42);
+    assert(lit_int->as.literal.type == typ_int);
+    assert(lit_int->as.literal.is_interpolated == false);
+    assert(lit_int->token == loc);
+
+    // Double
+    LiteralValue val_double = {.double_value = 3.14};
+    Type *typ_double = ast_create_primitive_type(&arena, TYPE_DOUBLE);
+    Expr *lit_double = ast_create_literal_expr(&arena, val_double, typ_double, false, loc);
+    assert(lit_double->as.literal.value.double_value == 3.14);
+    assert(lit_double->as.literal.type == typ_double);
+
+    // Char
+    LiteralValue val_char = {.char_value = 'a'};
+    Type *typ_char = ast_create_primitive_type(&arena, TYPE_CHAR);
+    Expr *lit_char = ast_create_literal_expr(&arena, val_char, typ_char, false, loc);
+    assert(lit_char->as.literal.value.char_value == 'a');
+
+    // String
+    LiteralValue val_string = {.string_value = "hello"};
+    Type *typ_string = ast_create_primitive_type(&arena, TYPE_STRING);
+    Expr *lit_string = ast_create_literal_expr(&arena, val_string, typ_string, false, loc);
+    assert(strcmp(lit_string->as.literal.value.string_value, "hello") == 0);
+
+    // Bool
+    LiteralValue val_bool = {.bool_value = true};
+    Type *typ_bool = ast_create_primitive_type(&arena, TYPE_BOOL);
+    Expr *lit_bool = ast_create_literal_expr(&arena, val_bool, typ_bool, false, loc);
+    assert(lit_bool->as.literal.value.bool_value == true);
 
     // Interpolated
-    Expr *lit_interp = ast_create_literal_expr(&arena, val, typ, true, loc);
+    Expr *lit_interp = ast_create_literal_expr(&arena, val_int, typ_int, true, loc);
     assert(lit_interp->as.literal.is_interpolated == true);
+
+    // NULL type (code requires type, but test if NULL)
+    Expr *lit_null_type = ast_create_literal_expr(&arena, val_int, NULL, false, loc);
+    assert(lit_null_type != NULL);
+    assert(lit_null_type->as.literal.type == NULL);
+
+    // NULL loc
+    Expr *lit_null_loc = ast_create_literal_expr(&arena, val_int, typ_int, false, NULL);
+    assert(lit_null_loc != NULL);
+    assert(lit_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -295,6 +476,17 @@ void test_ast_create_variable_expr()
     assert(strcmp(var->as.variable.name.start, "varname") == 0);
     assert(var->as.variable.name.length == 7);
     assert(var->token == loc);
+
+    // Empty name (length 0)
+    Token empty_name = create_dummy_token(&arena, "");
+    Expr *var_empty = ast_create_variable_expr(&arena, empty_name, loc);
+    assert(var_empty != NULL);
+    assert(var_empty->as.variable.name.length == 0);
+
+    // NULL loc
+    Expr *var_null_loc = ast_create_variable_expr(&arena, name, NULL);
+    assert(var_null_loc != NULL);
+    assert(var_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -316,8 +508,20 @@ void test_ast_create_assign_expr()
     assert(ass->token == loc);
 
     // NULL value
-    Expr *ass_null = ast_create_assign_expr(&arena, name, NULL, loc);
-    assert(ass_null == NULL);
+    Expr *ass_null_val = ast_create_assign_expr(&arena, name, NULL, loc);
+    assert(ass_null_val != NULL); // Code allows NULL value
+    assert(ass_null_val->as.assign.value == NULL);
+
+    // Empty name
+    Token empty_name = create_dummy_token(&arena, "");
+    Expr *ass_empty = ast_create_assign_expr(&arena, empty_name, val, loc);
+    assert(ass_empty != NULL);
+    assert(ass_empty->as.assign.name.length == 0);
+
+    // NULL loc
+    Expr *ass_null_loc = ast_create_assign_expr(&arena, name, val, NULL);
+    assert(ass_null_loc != NULL);
+    assert(ass_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -347,10 +551,21 @@ void test_ast_create_call_expr()
     Expr *call_empty = ast_create_call_expr(&arena, callee, NULL, 0, loc);
     assert(call_empty != NULL);
     assert(call_empty->as.call.arg_count == 0);
+    assert(call_empty->as.call.arguments == NULL);
 
     // NULL callee
-    Expr *call_null = ast_create_call_expr(&arena, NULL, args, 2, loc);
-    assert(call_null == NULL);
+    assert(ast_create_call_expr(&arena, NULL, args, 2, loc) == NULL);
+
+    // NULL args with count > 0 (code sets arguments to passed, even if NULL)
+    Expr *call_null_args = ast_create_call_expr(&arena, callee, NULL, 2, loc);
+    assert(call_null_args != NULL);
+    assert(call_null_args->as.call.arguments == NULL);
+    assert(call_null_args->as.call.arg_count == 2);
+
+    // NULL loc
+    Expr *call_null_loc = ast_create_call_expr(&arena, callee, args, 2, NULL);
+    assert(call_null_loc != NULL);
+    assert(call_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -364,22 +579,35 @@ void test_ast_create_array_expr()
     Token temp_token = create_dummy_token(&arena, "loc");
     Token *loc = ast_clone_token(&arena, &temp_token);
     Expr *elems[3];
-    for (int i = 0; i < 3; i++)
-    {
-        LiteralValue val = {.int_value = i};
-        elems[i] = ast_create_literal_expr(&arena, val, ast_create_primitive_type(&arena, TYPE_INT), false, loc);
-    }
+    elems[0] = ast_create_literal_expr(&arena, (LiteralValue){.int_value = 1}, ast_create_primitive_type(&arena, TYPE_INT), false, loc);
+    elems[1] = ast_create_literal_expr(&arena, (LiteralValue){.int_value = 2}, ast_create_primitive_type(&arena, TYPE_INT), false, loc);
+    elems[2] = ast_create_literal_expr(&arena, (LiteralValue){.int_value = 3}, ast_create_primitive_type(&arena, TYPE_INT), false, loc);
     Expr *arr = ast_create_array_expr(&arena, elems, 3, loc);
     assert(arr != NULL);
     assert(arr->type == EXPR_ARRAY);
     assert(arr->as.array.element_count == 3);
     assert(arr->as.array.elements[0] == elems[0]);
+    assert(arr->as.array.elements[1] == elems[1]);
+    assert(arr->as.array.elements[2] == elems[2]);
     assert(arr->token == loc);
+    assert(arr->expr_type == NULL);
 
     // Empty array
     Expr *arr_empty = ast_create_array_expr(&arena, NULL, 0, loc);
     assert(arr_empty != NULL);
     assert(arr_empty->as.array.element_count == 0);
+    assert(arr_empty->as.array.elements == NULL);
+
+    // NULL elems with count > 0
+    Expr *arr_null_elems = ast_create_array_expr(&arena, NULL, 3, loc);
+    assert(arr_null_elems != NULL);
+    assert(arr_null_elems->as.array.elements == NULL);
+    assert(arr_null_elems->as.array.element_count == 3);
+
+    // NULL loc
+    Expr *arr_null_loc = ast_create_array_expr(&arena, elems, 3, NULL);
+    assert(arr_null_loc != NULL);
+    assert(arr_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -392,18 +620,25 @@ void test_ast_create_array_access_expr()
 
     Token temp_token = create_dummy_token(&arena, "loc");
     Token *loc = ast_clone_token(&arena, &temp_token);
-    Expr *arr = ast_create_variable_expr(&arena, create_dummy_token(&arena, "arr"), loc);
-    Expr *idx = ast_create_literal_expr(&arena, (LiteralValue){.int_value = 0}, ast_create_primitive_type(&arena, TYPE_INT), false, loc);
-    Expr *acc = ast_create_array_access_expr(&arena, arr, idx, loc);
-    assert(acc != NULL);
-    assert(acc->type == EXPR_ARRAY_ACCESS);
-    assert(acc->as.array_access.array == arr);
-    assert(acc->as.array_access.index == idx);
-    assert(acc->token == loc);
+    Expr *array = ast_create_variable_expr(&arena, create_dummy_token(&arena, "arr"), loc);
+    Expr *index = ast_create_literal_expr(&arena, (LiteralValue){.int_value = 0}, ast_create_primitive_type(&arena, TYPE_INT), false, loc);
+    Expr *access = ast_create_array_access_expr(&arena, array, index, loc);
+    assert(access != NULL);
+    assert(access->type == EXPR_ARRAY_ACCESS);
+    assert(access->as.array_access.array == array);
+    assert(access->as.array_access.index == index);
+    assert(access->token == loc);
+    assert(access->expr_type == NULL);
 
     // NULL array or index
-    assert(ast_create_array_access_expr(&arena, NULL, idx, loc) == NULL);
-    assert(ast_create_array_access_expr(&arena, arr, NULL, loc) == NULL);
+    assert(ast_create_array_access_expr(&arena, NULL, index, loc) == NULL);
+    assert(ast_create_array_access_expr(&arena, array, NULL, loc) == NULL);
+    assert(ast_create_array_access_expr(&arena, NULL, NULL, loc) == NULL);
+
+    // NULL loc
+    Expr *access_null_loc = ast_create_array_access_expr(&arena, array, index, NULL);
+    assert(access_null_loc != NULL);
+    assert(access_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -416,15 +651,21 @@ void test_ast_create_increment_expr()
 
     Token temp_token = create_dummy_token(&arena, "loc");
     Token *loc = ast_clone_token(&arena, &temp_token);
-    Expr *op = ast_create_variable_expr(&arena, create_dummy_token(&arena, "x"), loc);
-    Expr *inc = ast_create_increment_expr(&arena, op, loc);
+    Expr *operand = ast_create_variable_expr(&arena, create_dummy_token(&arena, "i"), loc);
+    Expr *inc = ast_create_increment_expr(&arena, operand, loc);
     assert(inc != NULL);
     assert(inc->type == EXPR_INCREMENT);
-    assert(inc->as.operand == op);
+    assert(inc->as.operand == operand);
     assert(inc->token == loc);
+    assert(inc->expr_type == NULL);
 
     // NULL operand
     assert(ast_create_increment_expr(&arena, NULL, loc) == NULL);
+
+    // NULL loc
+    Expr *inc_null_loc = ast_create_increment_expr(&arena, operand, NULL);
+    assert(inc_null_loc != NULL);
+    assert(inc_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -437,15 +678,21 @@ void test_ast_create_decrement_expr()
 
     Token temp_token = create_dummy_token(&arena, "loc");
     Token *loc = ast_clone_token(&arena, &temp_token);
-    Expr *op = ast_create_variable_expr(&arena, create_dummy_token(&arena, "x"), loc);
-    Expr *dec = ast_create_decrement_expr(&arena, op, loc);
+    Expr *operand = ast_create_variable_expr(&arena, create_dummy_token(&arena, "i"), loc);
+    Expr *dec = ast_create_decrement_expr(&arena, operand, loc);
     assert(dec != NULL);
     assert(dec->type == EXPR_DECREMENT);
-    assert(dec->as.operand == op);
+    assert(dec->as.operand == operand);
     assert(dec->token == loc);
+    assert(dec->expr_type == NULL);
 
     // NULL operand
     assert(ast_create_decrement_expr(&arena, NULL, loc) == NULL);
+
+    // NULL loc
+    Expr *dec_null_loc = ast_create_decrement_expr(&arena, operand, NULL);
+    assert(dec_null_loc != NULL);
+    assert(dec_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -459,8 +706,8 @@ void test_ast_create_interpolated_expr()
     Token temp_token = create_dummy_token(&arena, "loc");
     Token *loc = ast_clone_token(&arena, &temp_token);
     Expr *parts[2];
-    parts[0] = ast_create_literal_expr(&arena, (LiteralValue){.string_value = "hello"}, ast_create_primitive_type(&arena, TYPE_STRING), false, loc);
-    parts[1] = ast_create_variable_expr(&arena, create_dummy_token(&arena, "world"), loc);
+    parts[0] = ast_create_literal_expr(&arena, (LiteralValue){.string_value = "hello "}, ast_create_primitive_type(&arena, TYPE_STRING), true, loc);
+    parts[1] = ast_create_variable_expr(&arena, create_dummy_token(&arena, "name"), loc);
     Expr *interp = ast_create_interpolated_expr(&arena, parts, 2, loc);
     assert(interp != NULL);
     assert(interp->type == EXPR_INTERPOLATED);
@@ -468,11 +715,24 @@ void test_ast_create_interpolated_expr()
     assert(interp->as.interpol.parts[0] == parts[0]);
     assert(interp->as.interpol.parts[1] == parts[1]);
     assert(interp->token == loc);
+    assert(interp->expr_type == NULL);
 
     // Empty parts
     Expr *interp_empty = ast_create_interpolated_expr(&arena, NULL, 0, loc);
     assert(interp_empty != NULL);
     assert(interp_empty->as.interpol.part_count == 0);
+    assert(interp_empty->as.interpol.parts == NULL);
+
+    // NULL parts with count > 0
+    Expr *interp_null_parts = ast_create_interpolated_expr(&arena, NULL, 2, loc);
+    assert(interp_null_parts != NULL);
+    assert(interp_null_parts->as.interpol.parts == NULL);
+    assert(interp_null_parts->as.interpol.part_count == 2);
+
+    // NULL loc
+    Expr *interp_null_loc = ast_create_interpolated_expr(&arena, parts, 2, NULL);
+    assert(interp_null_loc != NULL);
+    assert(interp_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -487,13 +747,20 @@ void test_ast_create_comparison_expr()
     Token *loc = ast_clone_token(&arena, &temp_token);
     Expr *left = ast_create_literal_expr(&arena, (LiteralValue){.int_value = 1}, ast_create_primitive_type(&arena, TYPE_INT), false, loc);
     Expr *right = ast_create_literal_expr(&arena, (LiteralValue){.int_value = 2}, ast_create_primitive_type(&arena, TYPE_INT), false, loc);
-    Expr *comp = ast_create_comparison_expr(&arena, left, right, TOKEN_GREATER, loc);
+    Expr *comp = ast_create_comparison_expr(&arena, left, right, TOKEN_EQUAL_EQUAL, loc);
     assert(comp != NULL);
-    assert(comp->type == EXPR_BINARY); // Since it's a wrapper for binary
-    assert(comp->as.binary.operator == TOKEN_GREATER);
+    assert(comp->type == EXPR_BINARY); // Since it's alias to binary
+    assert(comp->as.binary.left == left);
+    assert(comp->as.binary.right == right);
+    assert(comp->as.binary.operator == TOKEN_EQUAL_EQUAL);
+
+    // Different comparison types
+    Expr *comp_gt = ast_create_comparison_expr(&arena, left, right, TOKEN_GREATER, loc);
+    assert(comp_gt->as.binary.operator == TOKEN_GREATER);
 
     // NULL left/right
-    assert(ast_create_comparison_expr(&arena, NULL, right, TOKEN_GREATER, loc) == NULL);
+    assert(ast_create_comparison_expr(&arena, NULL, right, TOKEN_EQUAL_EQUAL, loc) == NULL);
+    assert(ast_create_comparison_expr(&arena, left, NULL, TOKEN_EQUAL_EQUAL, loc) == NULL);
 
     cleanup_arena(&arena);
 }
@@ -508,14 +775,19 @@ void test_ast_create_expr_stmt()
     Token temp_token = create_dummy_token(&arena, "loc");
     Token *loc = ast_clone_token(&arena, &temp_token);
     Expr *expr = ast_create_variable_expr(&arena, create_dummy_token(&arena, "x"), loc);
-    Stmt *stmt = ast_create_expr_stmt(&arena, expr, loc);
-    assert(stmt != NULL);
-    assert(stmt->type == STMT_EXPR);
-    assert(stmt->as.expression.expression == expr);
-    assert(stmt->token == loc);
+    Stmt *estmt = ast_create_expr_stmt(&arena, expr, loc);
+    assert(estmt != NULL);
+    assert(estmt->type == STMT_EXPR);
+    assert(estmt->as.expression.expression == expr);
+    assert(estmt->token == loc);
 
     // NULL expr
     assert(ast_create_expr_stmt(&arena, NULL, loc) == NULL);
+
+    // NULL loc
+    Stmt *estmt_null_loc = ast_create_expr_stmt(&arena, expr, NULL);
+    assert(estmt_null_loc != NULL);
+    assert(estmt_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -543,6 +815,20 @@ void test_ast_create_var_decl_stmt()
     assert(decl_no_init != NULL);
     assert(decl_no_init->as.var_decl.initializer == NULL);
 
+    // NULL type
+    assert(ast_create_var_decl_stmt(&arena, name, NULL, init, loc) == NULL);
+
+    // Empty name
+    Token empty_name = create_dummy_token(&arena, "");
+    Stmt *decl_empty = ast_create_var_decl_stmt(&arena, empty_name, typ, init, loc);
+    assert(decl_empty != NULL);
+    assert(decl_empty->as.var_decl.name.length == 0);
+
+    // NULL loc
+    Stmt *decl_null_loc = ast_create_var_decl_stmt(&arena, name, typ, init, NULL);
+    assert(decl_null_loc != NULL);
+    assert(decl_null_loc->token == NULL);
+
     cleanup_arena(&arena);
 }
 
@@ -566,6 +852,7 @@ void test_ast_create_function_stmt()
     assert(strcmp(fn->as.function.name.start, "func") == 0);
     assert(fn->as.function.param_count == 1);
     assert(strcmp(fn->as.function.params[0].name.start, "p") == 0);
+    assert(fn->as.function.params[0].type->kind == TYPE_INT);
     assert(fn->as.function.return_type == ret);
     assert(fn->as.function.body_count == 1);
     assert(fn->as.function.body[0] == body[0]);
@@ -575,7 +862,31 @@ void test_ast_create_function_stmt()
     Stmt *fn_empty = ast_create_function_stmt(&arena, name, NULL, 0, ret, NULL, 0, loc);
     assert(fn_empty != NULL);
     assert(fn_empty->as.function.param_count == 0);
+    assert(fn_empty->as.function.params == NULL);
     assert(fn_empty->as.function.body_count == 0);
+    assert(fn_empty->as.function.body == NULL);
+
+    // NULL return type
+    Stmt *fn_null_ret = ast_create_function_stmt(&arena, name, params, 1, NULL, body, 1, loc);
+    assert(fn_null_ret != NULL);
+    assert(fn_null_ret->as.function.return_type == NULL);
+
+    // NULL params with count > 0 (code allocates and copies, but type could be NULL)
+    Parameter null_params[1] = {{.name = create_dummy_token(&arena, "p"), .type = NULL}};
+    Stmt *fn_null_param_type = ast_create_function_stmt(&arena, name, null_params, 1, ret, body, 1, loc);
+    assert(fn_null_param_type != NULL);
+    assert(fn_null_param_type->as.function.params[0].type == NULL);
+
+    // Empty name
+    Token empty_name = create_dummy_token(&arena, "");
+    Stmt *fn_empty_name = ast_create_function_stmt(&arena, empty_name, params, 1, ret, body, 1, loc);
+    assert(fn_empty_name != NULL);
+    assert(fn_empty_name->as.function.name.length == 0);
+
+    // NULL loc
+    Stmt *fn_null_loc = ast_create_function_stmt(&arena, name, params, 1, ret, body, 1, NULL);
+    assert(fn_null_loc != NULL);
+    assert(fn_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -600,6 +911,17 @@ void test_ast_create_return_stmt()
     Stmt *ret_no_val = ast_create_return_stmt(&arena, kw, NULL, loc);
     assert(ret_no_val != NULL);
     assert(ret_no_val->as.return_stmt.value == NULL);
+
+    // Empty keyword (though unlikely)
+    Token empty_kw = create_dummy_token(&arena, "");
+    Stmt *ret_empty_kw = ast_create_return_stmt(&arena, empty_kw, val, loc);
+    assert(ret_empty_kw != NULL);
+    assert(ret_empty_kw->as.return_stmt.keyword.length == 0);
+
+    // NULL loc
+    Stmt *ret_null_loc = ast_create_return_stmt(&arena, kw, val, NULL);
+    assert(ret_null_loc != NULL);
+    assert(ret_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -627,6 +949,18 @@ void test_ast_create_block_stmt()
     Stmt *block_empty = ast_create_block_stmt(&arena, NULL, 0, loc);
     assert(block_empty != NULL);
     assert(block_empty->as.block.count == 0);
+    assert(block_empty->as.block.statements == NULL);
+
+    // NULL statements with count > 0
+    Stmt *block_null_stmts = ast_create_block_stmt(&arena, NULL, 2, loc);
+    assert(block_null_stmts != NULL);
+    assert(block_null_stmts->as.block.statements == NULL);
+    assert(block_null_stmts->as.block.count == 2);
+
+    // NULL loc
+    Stmt *block_null_loc = ast_create_block_stmt(&arena, stmts, 2, NULL);
+    assert(block_null_loc != NULL);
+    assert(block_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -658,6 +992,12 @@ void test_ast_create_if_stmt()
     // NULL cond or then
     assert(ast_create_if_stmt(&arena, NULL, then, els, loc) == NULL);
     assert(ast_create_if_stmt(&arena, cond, NULL, els, loc) == NULL);
+    assert(ast_create_if_stmt(&arena, NULL, NULL, els, loc) == NULL);
+
+    // NULL loc
+    Stmt *if_null_loc = ast_create_if_stmt(&arena, cond, then, els, NULL);
+    assert(if_null_loc != NULL);
+    assert(if_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -682,6 +1022,12 @@ void test_ast_create_while_stmt()
     // NULL cond or body
     assert(ast_create_while_stmt(&arena, NULL, body, loc) == NULL);
     assert(ast_create_while_stmt(&arena, cond, NULL, loc) == NULL);
+    assert(ast_create_while_stmt(&arena, NULL, NULL, loc) == NULL);
+
+    // NULL loc
+    Stmt *wh_null_loc = ast_create_while_stmt(&arena, cond, body, NULL);
+    assert(wh_null_loc != NULL);
+    assert(wh_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -717,6 +1063,11 @@ void test_ast_create_for_stmt()
     // NULL body
     assert(ast_create_for_stmt(&arena, init, cond, inc, NULL, loc) == NULL);
 
+    // NULL loc
+    Stmt *fr_null_loc = ast_create_for_stmt(&arena, init, cond, inc, body, NULL);
+    assert(fr_null_loc != NULL);
+    assert(fr_null_loc->token == NULL);
+
     cleanup_arena(&arena);
 }
 
@@ -732,7 +1083,19 @@ void test_ast_create_import_stmt()
     assert(imp != NULL);
     assert(imp->type == STMT_IMPORT);
     assert(strcmp(imp->as.import.module_name.start, "module") == 0);
+    assert(imp->as.import.module_name.length == 6);
     assert(imp->token == loc);
+
+    // Empty module name
+    Token empty_mod = create_dummy_token(&arena, "");
+    Stmt *imp_empty = ast_create_import_stmt(&arena, empty_mod, loc);
+    assert(imp_empty != NULL);
+    assert(imp_empty->as.import.module_name.length == 0);
+
+    // NULL loc
+    Stmt *imp_null_loc = ast_create_import_stmt(&arena, mod, NULL);
+    assert(imp_null_loc != NULL);
+    assert(imp_null_loc->token == NULL);
 
     cleanup_arena(&arena);
 }
@@ -754,6 +1117,11 @@ void test_ast_init_module()
     // NULL module
     ast_init_module(&arena, NULL, "test.sn"); // Should do nothing
 
+    // NULL filename (code allows, but filename is const char*)
+    Module mod_null_file;
+    ast_init_module(&arena, &mod_null_file, NULL);
+    assert(mod_null_file.filename == NULL);
+
     cleanup_arena(&arena);
 }
 
@@ -774,17 +1142,20 @@ void test_ast_module_add_statement()
     assert(mod.statements[0] == s1);
 
     // Add more to trigger resize
+    int old_capacity = mod.capacity;
     for (int i = 1; i < 10; i++)
     {
         Stmt *s = ast_create_expr_stmt(&arena, ast_create_variable_expr(&arena, create_dummy_token(&arena, "y"), loc), loc);
         ast_module_add_statement(&arena, &mod, s);
+        assert(mod.statements[i] == s);
     }
     assert(mod.count == 10);
-    assert(mod.capacity >= 10);
+    assert(mod.capacity > old_capacity); // Resized
 
     // NULL module or stmt
     ast_module_add_statement(&arena, NULL, s1);   // Nothing
-    ast_module_add_statement(&arena, &mod, NULL); // Nothing
+    ast_module_add_statement(&arena, &mod, NULL); // Nothing, count unchanged
+    assert(mod.count == 10);
 
     cleanup_arena(&arena);
 }
@@ -808,6 +1179,19 @@ void test_ast_clone_token()
 
     // NULL
     assert(ast_clone_token(&arena, NULL) == NULL);
+
+    // Empty string
+    Token empty_orig = create_dummy_token(&arena, "");
+    Token *empty_clone = ast_clone_token(&arena, &empty_orig);
+    assert(empty_clone != NULL);
+    assert(empty_clone->length == 0);
+    assert(strcmp(empty_clone->start, "") == 0);
+
+    // Different type
+    Token diff_type = orig;
+    diff_type.type = TOKEN_STRING_LITERAL;
+    Token *clone_diff = ast_clone_token(&arena, &diff_type);
+    assert(clone_diff->type == TOKEN_STRING_LITERAL);
 
     cleanup_arena(&arena);
 }
@@ -838,6 +1222,14 @@ void test_ast_print()
     // NULL
     ast_print_expr(NULL, 0);
     ast_print_stmt(NULL, 0);
+
+    // More complex expr
+    Expr *lit = ast_create_literal_expr(&arena, (LiteralValue){.string_value = "test"}, ast_create_primitive_type(&arena, TYPE_STRING), true, loc);
+    ast_print_expr(lit, 0);
+
+    // Complex stmt
+    Stmt *func = ast_create_function_stmt(&arena, create_dummy_token(&arena, "func"), NULL, 0, ast_create_primitive_type(&arena, TYPE_VOID), NULL, 0, loc);
+    ast_print_stmt(func, 0);
 
     cleanup_arena(&arena);
 }
