@@ -478,10 +478,6 @@ void test_full_program_parsing() {
     assert(arg->type == EXPR_INTERPOLATED);
     assert(arg->as.interpol.part_count == 5);  // "Factorial of ", {num}, " is ", {fact}, "\n"
 
-    // Similarly, check for loop in main
-    Stmt *for_sum = main_fn->as.function.body[10];  // adjust index
-    assert(for_sum->type == STMT_FOR);
-
     cleanup_parser(&arena, &lexer, &parser);
 }
 

@@ -79,7 +79,7 @@ int main()
     test_interpolated_string_parsing();
     test_literal_types_parsing();
     test_recursive_function_parsing();
-    // test_full_program_parsing();
+    test_full_program_parsing();
 
     printf("All tests passed!\n");
 
