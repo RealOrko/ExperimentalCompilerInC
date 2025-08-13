@@ -1,6 +1,7 @@
 // parser.c
 #include "parser.h"
 #include "debug.h"
+#include "file.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -125,13 +126,13 @@ int skip_newlines_and_check_end(Parser *parser)
     return parser_is_at_end(parser);
 }
 
-void parser_init(Arena *arena, Parser *parser, Lexer *lexer)
+void parser_init(Arena *arena, Parser *parser, Lexer *lexer, SymbolTable *symbol_table)
 {
     parser->arena = arena;
     parser->lexer = lexer;
     parser->had_error = 0;
     parser->panic_mode = 0;
-    parser->symbol_table = symbol_table_init(arena);
+    parser->symbol_table = symbol_table;
 
     // Add built-in functions to the global symbol table
     Token print_token;
@@ -172,7 +173,6 @@ void parser_init(Arena *arena, Parser *parser, Lexer *lexer)
 
 void parser_cleanup(Parser *parser)
 {
-    symbol_table_cleanup(parser->symbol_table);
     parser->interp_sources = NULL;
     parser->interp_count = 0;
     parser->interp_capacity = 0;
@@ -216,7 +216,8 @@ void parser_error_at(Parser *parser, Token *token, const char *message)
 
     // Advance if the error is at the current token to prevent infinite loops
     // by skipping the offending token and allowing parsing to progress.
-    if (token == &parser->current) {
+    if (token == &parser->current)
+    {
         parser_advance(parser);
     }
 }
@@ -275,7 +276,7 @@ static void synchronize(Parser *parser)
         case TOKEN_WHILE:
         case TOKEN_RETURN:
         case TOKEN_IMPORT:
-        case TOKEN_ELSE:  // Added to handle else clauses during synchronization
+        case TOKEN_ELSE: // Added to handle else clauses during synchronization
             return;
         case TOKEN_NEWLINE:
             parser_advance(parser);
@@ -576,11 +577,8 @@ Expr *parser_primary(Parser *parser)
                 Lexer sub_lexer;
                 lexer_init(parser->arena, &sub_lexer, expr_src, "interpolated");
                 Parser sub_parser;
-                parser_init(parser->arena, &sub_parser, &sub_lexer);
-                SymbolTable *unused_table = sub_parser.symbol_table;
+                parser_init(parser->arena, &sub_parser, &sub_lexer, parser->symbol_table);
                 sub_parser.symbol_table = parser->symbol_table;
-
-                symbol_table_cleanup(unused_table);
 
                 Expr *inner = parser_expression(&sub_parser);
                 if (inner == NULL || sub_parser.had_error)
@@ -1287,5 +1285,186 @@ Module *parser_execute(Parser *parser, const char *filename)
         return NULL;
     }
 
+    return module;
+}
+
+Module *parse_module_with_imports(Arena *arena, SymbolTable *symbol_table, const char *filename, char ***imported, int *imported_count, int *imported_capacity)
+{
+    char *source = file_read(arena, filename);
+    if (!source)
+    {
+        DEBUG_ERROR("Failed to read file: %s", filename);
+        return NULL;
+    }
+
+    Lexer lexer;
+    lexer_init(arena, &lexer, source, filename);
+
+    Parser parser;
+    parser_init(arena, &parser, &lexer, symbol_table);
+
+    Module *module = parser_execute(&parser, filename);
+    if (!module || parser.had_error)
+    {
+        parser_cleanup(&parser);
+        lexer_cleanup(&lexer);
+        return NULL;
+    }
+
+    // Collect all statements, starting with imported ones
+    Stmt **all_statements = NULL;
+    int all_count = 0;
+    int all_capacity = 0;
+
+    // Extract directory from current filename
+    const char *dir_end = strrchr(filename, '/');
+    size_t dir_len = dir_end ? (size_t)(dir_end - filename + 1) : 0;
+    char *dir = NULL;
+    if (dir_len > 0) {
+        dir = arena_alloc(arena, dir_len + 1);
+        if (!dir) {
+            DEBUG_ERROR("Failed to allocate memory for directory path");
+            parser_cleanup(&parser);
+            lexer_cleanup(&lexer);
+            return NULL;
+        }
+        strncpy(dir, filename, dir_len);
+        dir[dir_len] = '\0';
+    }
+
+    // Process imports (remove them and prepend imported statements)
+    for (int i = 0; i < module->count;)
+    {
+        Stmt *stmt = module->statements[i];
+        if (stmt->type == STMT_IMPORT)
+        {
+            Token mod_name = stmt->as.import.module_name;
+            size_t mod_name_len = strlen(mod_name.start);
+            size_t path_len = dir_len + mod_name_len + 4; // ".sn\0"
+            char *import_path = arena_alloc(arena, path_len);
+            if (!import_path)
+            {
+                DEBUG_ERROR("Failed to allocate memory for import path");
+                parser_cleanup(&parser);
+                lexer_cleanup(&lexer);
+                return NULL;
+            }
+            if (dir_len > 0) {
+                strcpy(import_path, dir);
+            } else {
+                import_path[0] = '\0';
+            }
+            strcat(import_path, mod_name.start);
+            strcat(import_path, ".sn");
+
+            // Check if already imported to avoid cycles/duplicates
+            int already_imported = 0;
+            for (int j = 0; j < *imported_count; j++)
+            {
+                if (strcmp((*imported)[j], import_path) == 0)
+                {
+                    already_imported = 1;
+                    break;
+                }
+            }
+
+            if (already_imported)
+            {
+                // Remove the import statement
+                memmove(&module->statements[i], &module->statements[i + 1], sizeof(Stmt *) * (module->count - i - 1));
+                module->count--;
+                continue;
+            }
+
+            // Add to imported list
+            if (*imported_count >= *imported_capacity)
+            {
+                *imported_capacity = *imported_capacity == 0 ? 8 : *imported_capacity * 2;
+                char **new_imported = arena_alloc(arena, sizeof(char *) * *imported_capacity);
+                if (!new_imported)
+                {
+                    DEBUG_ERROR("Failed to allocate memory for imported list");
+                    parser_cleanup(&parser);
+                    lexer_cleanup(&lexer);
+                    return NULL;
+                }
+                if (*imported_count > 0)
+                {
+                    memcpy(new_imported, *imported, sizeof(char *) * *imported_count);
+                }
+                *imported = new_imported;
+            }
+            (*imported)[(*imported_count)++] = import_path;
+
+            // Recursively parse the imported module
+            Module *imported_module = parse_module_with_imports(arena, symbol_table, import_path, imported, imported_count, imported_capacity);
+            if (!imported_module)
+            {
+                parser_cleanup(&parser);
+                lexer_cleanup(&lexer);
+                return NULL;
+            }
+
+            // Append imported statements to all_statements
+            int new_all_count = all_count + imported_module->count;
+            if (new_all_count > all_capacity)
+            {
+                all_capacity = all_capacity == 0 ? 8 : all_capacity * 2;
+                Stmt **new_statements = arena_alloc(arena, sizeof(Stmt *) * all_capacity);
+                if (!new_statements)
+                {
+                    DEBUG_ERROR("Failed to allocate memory for statements");
+                    parser_cleanup(&parser);
+                    lexer_cleanup(&lexer);
+                    return NULL;
+                }
+                if (all_count > 0)
+                {
+                    memcpy(new_statements, all_statements, sizeof(Stmt *) * all_count);
+                }
+                all_statements = new_statements;
+            }
+            memcpy(all_statements + all_count, imported_module->statements, sizeof(Stmt *) * imported_module->count);
+            all_count = new_all_count;
+
+            // Remove the import statement
+            memmove(&module->statements[i], &module->statements[i + 1], sizeof(Stmt *) * (module->count - i - 1));
+            module->count--;
+        }
+        else
+        {
+            i++;
+        }
+    }
+
+    // Append the current module's remaining statements
+    int new_all_count = all_count + module->count;
+    if (new_all_count > all_capacity)
+    {
+        all_capacity = all_capacity == 0 ? 8 : all_capacity * 2;
+        Stmt **new_statements = arena_alloc(arena, sizeof(Stmt *) * all_capacity);
+        if (!new_statements)
+        {
+            DEBUG_ERROR("Failed to allocate memory for statements");
+            parser_cleanup(&parser);
+            lexer_cleanup(&lexer);
+            return NULL;
+        }
+        if (all_count > 0)
+        {
+            memcpy(new_statements, all_statements, sizeof(Stmt *) * all_count);
+        }
+        all_statements = new_statements;
+    }
+    memcpy(all_statements + all_count, module->statements, sizeof(Stmt *) * module->count);
+    all_count = new_all_count;
+
+    // Update the module with the combined statements
+    module->statements = all_statements;
+    module->count = all_count;
+    module->capacity = all_count; // Capacity doesn't need to be larger
+
+    parser_cleanup(&parser);
+    lexer_cleanup(&lexer);
     return module;
 }

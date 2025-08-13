@@ -10,49 +10,59 @@
 #include "../debug.h"
 #include "../symbol_table.h"
 
-static void setup_parser(Arena *arena, Lexer *lexer, Parser *parser, const char *source) {
+static void setup_parser(Arena *arena, Lexer *lexer, Parser *parser, SymbolTable *symbol_table, const char *source)
+{
     arena_init(arena, 4096);
     lexer_init(arena, lexer, source, "test.sn");
-    parser_init(arena, parser, lexer);
+    symbol_table_init(arena, symbol_table);
+    parser_init(arena, parser, lexer, symbol_table);
 }
 
-static void cleanup_parser(Arena *arena, Lexer *lexer, Parser *parser) {
+static void cleanup_parser(Arena *arena, Lexer *lexer, Parser *parser, SymbolTable *symbol_table)
+{
     parser_cleanup(parser);
     lexer_cleanup(lexer);
+    symbol_table_cleanup(symbol_table);
     arena_free(arena);
 }
 
-void test_empty_program_parsing() {
+void test_empty_program_parsing()
+{
     printf("Testing parser_execute empty program...\n");
 
     Arena arena;
     Lexer lexer;
     Parser parser;
-    setup_parser(&arena, &lexer, &parser, "");
+    SymbolTable symbol_table;
+    setup_parser(&arena, &lexer, &parser, &symbol_table, "");
 
     Module *module = parser_execute(&parser, "test.sn");
 
-    if (module) {
+    if (module)
+    {
     }
     assert(module != NULL);
     assert(module->count == 0);
     assert(strcmp(module->filename, "test.sn") == 0);
 
-    cleanup_parser(&arena, &lexer, &parser);
+    cleanup_parser(&arena, &lexer, &parser, &symbol_table);
 }
 
-void test_var_decl_parsing() {
+void test_var_decl_parsing()
+{
     printf("Testing parser_execute variable declaration...\n");
 
     Arena arena;
     Lexer lexer;
     Parser parser;
+    SymbolTable symbol_table;
     const char *source = "var x:int = 42\n";
-    setup_parser(&arena, &lexer, &parser, source);
+    setup_parser(&arena, &lexer, &parser, &symbol_table, source);
 
     Module *module = parser_execute(&parser, "test.sn");
 
-    if (module) {
+    if (module)
+    {
     }
     assert(module != NULL);
     assert(module->count == 1);
@@ -63,23 +73,26 @@ void test_var_decl_parsing() {
     assert(stmt->as.var_decl.initializer->type == EXPR_LITERAL);
     assert(stmt->as.var_decl.initializer->as.literal.value.int_value == 42);
 
-    cleanup_parser(&arena, &lexer, &parser);
+    cleanup_parser(&arena, &lexer, &parser, &symbol_table);
 }
 
-void test_function_no_params_parsing() {
+void test_function_no_params_parsing()
+{
     printf("Testing parser_execute function no params...\n");
 
     Arena arena;
     Lexer lexer;
     Parser parser;
+    SymbolTable symbol_table;
     const char *source =
         "fn main():void =>\n"
         "  print(\"hello\\n\")\n";
-    setup_parser(&arena, &lexer, &parser, source);
+    setup_parser(&arena, &lexer, &parser, &symbol_table, source);
 
     Module *module = parser_execute(&parser, "test.sn");
 
-    if (module) {
+    if (module)
+    {
     }
     assert(module != NULL);
     assert(module->count == 1);
@@ -97,41 +110,53 @@ void test_function_no_params_parsing() {
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->type == EXPR_LITERAL);
     assert(strcmp(print_stmt->as.expression.expression->as.call.arguments[0]->as.literal.value.string_value, "hello\n") == 0);
 
-    cleanup_parser(&arena, &lexer, &parser);
+    cleanup_parser(&arena, &lexer, &parser, &symbol_table);
 }
 
-void test_if_statement_parsing() {
+void test_if_statement_parsing()
+{
     printf("Testing parser_execute if statement...\n");
 
     Arena arena;
     Lexer lexer;
     Parser parser;
+    SymbolTable symbol_table;
     const char *source =
         "if x > 0 =>\n"
         "  print(\"positive\\n\")\n"
         "else =>\n"
         "  print(\"non-positive\\n\")\n";
-    setup_parser(&arena, &lexer, &parser, source);
+    setup_parser(&arena, &lexer, &parser, &symbol_table, source);
 
     Module *module = parser_execute(&parser, "test.sn");
 
     // Added debugging logs to inspect parser state and AST
-    if (module) {
-        if (module->count > 0) {
+    if (module)
+    {
+        if (module->count > 0)
+        {
             ast_print_stmt(&arena, module->statements[0], 0);
             Stmt *if_stmt = module->statements[0];
-            if (if_stmt->type == STMT_IF) {
-                if (if_stmt->as.if_stmt.condition->type == EXPR_BINARY) {
+            if (if_stmt->type == STMT_IF)
+            {
+                if (if_stmt->as.if_stmt.condition->type == EXPR_BINARY)
+                {
                 }
-                if (if_stmt->as.if_stmt.then_branch->type == STMT_BLOCK) {
+                if (if_stmt->as.if_stmt.then_branch->type == STMT_BLOCK)
+                {
                 }
-                if (if_stmt->as.if_stmt.else_branch->type == STMT_BLOCK) {
+                if (if_stmt->as.if_stmt.else_branch->type == STMT_BLOCK)
+                {
                 }
             }
-        } else {
+        }
+        else
+        {
             DEBUG_WARNING("No statements parsed in module.");
         }
-    } else {
+    }
+    else
+    {
         DEBUG_ERROR("Module is NULL after parsing.");
     }
 
@@ -148,24 +173,27 @@ void test_if_statement_parsing() {
     assert(if_stmt->as.if_stmt.else_branch->type == STMT_BLOCK);
     assert(if_stmt->as.if_stmt.else_branch->as.block.count == 1);
 
-    cleanup_parser(&arena, &lexer, &parser);
+    cleanup_parser(&arena, &lexer, &parser, &symbol_table);
 }
 
-void test_while_loop_parsing() {
+void test_while_loop_parsing()
+{
     printf("Testing parser_execute while loop...\n");
 
     Arena arena;
     Lexer lexer;
     Parser parser;
+    SymbolTable symbol_table;
     const char *source =
         "while i < 10 =>\n"
         "  i = i + 1\n"
         "  print(i)\n";
-    setup_parser(&arena, &lexer, &parser, source);
+    setup_parser(&arena, &lexer, &parser, &symbol_table, source);
 
     Module *module = parser_execute(&parser, "test.sn");
 
-    if (module) {
+    if (module)
+    {
     }
     assert(module != NULL);
     assert(module->count == 1);
@@ -184,23 +212,26 @@ void test_while_loop_parsing() {
     assert(assign->as.expression.expression->as.assign.value->type == EXPR_BINARY);
     assert(assign->as.expression.expression->as.assign.value->as.binary.operator == TOKEN_PLUS);
 
-    cleanup_parser(&arena, &lexer, &parser);
+    cleanup_parser(&arena, &lexer, &parser, &symbol_table);
 }
 
-void test_for_loop_parsing() {
+void test_for_loop_parsing()
+{
     printf("Testing parser_execute for loop...\n");
 
     Arena arena;
     Lexer lexer;
     Parser parser;
+    SymbolTable symbol_table;
     const char *source =
         "for var j:int = 0; j < 5; j++ =>\n"
         "  print(j)\n";
-    setup_parser(&arena, &lexer, &parser, source);
+    setup_parser(&arena, &lexer, &parser, &symbol_table, source);
 
     Module *module = parser_execute(&parser, "test.sn");
 
-    if (module) {
+    if (module)
+    {
     }
     assert(module != NULL);
     assert(module->count == 1);
@@ -217,21 +248,24 @@ void test_for_loop_parsing() {
     assert(for_stmt->as.for_stmt.body->type == STMT_BLOCK);
     assert(for_stmt->as.for_stmt.body->as.block.count == 1);
 
-    cleanup_parser(&arena, &lexer, &parser);
+    cleanup_parser(&arena, &lexer, &parser, &symbol_table);
 }
 
-void test_interpolated_string_parsing() {
+void test_interpolated_string_parsing()
+{
     printf("Testing parser_execute interpolated string...\n");
 
     Arena arena;
     Lexer lexer;
     Parser parser;
+    SymbolTable symbol_table;
     const char *source = "print($\"Value is {x} and {y * 2}\\n\")\n";
-    setup_parser(&arena, &lexer, &parser, source);
+    setup_parser(&arena, &lexer, &parser, &symbol_table, source);
 
     Module *module = parser_execute(&parser, "test.sn");
 
-    if (module) {
+    if (module)
+    {
     }
     assert(module != NULL);
     assert(module->count == 1);
@@ -256,15 +290,17 @@ void test_interpolated_string_parsing() {
     assert(arg->as.interpol.parts[4]->type == EXPR_LITERAL);
     assert(strcmp(arg->as.interpol.parts[4]->as.literal.value.string_value, "\n") == 0);
 
-    cleanup_parser(&arena, &lexer, &parser);
+    cleanup_parser(&arena, &lexer, &parser, &symbol_table);
 }
 
-void test_literal_types_parsing() {
+void test_literal_types_parsing()
+{
     printf("Testing parser_execute various literals...\n");
 
     Arena arena;
     Lexer lexer;
     Parser parser;
+    SymbolTable symbol_table;
     const char *source =
         "var i:int = 42\n"
         "var l:long = 123456789012\n"
@@ -272,11 +308,12 @@ void test_literal_types_parsing() {
         "var c:char = 'A'\n"
         "var b:bool = true\n"
         "var s:str = \"hello\"\n";
-    setup_parser(&arena, &lexer, &parser, source);
+    setup_parser(&arena, &lexer, &parser, &symbol_table, source);
 
     Module *module = parser_execute(&parser, "test.sn");
 
-    if (module) {
+    if (module)
+    {
     }
     assert(module != NULL);
     assert(module->count == 6);
@@ -309,7 +346,7 @@ void test_literal_types_parsing() {
     Stmt *stmt5 = module->statements[4];
     assert(stmt5->type == STMT_VAR_DECL);
     assert(stmt5->as.var_decl.type->kind == TYPE_BOOL);
-    assert(stmt5->as.var_decl.initializer->as.literal.value.bool_value == 1);  // true
+    assert(stmt5->as.var_decl.initializer->as.literal.value.bool_value == 1); // true
 
     // string
     Stmt *stmt6 = module->statements[5];
@@ -317,25 +354,28 @@ void test_literal_types_parsing() {
     assert(stmt6->as.var_decl.type->kind == TYPE_STRING);
     assert(strcmp(stmt6->as.var_decl.initializer->as.literal.value.string_value, "hello") == 0);
 
-    cleanup_parser(&arena, &lexer, &parser);
+    cleanup_parser(&arena, &lexer, &parser, &symbol_table);
 }
 
-void test_recursive_function_parsing() {
+void test_recursive_function_parsing()
+{
     printf("Testing parser_execute recursive function...\n");
 
     Arena arena;
     Lexer lexer;
     Parser parser;
+    SymbolTable symbol_table;
     const char *source =
         "fn factorial(n:int):int =>\n"
         "  if n <= 1 =>\n"
         "    return 1\n"
         "  return n * factorial(n - 1)\n";
-    setup_parser(&arena, &lexer, &parser, source);
+    setup_parser(&arena, &lexer, &parser, &symbol_table, source);
 
     Module *module = parser_execute(&parser, "test.sn");
 
-    if (module) {
+    if (module)
+    {
     }
     assert(module != NULL);
     assert(module->count == 1);
@@ -359,14 +399,16 @@ void test_recursive_function_parsing() {
     assert(return_stmt->as.return_stmt.value->as.binary.right->type == EXPR_CALL);
     assert(strcmp(return_stmt->as.return_stmt.value->as.binary.right->as.call.callee->as.variable.name.start, "factorial") == 0);
 
-    cleanup_parser(&arena, &lexer, &parser);
+    cleanup_parser(&arena, &lexer, &parser, &symbol_table);
 }
 
-void test_full_program_parsing() {
+void test_full_program_parsing()
+{
     printf("Testing parser_execute full program...\n");
     Arena arena;
     Lexer lexer;
     Parser parser;
+    SymbolTable symbol_table;
     const char *source =
         "fn factorial(n: int): int =>\n"
         "  print($\"factorial: n={n}\\n\")\n"
@@ -418,21 +460,25 @@ void test_full_program_parsing() {
         "  var flag: bool = true\n"
         "  print($\"Flag: {flag}\\n\")\n"
         "  print(\"Complete main method ... \\n\")\n";
-    setup_parser(&arena, &lexer, &parser, source);
+    setup_parser(&arena, &lexer, &parser, &symbol_table, source);
 
     Module *module = parser_execute(&parser, "test.sn");
 
     // Added debugging logs to inspect parser state and AST
-    if (module) {
-        for (int i = 0; i < module->count; i++) {
+    if (module)
+    {
+        for (int i = 0; i < module->count; i++)
+        {
             ast_print_stmt(&arena, module->statements[i], 0);
         }
-    } else {
+    }
+    else
+    {
         DEBUG_ERROR("Module is NULL after parsing.");
     }
 
     assert(module != NULL);
-    assert(module->count == 4);  // Four functions: factorial, is_prime, repeat_string, main
+    assert(module->count == 4); // Four functions: factorial, is_prime, repeat_string, main
 
     // factorial
     Stmt *fact_fn = module->statements[0];
@@ -441,20 +487,20 @@ void test_full_program_parsing() {
     assert(fact_fn->as.function.param_count == 1);
     assert(fact_fn->as.function.return_type->kind == TYPE_INT);
     // Corrected body_count to 5 (print, if, var, print, return)
-    assert(fact_fn->as.function.body_count == 5);  
-    assert(fact_fn->as.function.body[0]->type == STMT_EXPR);  // print
+    assert(fact_fn->as.function.body_count == 5);
+    assert(fact_fn->as.function.body[0]->type == STMT_EXPR); // print
     assert(fact_fn->as.function.body[1]->type == STMT_IF);
-    assert(fact_fn->as.function.body[2]->type == STMT_VAR_DECL);  // var j
-    assert(fact_fn->as.function.body[3]->type == STMT_EXPR);  // print
-    assert(fact_fn->as.function.body[4]->type == STMT_RETURN);  // return j
+    assert(fact_fn->as.function.body[2]->type == STMT_VAR_DECL); // var j
+    assert(fact_fn->as.function.body[3]->type == STMT_EXPR);     // print
+    assert(fact_fn->as.function.body[4]->type == STMT_RETURN);   // return j
     // Added debug for factorial body
 
     // To keep it concise, assert key parts
-    assert(fact_fn->as.function.body[0]->type == STMT_EXPR);  // print
+    assert(fact_fn->as.function.body[0]->type == STMT_EXPR); // print
     assert(fact_fn->as.function.body[1]->type == STMT_IF);
-    assert(fact_fn->as.function.body[2]->type == STMT_VAR_DECL);  // var j
-    assert(fact_fn->as.function.body[3]->type == STMT_EXPR);  // print
-    assert(fact_fn->as.function.body[4]->type == STMT_RETURN);  // return j
+    assert(fact_fn->as.function.body[2]->type == STMT_VAR_DECL); // var j
+    assert(fact_fn->as.function.body[3]->type == STMT_EXPR);     // print
+    assert(fact_fn->as.function.body[4]->type == STMT_RETURN);   // return j
     // Since exhaustive, but to avoid too long, assert module count and function names
     Stmt *prime_fn = module->statements[1];
     assert(strcmp(prime_fn->as.function.name.start, "is_prime") == 0);
@@ -467,21 +513,22 @@ void test_full_program_parsing() {
     Stmt *main_fn = module->statements[3];
     assert(strcmp(main_fn->as.function.name.start, "main") == 0);
     assert(main_fn->as.function.return_type->kind == TYPE_VOID);
-    // Count body statements, e.g., 20+ 
+    // Count body statements, e.g., 20+
 
     // Assert one interpolated in main
-    Stmt *print_fact = main_fn->as.function.body[3];  // print Factorial of...
+    Stmt *print_fact = main_fn->as.function.body[3]; // print Factorial of...
     assert(print_fact->type == STMT_EXPR);
     Expr *call = print_fact->as.expression.expression;
     assert(call->type == EXPR_CALL);
     Expr *arg = call->as.call.arguments[0];
     assert(arg->type == EXPR_INTERPOLATED);
-    assert(arg->as.interpol.part_count == 5);  // "Factorial of ", {num}, " is ", {fact}, "\n"
+    assert(arg->as.interpol.part_count == 5); // "Factorial of ", {num}, " is ", {fact}, "\n"
 
-    cleanup_parser(&arena, &lexer, &parser);
+    cleanup_parser(&arena, &lexer, &parser, &symbol_table);
 }
 
-void test_simple_program_parsing() {
+void test_simple_program_parsing()
+{
     // Existing test, kept as is
     printf("Testing parser_execute simple program...\n");
 
@@ -498,16 +545,20 @@ void test_simple_program_parsing() {
     Lexer lexer;
     lexer_init(&arena, &lexer, source, "test.sn");
 
+    SymbolTable symbol_table;
+    symbol_table_init(&arena, &symbol_table);
+
     Parser parser;
-    parser_init(&arena, &parser, &lexer);
+    parser_init(&arena, &parser, &lexer, &symbol_table);
 
     Module *module = parser_execute(&parser, "test.sn");
 
     // Basic assertions on the parsed module
-    if (module) {
+    if (module)
+    {
     }
     assert(module != NULL);
-    assert(module->count == 2);  // Two function declarations: add and main
+    assert(module->count == 2); // Two function declarations: add and main
     assert(strcmp(module->filename, "test.sn") == 0);
 
     // First statement: fn add
@@ -521,7 +572,7 @@ void test_simple_program_parsing() {
     assert(strcmp(add_fn->as.function.params[1].name.start, "y") == 0);
     assert(add_fn->as.function.params[1].type->kind == TYPE_INT);
     assert(add_fn->as.function.return_type->kind == TYPE_INT);
-    assert(add_fn->as.function.body_count == 1);  // One return statement in body
+    assert(add_fn->as.function.body_count == 1); // One return statement in body
 
     Stmt *add_body = add_fn->as.function.body[0];
     assert(add_body->type == STMT_RETURN);
@@ -539,7 +590,7 @@ void test_simple_program_parsing() {
     assert(strcmp(main_fn->as.function.name.start, "main") == 0);
     assert(main_fn->as.function.param_count == 0);
     assert(main_fn->as.function.return_type->kind == TYPE_VOID);
-    assert(main_fn->as.function.body_count == 2);  // Var decl and print call
+    assert(main_fn->as.function.body_count == 2); // Var decl and print call
 
     Stmt *var_decl = main_fn->as.function.body[0];
     assert(var_decl->type == STMT_VAR_DECL);
@@ -561,7 +612,7 @@ void test_simple_program_parsing() {
     assert(strcmp(print_stmt->as.expression.expression->as.call.callee->as.variable.name.start, "print") == 0);
     assert(print_stmt->as.expression.expression->as.call.arg_count == 1);
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->type == EXPR_INTERPOLATED);
-    assert(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.part_count == 3);  // "The answer is ", {z}, "\n"
+    assert(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.part_count == 3); // "The answer is ", {z}, "\n"
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[0]->type == EXPR_LITERAL);
     assert(strcmp(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[0]->as.literal.value.string_value, "The answer is ") == 0);
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->as.interpol.parts[1]->type == EXPR_VARIABLE);
@@ -572,5 +623,6 @@ void test_simple_program_parsing() {
     // Cleanup
     parser_cleanup(&parser);
     lexer_cleanup(&lexer);
+    symbol_table_cleanup(&symbol_table);
     arena_free(&arena);
 }

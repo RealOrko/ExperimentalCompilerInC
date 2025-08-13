@@ -11,8 +11,7 @@
 typedef struct
 {
     Arena arena;
-    Lexer lexer;
-    Parser parser;
+    SymbolTable symbol_table;
     char *source_file;
     char *output_file;
     char *source;
@@ -23,5 +22,6 @@ typedef struct
 void compiler_init(CompilerOptions *options, int argc, char **argv);
 void compiler_cleanup(CompilerOptions *options);
 int compiler_parse_args(int argc, char **argv, CompilerOptions *options);
+Module* compiler_compile(CompilerOptions *options);
 
 #endif

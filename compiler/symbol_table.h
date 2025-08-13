@@ -52,7 +52,7 @@ int get_type_size(Type *type);
 
 void symbol_table_print(SymbolTable *table, const char *where);
 
-SymbolTable *symbol_table_init(Arena *arena);
+void symbol_table_init(Arena *arena, SymbolTable *table);
 void symbol_table_cleanup(SymbolTable *table);
 
 void symbol_table_push_scope(SymbolTable *table);

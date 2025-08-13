@@ -12,23 +12,15 @@ int main(int argc, char **argv)
 
     compiler_init(&options, argc, argv);
     init_debug(options.log_level);
+    module = compiler_compile(&options);
 
-    module = parser_execute(&options.parser, options.source_file);
-    if (module == NULL)
-    {
+    if (module == NULL) {
         compiler_cleanup(&options);
-        exit(1);
-    }
-
-    int type_check_success = type_check_module(module, options.parser.symbol_table);
-    if (!type_check_success)
-    {
-        compiler_cleanup(&options);
-        exit(1);
+        return 1;
     }
 
     CodeGen gen;
-    code_gen_init(&options.arena, &gen, options.parser.symbol_table, options.output_file);
+    code_gen_init(&options.arena, &gen, &options.symbol_table, options.output_file);
     code_gen_module(&gen, module);
     code_gen_cleanup(&gen);
 

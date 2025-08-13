@@ -75,30 +75,25 @@ void symbol_table_print(SymbolTable *table, const char *where)
     DEBUG_VERBOSE("====================================");
 }
 
-SymbolTable *symbol_table_init(Arena *arena)
+void symbol_table_init(Arena *arena, SymbolTable *table)
 {
-    SymbolTable *table = arena_alloc(arena, sizeof(SymbolTable));
     if (table == NULL)
     {
-        DEBUG_ERROR("Out of memory creating symbol table");
-        return NULL;
+        DEBUG_ERROR("NULL table in symbol_table_init");
+        return;
     }
+    table->arena = arena;
     table->scopes = arena_alloc(arena, sizeof(Scope *) * 8);
     if (table->scopes == NULL)
     {
         DEBUG_ERROR("Out of memory creating scopes array");
-        free(table);
-        return NULL;
     }
-    table->arena = arena;
     table->scopes_count = 0;
     table->scopes_capacity = 8;
     table->current = NULL;
 
     symbol_table_push_scope(table);
     table->global_scope = table->current;
-
-    return table;
 }
 
 void free_scope(Scope *scope)
