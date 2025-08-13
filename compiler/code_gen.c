@@ -21,23 +21,29 @@ static char *code_gen_increment_expression(CodeGen *gen, Expr *expr);
 static char *code_gen_decrement_expression(CodeGen *gen, Expr *expr);
 static bool expression_produces_temp(Expr *expr);
 
-static char *arena_vsprintf(Arena *arena, const char *fmt, va_list args) {
+static char *arena_vsprintf(Arena *arena, const char *fmt, va_list args)
+{
+    DEBUG_VERBOSE("Entering arena_vsprintf");
     va_list args_copy;
     va_copy(args_copy, args);
     int size = vsnprintf(NULL, 0, fmt, args_copy);
     va_end(args_copy);
-    if (size < 0) {
+    if (size < 0)
+    {
         exit(1);
     }
     char *buf = arena_alloc(arena, size + 1);
-    if (buf == NULL) {
+    if (buf == NULL)
+    {
         exit(1);
     }
     vsnprintf(buf, size + 1, fmt, args);
     return buf;
 }
 
-static char *arena_sprintf(Arena *arena, const char *fmt, ...) {
+static char *arena_sprintf(Arena *arena, const char *fmt, ...)
+{
+    DEBUG_VERBOSE("Entering arena_sprintf");
     va_list args;
     va_start(args, fmt);
     char *result = arena_vsprintf(arena, fmt, args);
@@ -45,19 +51,25 @@ static char *arena_sprintf(Arena *arena, const char *fmt, ...) {
     return result;
 }
 
-static char *escape_c_string(Arena *arena, const char *str) {
-    if (str == NULL) {
+static char *escape_c_string(Arena *arena, const char *str)
+{
+    DEBUG_VERBOSE("Entering escape_c_string");
+    if (str == NULL)
+    {
         return arena_strdup(arena, "NULL");
     }
     size_t len = strlen(str);
     char *buf = arena_alloc(arena, len * 2 + 3);
-    if (buf == NULL) {
+    if (buf == NULL)
+    {
         exit(1);
     }
     char *p = buf;
     *p++ = '"';
-    for (const char *s = str; *s; s++) {
-        switch (*s) {
+    for (const char *s = str; *s; s++)
+    {
+        switch (*s)
+        {
         case '"':
             *p++ = '\\';
             *p++ = '"';
@@ -88,11 +100,15 @@ static char *escape_c_string(Arena *arena, const char *str) {
     return buf;
 }
 
-static const char *get_c_type(Type *type) {
-    if (type == NULL) {
+static const char *get_c_type(Type *type)
+{
+    DEBUG_VERBOSE("Entering get_c_type");
+    if (type == NULL)
+    {
         return "void";
     }
-    switch (type->kind) {
+    switch (type->kind)
+    {
     case TYPE_INT:
     case TYPE_LONG:
     case TYPE_CHAR:
@@ -104,14 +120,19 @@ static const char *get_c_type(Type *type) {
         return "char *";
     case TYPE_NIL:
         return "long";
+    case TYPE_VOID:
+        return "void";
     default:
         exit(1);
     }
     return NULL;
 }
 
-static const char *get_rt_to_string_func(TypeKind kind) {
-    switch (kind) {
+static const char *get_rt_to_string_func(TypeKind kind)
+{
+    DEBUG_VERBOSE("Entering get_rt_to_string_func");
+    switch (kind)
+    {
     case TYPE_INT:
     case TYPE_LONG:
         return "rt_to_string_long";
@@ -127,8 +148,11 @@ static const char *get_rt_to_string_func(TypeKind kind) {
     return NULL;
 }
 
-static const char *get_rt_print_func(TypeKind kind) {
-    switch (kind) {
+static const char *get_rt_print_func(TypeKind kind)
+{
+    DEBUG_VERBOSE("Entering get_rt_print_func");
+    switch (kind)
+    {
     case TYPE_INT:
     case TYPE_LONG:
         return "rt_print_long";
@@ -146,17 +170,25 @@ static const char *get_rt_print_func(TypeKind kind) {
     return NULL;
 }
 
-static const char *get_default_value(Type *type) {
-    if (type->kind == TYPE_STRING) {
+static const char *get_default_value(Type *type)
+{
+    DEBUG_VERBOSE("Entering get_default_value");
+    if (type->kind == TYPE_STRING)
+    {
         return "NULL";
-    } else {
+    }
+    else
+    {
         return "0";
     }
 }
 
-static char *get_var_name(Arena *arena, Token name) {
+static char *get_var_name(Arena *arena, Token name)
+{
+    DEBUG_VERBOSE("Entering get_var_name");
     char *var_name = arena_alloc(arena, name.length + 1);
-    if (var_name == NULL) {
+    if (var_name == NULL)
+    {
         exit(1);
     }
     strncpy(var_name, name.start, name.length);
@@ -164,36 +196,48 @@ static char *get_var_name(Arena *arena, Token name) {
     return var_name;
 }
 
-void code_gen_init(Arena *arena, CodeGen *gen, SymbolTable *symbol_table, const char *output_file) {
+void code_gen_init(Arena *arena, CodeGen *gen, SymbolTable *symbol_table, const char *output_file)
+{
+    DEBUG_VERBOSE("Entering code_gen_init");
     gen->arena = arena;
     gen->label_count = 0;
     gen->symbol_table = symbol_table;
     gen->output = fopen(output_file, "w");
     gen->current_function = NULL;
     gen->current_return_type = NULL;
-    if (gen->output == NULL) {
+    if (gen->output == NULL)
+    {
         exit(1);
     }
 }
 
-void code_gen_cleanup(CodeGen *gen) {
-    if (gen->output != NULL) {
+void code_gen_cleanup(CodeGen *gen)
+{
+    DEBUG_VERBOSE("Entering code_gen_cleanup");
+    if (gen->output != NULL)
+    {
         fclose(gen->output);
     }
     gen->current_function = NULL;
 }
 
-int code_gen_new_label(CodeGen *gen) {
+int code_gen_new_label(CodeGen *gen)
+{
+    DEBUG_VERBOSE("Entering code_gen_new_label");
     return gen->label_count++;
 }
 
-static void code_gen_headers(CodeGen *gen) {
+static void code_gen_headers(CodeGen *gen)
+{
+    DEBUG_VERBOSE("Entering code_gen_headers");
     fprintf(gen->output, "#include <stdlib.h>\n");
     fprintf(gen->output, "#include <string.h>\n");
     fprintf(gen->output, "#include <stdio.h>\n\n");
 }
 
-static void code_gen_externs(CodeGen *gen) {
+static void code_gen_externs(CodeGen *gen)
+{
+    DEBUG_VERBOSE("Entering code_gen_externs");
     fprintf(gen->output, "extern char *rt_str_concat(char *, char *);\n");
     fprintf(gen->output, "extern void rt_print_long(long);\n");
     fprintf(gen->output, "extern void rt_print_double(double);\n");
@@ -240,26 +284,44 @@ static void code_gen_externs(CodeGen *gen) {
     fprintf(gen->output, "extern void rt_free_string(char *);\n\n");
 }
 
-static char *code_gen_binary_op_str(TokenType op) {
-    switch (op) {
-    case TOKEN_PLUS: return "add";
-    case TOKEN_MINUS: return "sub";
-    case TOKEN_STAR: return "mul";
-    case TOKEN_SLASH: return "div";
-    case TOKEN_MODULO: return "mod";
-    case TOKEN_EQUAL_EQUAL: return "eq";
-    case TOKEN_BANG_EQUAL: return "ne";
-    case TOKEN_LESS: return "lt";
-    case TOKEN_LESS_EQUAL: return "le";
-    case TOKEN_GREATER: return "gt";
-    case TOKEN_GREATER_EQUAL: return "ge";
-    default: exit(1);
+static char *code_gen_binary_op_str(TokenType op)
+{
+    DEBUG_VERBOSE("Entering code_gen_binary_op_str");
+    switch (op)
+    {
+    case TOKEN_PLUS:
+        return "add";
+    case TOKEN_MINUS:
+        return "sub";
+    case TOKEN_STAR:
+        return "mul";
+    case TOKEN_SLASH:
+        return "div";
+    case TOKEN_MODULO:
+        return "mod";
+    case TOKEN_EQUAL_EQUAL:
+        return "eq";
+    case TOKEN_BANG_EQUAL:
+        return "ne";
+    case TOKEN_LESS:
+        return "lt";
+    case TOKEN_LESS_EQUAL:
+        return "le";
+    case TOKEN_GREATER:
+        return "gt";
+    case TOKEN_GREATER_EQUAL:
+        return "ge";
+    default:
+        exit(1);
     }
     return NULL;
 }
 
-static char *code_gen_type_suffix(Type *type) {
-    switch (type->kind) {
+static char *code_gen_type_suffix(Type *type)
+{
+    DEBUG_VERBOSE("Entering code_gen_type_suffix");
+    switch (type->kind)
+    {
     case TYPE_INT:
     case TYPE_LONG:
     case TYPE_CHAR:
@@ -275,9 +337,13 @@ static char *code_gen_type_suffix(Type *type) {
     return NULL;
 }
 
-static bool expression_produces_temp(Expr *expr) {
-    if (expr->expr_type->kind != TYPE_STRING) return false;
-    switch (expr->type) {
+static bool expression_produces_temp(Expr *expr)
+{
+    DEBUG_VERBOSE("Entering expression_produces_temp");
+    if (expr->expr_type->kind != TYPE_STRING)
+        return false;
+    switch (expr->type)
+    {
     case EXPR_VARIABLE:
     case EXPR_ASSIGN:
         return false;
@@ -291,38 +357,52 @@ static bool expression_produces_temp(Expr *expr) {
     }
 }
 
-static char *code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr) {
+static char *code_gen_binary_expression(CodeGen *gen, BinaryExpr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_binary_expression");
     char *left_str = code_gen_expression(gen, expr->left);
     char *right_str = code_gen_expression(gen, expr->right);
     Type *type = expr->left->expr_type;
     TokenType op = expr->operator;
-    if (op == TOKEN_AND) {
+    if (op == TOKEN_AND)
+    {
         return arena_sprintf(gen->arena, "((%s != 0 && %s != 0) ? 1L : 0L)", left_str, right_str);
-    } else if (op == TOKEN_OR) {
+    }
+    else if (op == TOKEN_OR)
+    {
         return arena_sprintf(gen->arena, "((%s != 0 || %s != 0) ? 1L : 0L)", left_str, right_str);
     }
     char *op_str = code_gen_binary_op_str(op);
     char *suffix = code_gen_type_suffix(type);
-    if (op == TOKEN_PLUS && type->kind == TYPE_STRING) {
+    if (op == TOKEN_PLUS && type->kind == TYPE_STRING)
+    {
         bool free_left = expression_produces_temp(expr->left);
         bool free_right = expression_produces_temp(expr->right);
         char *free_l_str = free_left ? "rt_free_string(_left); " : "";
         char *free_r_str = free_right ? "rt_free_string(_right); " : "";
         return arena_sprintf(gen->arena, "({ char *_left = %s; char *_right = %s; char *_res = rt_str_concat(_left, _right); %s%s _res; })",
                              left_str, right_str, free_l_str, free_r_str);
-    } else {
+    }
+    else
+    {
         return arena_sprintf(gen->arena, "rt_%s_%s(%s, %s)", op_str, suffix, left_str, right_str);
     }
 }
 
-static char *code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr) {
+static char *code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_unary_expression");
     char *operand_str = code_gen_expression(gen, expr->operand);
     Type *type = expr->operand->expr_type;
-    switch (expr->operator) {
+    switch (expr->operator)
+    {
     case TOKEN_MINUS:
-        if (type->kind == TYPE_DOUBLE) {
+        if (type->kind == TYPE_DOUBLE)
+        {
             return arena_sprintf(gen->arena, "rt_neg_double(%s)", operand_str);
-        } else {
+        }
+        else
+        {
             return arena_sprintf(gen->arena, "rt_neg_long(%s)", operand_str);
         }
     case TOKEN_BANG:
@@ -333,9 +413,12 @@ static char *code_gen_unary_expression(CodeGen *gen, UnaryExpr *expr) {
     return NULL;
 }
 
-static char *code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr) {
+static char *code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_literal_expression");
     Type *type = expr->type;
-    switch (type->kind) {
+    switch (type->kind)
+    {
     case TYPE_INT:
     case TYPE_LONG:
         return arena_sprintf(gen->arena, "%ldL", expr->value.int_value);
@@ -343,7 +426,8 @@ static char *code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr) {
         return arena_sprintf(gen->arena, "%.17g", expr->value.double_value);
     case TYPE_CHAR:
         return arena_sprintf(gen->arena, "%ldL", (long)(unsigned char)expr->value.char_value);
-    case TYPE_STRING: {
+    case TYPE_STRING:
+    {
         char *escaped = escape_c_string(gen->arena, expr->value.string_value);
         return arena_sprintf(gen->arena, "rt_to_string_string(%s)", escaped);
     }
@@ -357,59 +441,79 @@ static char *code_gen_literal_expression(CodeGen *gen, LiteralExpr *expr) {
     return NULL;
 }
 
-static char *code_gen_variable_expression(CodeGen *gen, VariableExpr *expr) {
+static char *code_gen_variable_expression(CodeGen *gen, VariableExpr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_variable_expression");
     return get_var_name(gen->arena, expr->name);
 }
 
-static char *code_gen_assign_expression(CodeGen *gen, AssignExpr *expr) {
+static char *code_gen_assign_expression(CodeGen *gen, AssignExpr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_assign_expression");
     char *var_name = get_var_name(gen->arena, expr->name);
     char *value_str = code_gen_expression(gen, expr->value);
     Symbol *symbol = symbol_table_lookup_symbol(gen->symbol_table, expr->name);
-    if (symbol == NULL) {
+    if (symbol == NULL)
+    {
         exit(1);
     }
     Type *type = symbol->type;
-    if (type->kind == TYPE_STRING) {
+    if (type->kind == TYPE_STRING)
+    {
         return arena_sprintf(gen->arena, "({ char *_val = %s; if (%s) rt_free_string(%s); %s = _val; _val; })",
                              value_str, var_name, var_name, var_name);
-    } else {
+    }
+    else
+    {
         return arena_sprintf(gen->arena, "(%s = %s)", var_name, value_str);
     }
 }
 
-static char *code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) {
+static char *code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_interpolated_expression");
     int count = expr->part_count;
-    if (count == 0) {
+    if (count == 0)
+    {
         return arena_strdup(gen->arena, "rt_to_string_string(\"\")");
     }
     char **part_strs = arena_alloc(gen->arena, count * sizeof(char *));
     Type **part_types = arena_alloc(gen->arena, count * sizeof(Type *));
     bool *free_parts = arena_alloc(gen->arena, count * sizeof(bool));
-    for (int i = 0; i < count; i++) {
+    for (int i = 0; i < count; i++)
+    {
         part_strs[i] = code_gen_expression(gen, expr->parts[i]);
         part_types[i] = expr->parts[i]->expr_type;
         free_parts[i] = (part_types[i]->kind == TYPE_STRING ? expression_produces_temp(expr->parts[i]) : true);
     }
     char *result = arena_sprintf(gen->arena, "({ ");
     char *first_str;
-    if (part_types[0]->kind == TYPE_STRING) {
+    if (part_types[0]->kind == TYPE_STRING)
+    {
         first_str = part_strs[0];
-    } else {
+    }
+    else
+    {
         const char *to_str_func = get_rt_to_string_func(part_types[0]->kind);
         first_str = arena_sprintf(gen->arena, "%s(%s)", to_str_func, part_strs[0]);
     }
     result = arena_sprintf(gen->arena, "%schar *_res = %s; ", result, first_str);
-    for (int i = 1; i < count; i++) {
+    for (int i = 1; i < count; i++)
+    {
         char *next_str;
-        if (part_types[i]->kind == TYPE_STRING) {
+        if (part_types[i]->kind == TYPE_STRING)
+        {
             next_str = part_strs[i];
-        } else {
+        }
+        else
+        {
             const char *to_str_func = get_rt_to_string_func(part_types[i]->kind);
             next_str = arena_sprintf(gen->arena, "%s(%s)", to_str_func, part_strs[i]);
         }
         result = arena_sprintf(gen->arena, "%schar *_next%d = %s; char *_new%d = rt_str_concat(_res, _next%d); rt_free_string(_res); ",
                                result, i, next_str, i, i);
-        if (free_parts[i]) {
+        if (free_parts[i])
+        {
             result = arena_sprintf(gen->arena, "%srt_free_string(_next%d); ", result, i);
         }
         result = arena_sprintf(gen->arena, "%s_res = _new%d; ", result, i);
@@ -418,45 +522,61 @@ static char *code_gen_interpolated_expression(CodeGen *gen, InterpolExpr *expr) 
     return result;
 }
 
-static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr) {
-    for (int i = 0; i < expr->part_count; i++) {
+static void code_gen_interpolated_print(CodeGen *gen, InterpolExpr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_interpolated_print");
+    for (int i = 0; i < expr->part_count; i++)
+    {
         Expr *part = expr->parts[i];
         Type *pt = part->expr_type;
         char *part_str = code_gen_expression(gen, part);
         const char *rt_func = get_rt_print_func(pt->kind);
         bool needs_free = (pt->kind == TYPE_STRING && expression_produces_temp(part));
-        if (needs_free) {
+        if (needs_free)
+        {
             fprintf(gen->output, "{\n");
             fprintf(gen->output, "    char *_tmp = %s;\n", part_str);
             fprintf(gen->output, "    %s(_tmp);\n", rt_func);
             fprintf(gen->output, "    rt_free_string(_tmp);\n");
             fprintf(gen->output, "}\n");
-        } else {
+        }
+        else
+        {
             fprintf(gen->output, "%s(%s);\n", rt_func, part_str);
         }
     }
 }
 
-static char *code_gen_call_expression(CodeGen *gen, Expr *expr) {
+static char *code_gen_call_expression(CodeGen *gen, Expr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_call_expression");
     CallExpr *call = &expr->as.call;
-    if (call->callee->type != EXPR_VARIABLE) {
+    if (call->callee->type != EXPR_VARIABLE)
+    {
         exit(1);
     }
     char *func_name = get_var_name(gen->arena, call->callee->as.variable.name);
-    if (strcmp(func_name, "print") == 0 && call->arg_count == 1) {
+    if (strcmp(func_name, "print") == 0 && call->arg_count == 1)
+    {
         Expr *arg = call->arguments[0];
-        if (arg->type == EXPR_INTERPOLATED) {
+        if (arg->type == EXPR_INTERPOLATED)
+        {
             code_gen_interpolated_print(gen, &arg->as.interpol);
             return arena_strdup(gen->arena, "0L");
-        } else {
+        }
+        else
+        {
             char *arg_str = code_gen_expression(gen, arg);
             Type *arg_type = arg->expr_type;
             const char *rt_func = get_rt_print_func(arg_type->kind);
             bool needs_free = (arg_type->kind == TYPE_STRING && expression_produces_temp(arg));
-            if (needs_free) {
+            if (needs_free)
+            {
                 return arena_sprintf(gen->arena, "({ char *_arg = %s; %s(_arg); rt_free_string(_arg); })",
                                      arg_str, rt_func);
-            } else {
+            }
+            else
+            {
                 return arena_sprintf(gen->arena, "({ %s(%s); })", rt_func, arg_str);
             }
         }
@@ -465,23 +585,29 @@ static char *code_gen_call_expression(CodeGen *gen, Expr *expr) {
     char **arg_strs = arena_alloc(gen->arena, call->arg_count * sizeof(char *));
     Type **arg_types = arena_alloc(gen->arena, call->arg_count * sizeof(Type *));
     int num_temps = 0;
-    for (int i = 0; i < call->arg_count; i++) {
+    for (int i = 0; i < call->arg_count; i++)
+    {
         arg_strs[i] = code_gen_expression(gen, call->arguments[i]);
         arg_types[i] = call->arguments[i]->expr_type;
-        if (arg_types[i]->kind == TYPE_STRING && expression_produces_temp(call->arguments[i])) {
+        if (arg_types[i]->kind == TYPE_STRING && expression_produces_temp(call->arguments[i]))
+        {
             num_temps++;
         }
     }
     char *result = arena_sprintf(gen->arena, "({ ");
-    for (int i = 0; i < call->arg_count; i++) {
+    for (int i = 0; i < call->arg_count; i++)
+    {
         const char *arg_type_c = get_c_type(arg_types[i]);
         result = arena_sprintf(gen->arena, "%s%s _arg%d = %s; ", result, arg_type_c, i, arg_strs[i]);
     }
-    if (num_temps > 0) {
+    if (num_temps > 0)
+    {
         result = arena_sprintf(gen->arena, "%schar *_temps[%d]; ", result, num_temps);
         int ti = 0;
-        for (int i = 0; i < call->arg_count; i++) {
-            if (arg_types[i]->kind == TYPE_STRING && expression_produces_temp(call->arguments[i])) {
+        for (int i = 0; i < call->arg_count; i++)
+        {
+            if (arg_types[i]->kind == TYPE_STRING && expression_produces_temp(call->arguments[i]))
+            {
                 result = arena_sprintf(gen->arena, "%s_temps[%d] = _arg%d; ", result, ti, i);
                 ti++;
             }
@@ -489,53 +615,70 @@ static char *code_gen_call_expression(CodeGen *gen, Expr *expr) {
     }
     const char *ret_type_c = get_c_type(expr->expr_type);
     result = arena_sprintf(gen->arena, "%s%s _res = %s(", result, ret_type_c, func_name);
-    for (int i = 0; i < call->arg_count; i++) {
+    for (int i = 0; i < call->arg_count; i++)
+    {
         result = arena_sprintf(gen->arena, "%s_arg%d", result, i);
-        if (i < call->arg_count - 1) {
+        if (i < call->arg_count - 1)
+        {
             result = arena_sprintf(gen->arena, "%s, ", result);
         }
     }
     result = arena_sprintf(gen->arena, "%s); ", result);
-    if (num_temps > 0) {
+    if (num_temps > 0)
+    {
         result = arena_sprintf(gen->arena, "%sfor (int _j = 0; _j < %d; _j++) { rt_free_string(_temps[_j]); } ", result, num_temps);
     }
     result = arena_sprintf(gen->arena, "%s_res; })", result);
     return result;
 }
 
-static char *code_gen_array_expression(CodeGen *gen, ArrayExpr *expr) {
+static char *code_gen_array_expression(CodeGen *gen, ArrayExpr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_array_expression");
     (void)gen;
     (void)expr;
     return arena_strdup(gen->arena, "0L");
 }
 
-static char *code_gen_array_access_expression(CodeGen *gen, ArrayAccessExpr *expr) {
+static char *code_gen_array_access_expression(CodeGen *gen, ArrayAccessExpr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_array_access_expression");
     (void)gen;
     (void)expr;
     return arena_strdup(gen->arena, "0L");
 }
 
-static char *code_gen_increment_expression(CodeGen *gen, Expr *expr) {
-    if (expr->as.operand->type != EXPR_VARIABLE) {
+static char *code_gen_increment_expression(CodeGen *gen, Expr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_increment_expression");
+    if (expr->as.operand->type != EXPR_VARIABLE)
+    {
         exit(1);
     }
     char *var_name = get_var_name(gen->arena, expr->as.operand->as.variable.name);
     return arena_sprintf(gen->arena, "rt_post_inc_long(&%s)", var_name);
 }
 
-static char *code_gen_decrement_expression(CodeGen *gen, Expr *expr) {
-    if (expr->as.operand->type != EXPR_VARIABLE) {
+static char *code_gen_decrement_expression(CodeGen *gen, Expr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_decrement_expression");
+    if (expr->as.operand->type != EXPR_VARIABLE)
+    {
         exit(1);
     }
     char *var_name = get_var_name(gen->arena, expr->as.operand->as.variable.name);
     return arena_sprintf(gen->arena, "rt_post_dec_long(&%s)", var_name);
 }
 
-static char *code_gen_expression(CodeGen *gen, Expr *expr) {
-    if (expr == NULL) {
+static char *code_gen_expression(CodeGen *gen, Expr *expr)
+{
+    DEBUG_VERBOSE("Entering code_gen_expression");
+    if (expr == NULL)
+    {
         return arena_strdup(gen->arena, "0L");
     }
-    switch (expr->type) {
+    switch (expr->type)
+    {
     case EXPR_BINARY:
         return code_gen_binary_expression(gen, &expr->as.binary);
     case EXPR_UNARY:
@@ -564,43 +707,60 @@ static char *code_gen_expression(CodeGen *gen, Expr *expr) {
     return NULL;
 }
 
-static void code_gen_expression_statement(CodeGen *gen, ExprStmt *stmt) {
+static void code_gen_expression_statement(CodeGen *gen, ExprStmt *stmt)
+{
+    DEBUG_VERBOSE("Entering code_gen_expression_statement");
     char *expr_str = code_gen_expression(gen, stmt->expression);
-    if (stmt->expression->expr_type->kind == TYPE_STRING && expression_produces_temp(stmt->expression)) {
+    if (stmt->expression->expr_type->kind == TYPE_STRING && expression_produces_temp(stmt->expression))
+    {
         fprintf(gen->output, "{\n");
         fprintf(gen->output, "    char *_tmp = %s;\n", expr_str);
         fprintf(gen->output, "    (void)_tmp;\n");
         fprintf(gen->output, "    rt_free_string(_tmp);\n");
         fprintf(gen->output, "}\n");
-    } else {
+    }
+    else
+    {
         fprintf(gen->output, "%s;\n", expr_str);
     }
 }
 
-static void code_gen_var_declaration(CodeGen *gen, VarDeclStmt *stmt) {
+static void code_gen_var_declaration(CodeGen *gen, VarDeclStmt *stmt)
+{
+    DEBUG_VERBOSE("Entering code_gen_var_declaration");
     symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->name, stmt->type, SYMBOL_LOCAL);
     const char *type_c = get_c_type(stmt->type);
     char *var_name = get_var_name(gen->arena, stmt->name);
     char *init_str;
-    if (stmt->initializer) {
+    if (stmt->initializer)
+    {
         init_str = code_gen_expression(gen, stmt->initializer);
-    } else {
+    }
+    else
+    {
         init_str = arena_strdup(gen->arena, get_default_value(stmt->type));
     }
     fprintf(gen->output, "%s %s = %s;\n", type_c, var_name, init_str);
 }
 
-static void code_gen_free_locals(CodeGen *gen, Scope *scope, bool is_function) {
+static void code_gen_free_locals(CodeGen *gen, Scope *scope, bool is_function)
+{
+    DEBUG_VERBOSE("Entering code_gen_free_locals");
     Symbol *sym = scope->symbols;
-    while (sym) {
-        if (sym->type && sym->type->kind == TYPE_STRING && sym->kind == SYMBOL_LOCAL) {
+    while (sym)
+    {
+        if (sym->type && sym->type->kind == TYPE_STRING && sym->kind == SYMBOL_LOCAL)
+        {
             char *var_name = get_var_name(gen->arena, sym->name);
             fprintf(gen->output, "if (%s) {\n", var_name);
-            if (is_function && gen->current_return_type && gen->current_return_type->kind == TYPE_STRING) {
+            if (is_function && gen->current_return_type && gen->current_return_type->kind == TYPE_STRING)
+            {
                 fprintf(gen->output, "    if (%s != _return_value) {\n", var_name);
                 fprintf(gen->output, "        rt_free_string(%s);\n", var_name);
                 fprintf(gen->output, "    }\n");
-            } else {
+            }
+            else
+            {
                 fprintf(gen->output, "    rt_free_string(%s);\n", var_name);
             }
             fprintf(gen->output, "}\n");
@@ -609,10 +769,13 @@ static void code_gen_free_locals(CodeGen *gen, Scope *scope, bool is_function) {
     }
 }
 
-void code_gen_block(CodeGen *gen, BlockStmt *stmt) {
+void code_gen_block(CodeGen *gen, BlockStmt *stmt)
+{
+    DEBUG_VERBOSE("Entering code_gen_block");
     symbol_table_push_scope(gen->symbol_table);
     fprintf(gen->output, "{\n");
-    for (int i = 0; i < stmt->count; i++) {
+    for (int i = 0; i < stmt->count; i++)
+    {
         code_gen_statement(gen, stmt->statements[i]);
     }
     code_gen_free_locals(gen, gen->symbol_table->current, false);
@@ -620,7 +783,9 @@ void code_gen_block(CodeGen *gen, BlockStmt *stmt) {
     symbol_table_pop_scope(gen->symbol_table);
 }
 
-void code_gen_function(CodeGen *gen, FunctionStmt *stmt) {
+void code_gen_function(CodeGen *gen, FunctionStmt *stmt)
+{
+    DEBUG_VERBOSE("Entering code_gen_function");
     char *old_function = gen->current_function;
     Type *old_return_type = gen->current_return_type;
     gen->current_function = get_var_name(gen->arena, stmt->name);
@@ -629,34 +794,42 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt) {
     // Special case for main: always use "int" return type in C for standard entry point.
     const char *ret_c = is_main ? "int" : get_c_type(gen->current_return_type);
     symbol_table_push_scope(gen->symbol_table);
-    for (int i = 0; i < stmt->param_count; i++) {
+    for (int i = 0; i < stmt->param_count; i++)
+    {
         symbol_table_add_symbol_with_kind(gen->symbol_table, stmt->params[i].name, stmt->params[i].type, SYMBOL_PARAM);
     }
     fprintf(gen->output, "%s %s(", ret_c, gen->current_function);
-    for (int i = 0; i < stmt->param_count; i++) {
+    for (int i = 0; i < stmt->param_count; i++)
+    {
         const char *param_type_c = get_c_type(stmt->params[i].type);
         char *param_name = get_var_name(gen->arena, stmt->params[i].name);
         fprintf(gen->output, "%s %s", param_type_c, param_name);
-        if (i < stmt->param_count - 1) {
+        if (i < stmt->param_count - 1)
+        {
             fprintf(gen->output, ", ");
         }
     }
     fprintf(gen->output, ") {\n");
     // Add _return_value if there is a return type or if this is main (default to 0 for main).
-    if (gen->current_return_type || is_main) {
+    if (gen->current_return_type || is_main)
+    {
         const char *default_val = is_main ? "0" : get_default_value(gen->current_return_type);
         fprintf(gen->output, "    %s _return_value = %s;\n", ret_c, default_val);
     }
-    for (int i = 0; i < stmt->body_count; i++) {
+    for (int i = 0; i < stmt->body_count; i++)
+    {
         code_gen_statement(gen, stmt->body[i]);
     }
     fprintf(gen->output, "goto %s_return;\n", gen->current_function);
     fprintf(gen->output, "%s_return:\n", gen->current_function);
     code_gen_free_locals(gen, gen->symbol_table->current, true);
     // Return _return_value if there is a return type or if this is main; otherwise just return.
-    if (gen->current_return_type || is_main) {
+    if (gen->current_return_type || is_main)
+    {
         fprintf(gen->output, "    return _return_value;\n");
-    } else {
+    }
+    else
+    {
         fprintf(gen->output, "    return;\n");
     }
     fprintf(gen->output, "}\n\n");
@@ -665,46 +838,59 @@ void code_gen_function(CodeGen *gen, FunctionStmt *stmt) {
     gen->current_return_type = old_return_type;
 }
 
-void code_gen_return_statement(CodeGen *gen, ReturnStmt *stmt) {
-    if (stmt->value) {
+void code_gen_return_statement(CodeGen *gen, ReturnStmt *stmt)
+{
+    DEBUG_VERBOSE("Entering code_gen_return_statement");
+    if (stmt->value)
+    {
         char *value_str = code_gen_expression(gen, stmt->value);
         fprintf(gen->output, "_return_value = %s;\n", value_str);
     }
     fprintf(gen->output, "goto %s_return;\n", gen->current_function);
 }
 
-void code_gen_if_statement(CodeGen *gen, IfStmt *stmt) {
+void code_gen_if_statement(CodeGen *gen, IfStmt *stmt)
+{
+    DEBUG_VERBOSE("Entering code_gen_if_statement");
     char *cond_str = code_gen_expression(gen, stmt->condition);
     fprintf(gen->output, "if (%s) {\n", cond_str);
     code_gen_statement(gen, stmt->then_branch);
     fprintf(gen->output, "}\n");
-    if (stmt->else_branch) {
+    if (stmt->else_branch)
+    {
         fprintf(gen->output, "else {\n");
         code_gen_statement(gen, stmt->else_branch);
         fprintf(gen->output, "}\n");
     }
 }
 
-void code_gen_while_statement(CodeGen *gen, WhileStmt *stmt) {
+void code_gen_while_statement(CodeGen *gen, WhileStmt *stmt)
+{
+    DEBUG_VERBOSE("Entering code_gen_while_statement");
     char *cond_str = code_gen_expression(gen, stmt->condition);
     fprintf(gen->output, "while (%s) {\n", cond_str);
     code_gen_statement(gen, stmt->body);
     fprintf(gen->output, "}\n");
 }
 
-void code_gen_for_statement(CodeGen *gen, ForStmt *stmt) {
+void code_gen_for_statement(CodeGen *gen, ForStmt *stmt)
+{
+    DEBUG_VERBOSE("Entering code_gen_for_statement");
     symbol_table_push_scope(gen->symbol_table);
     fprintf(gen->output, "{\n");
-    if (stmt->initializer) {
+    if (stmt->initializer)
+    {
         code_gen_statement(gen, stmt->initializer);
     }
     char *cond_str = NULL;
-    if (stmt->condition) {
+    if (stmt->condition)
+    {
         cond_str = code_gen_expression(gen, stmt->condition);
     }
     fprintf(gen->output, "while (%s) {\n", cond_str ? cond_str : "1");
     code_gen_statement(gen, stmt->body);
-    if (stmt->increment) {
+    if (stmt->increment)
+    {
         char *inc_str = code_gen_expression(gen, stmt->increment);
         fprintf(gen->output, "%s;\n", inc_str);
     }
@@ -714,8 +900,11 @@ void code_gen_for_statement(CodeGen *gen, ForStmt *stmt) {
     symbol_table_pop_scope(gen->symbol_table);
 }
 
-void code_gen_statement(CodeGen *gen, Stmt *stmt) {
-    switch (stmt->type) {
+void code_gen_statement(CodeGen *gen, Stmt *stmt)
+{
+    DEBUG_VERBOSE("Entering code_gen_statement");
+    switch (stmt->type)
+    {
     case STMT_EXPR:
         code_gen_expression_statement(gen, &stmt->as.expression);
         break;
@@ -745,20 +934,26 @@ void code_gen_statement(CodeGen *gen, Stmt *stmt) {
     }
 }
 
-void code_gen_module(CodeGen *gen, Module *module) {
+void code_gen_module(CodeGen *gen, Module *module)
+{
+    DEBUG_VERBOSE("Entering code_gen_module");
     code_gen_headers(gen);
     code_gen_externs(gen);
     bool has_main = false;
-    for (int i = 0; i < module->count; i++) {
-        if (module->statements[i]->type == STMT_FUNCTION) {
+    for (int i = 0; i < module->count; i++)
+    {
+        if (module->statements[i]->type == STMT_FUNCTION)
+        {
             char *name = get_var_name(gen->arena, module->statements[i]->as.function.name);
-            if (strcmp(name, "main") == 0) {
+            if (strcmp(name, "main") == 0)
+            {
                 has_main = true;
             }
         }
         code_gen_statement(gen, module->statements[i]);
     }
-    if (!has_main) {
+    if (!has_main)
+    {
         // If no main is defined, add a dummy int main() for valid C program entry point.
         fprintf(gen->output, "int main() {\n");
         fprintf(gen->output, "    return 0;\n");
