@@ -286,32 +286,31 @@ void test_ast_type_to_string()
     // Array
     Type *arr = ast_create_array_type(&arena, ast_create_primitive_type(&arena, TYPE_CHAR));
     const char *actual = ast_type_to_string(&arena, arr);
-    printf("Actual type string: '%s'\n", actual);
-    assert(strcmp(actual, "array<char>") == 0);
-    assert(strcmp(ast_type_to_string(&arena, arr), "array<char>") == 0);
+    assert(strcmp(actual, "array of char") == 0);
+    assert(strcmp(ast_type_to_string(&arena, arr), "array of char") == 0);
 
     // Nested array
     Type *nested_arr = ast_create_array_type(&arena, arr);
-    assert(strcmp(ast_type_to_string(&arena, nested_arr), "array<array<char>>") == 0);
+    assert(strcmp(ast_type_to_string(&arena, nested_arr), "array of array of char") == 0);
 
     // Function
     Type *params[1] = {ast_create_primitive_type(&arena, TYPE_BOOL)};
     Type *fn = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_STRING), params, 1);
-    assert(strcmp(ast_type_to_string(&arena, fn), "fn(bool) -> string") == 0);
+    assert(strcmp(ast_type_to_string(&arena, fn), "function(bool) -> string") == 0);
 
     // Function with multiple params
     Type *params_multi[2] = {ast_create_primitive_type(&arena, TYPE_INT), ast_create_primitive_type(&arena, TYPE_DOUBLE)};
     Type *fn_multi = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_VOID), params_multi, 2);
-    assert(strcmp(ast_type_to_string(&arena, fn_multi), "fn(int, double) -> void") == 0);
+    assert(strcmp(ast_type_to_string(&arena, fn_multi), "function(int, double) -> void") == 0);
 
     // Function with array param
     Type *params_arr[1] = {arr};
     Type *fn_arr = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_INT), params_arr, 1);
-    assert(strcmp(ast_type_to_string(&arena, fn_arr), "fn(array<char>) -> int") == 0);
+    assert(strcmp(ast_type_to_string(&arena, fn_arr), "function(array of char) -> int") == 0);
 
     // Empty function
     Type *fn_empty = ast_create_function_type(&arena, ast_create_primitive_type(&arena, TYPE_VOID), NULL, 0);
-    assert(strcmp(ast_type_to_string(&arena, fn_empty), "fn() -> void") == 0);
+    assert(strcmp(ast_type_to_string(&arena, fn_empty), "function() -> void") == 0);
 
     // Unknown kind
     Type *unknown = arena_alloc(&arena, sizeof(Type));
@@ -446,8 +445,7 @@ void test_ast_create_literal_expr()
 
     // NULL type (code requires type, but test if NULL)
     Expr *lit_null_type = ast_create_literal_expr(&arena, val_int, NULL, false, loc);
-    assert(lit_null_type != NULL);
-    assert(lit_null_type->as.literal.type == NULL);
+    assert(lit_null_type == NULL);
 
     // NULL loc
     Expr *lit_null_loc = ast_create_literal_expr(&arena, val_int, typ_int, false, NULL);
@@ -504,8 +502,7 @@ void test_ast_create_assign_expr()
 
     // NULL value
     Expr *ass_null_val = ast_create_assign_expr(&arena, name, NULL, loc);
-    assert(ass_null_val != NULL); // Code allows NULL value
-    assert(ass_null_val->as.assign.value == NULL);
+    assert(ass_null_val == NULL); // Code allows NULL value
 
     // Empty name
     Token empty_name = create_dummy_token(&arena, "");

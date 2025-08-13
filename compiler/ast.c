@@ -370,7 +370,6 @@ Type *ast_create_function_type(Arena *arena, Type *return_type, Type **param_typ
         if (param_types == NULL && param_count > 0)
         {
             DEBUG_ERROR("Cannot create function type: param_types is NULL but param_count > 0");
-            // Optionally free allocated memory and return NULL, or exit(1) as in other error paths.
             return NULL;
         }
         for (int i = 0; i < param_count; i++)
@@ -419,7 +418,7 @@ const char *ast_type_to_string(Arena *arena, Type *type)
 {
     if (type == NULL)
     {
-        return arena_strdup(arena, "unknown");
+        return NULL;
     }
 
     switch (type->kind)
@@ -829,28 +828,31 @@ Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int 
     stmt->as.function.name.type = name.type;
     stmt->as.function.name.filename = name.filename; // Added for location reporting.
 
-    Parameter *new_params = arena_alloc(arena, sizeof(Parameter) * param_count);
-    if (new_params == NULL && param_count > 0)
+    if (params != NULL)
     {
-        DEBUG_ERROR("Out of memory");
-        exit(1);
-    }
-    for (int i = 0; i < param_count; i++)
-    {
-        char *new_param_start = arena_strndup(arena, params[i].name.start, params[i].name.length);
-        if (new_param_start == NULL)
+        Parameter *new_params = arena_alloc(arena, sizeof(Parameter) * param_count);
+        if (new_params == NULL && param_count > 0)
         {
             DEBUG_ERROR("Out of memory");
             exit(1);
         }
-        new_params[i].name.start = new_param_start;
-        new_params[i].name.length = params[i].name.length;
-        new_params[i].name.line = params[i].name.line;
-        new_params[i].name.type = params[i].name.type;
-        new_params[i].name.filename = params[i].name.filename; // Added for location reporting.
-        new_params[i].type = params[i].type;
+        for (int i = 0; i < param_count; i++)
+        {
+            char *new_param_start = arena_strndup(arena, params[i].name.start, params[i].name.length);
+            if (new_param_start == NULL)
+            {
+                DEBUG_ERROR("Out of memory");
+                exit(1);
+            }
+            new_params[i].name.start = new_param_start;
+            new_params[i].name.length = params[i].name.length;
+            new_params[i].name.line = params[i].name.line;
+            new_params[i].name.type = params[i].name.type;
+            new_params[i].name.filename = params[i].name.filename; // Added for location reporting.
+            new_params[i].type = params[i].type;
+        }
+        stmt->as.function.params = new_params;
     }
-    stmt->as.function.params = new_params;
     stmt->as.function.param_count = param_count;
     stmt->as.function.return_type = return_type;
     stmt->as.function.body = body;
