@@ -6,14 +6,14 @@
 #include "symbol_table.h"
 #include <stdio.h>
 
-typedef struct
-{
-    int label_count;
+typedef struct {
     Arena *arena;
+    int label_count;
     SymbolTable *symbol_table;
     FILE *output;
     char *current_function;
     Type *current_return_type;
+    int temp_count;  // Add this line
 } CodeGen;
 
 void code_gen_init(Arena *arena, CodeGen *gen, SymbolTable *symbol_table, const char *output_file);
