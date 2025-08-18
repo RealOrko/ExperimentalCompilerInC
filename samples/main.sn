@@ -19,6 +19,7 @@ fn main(): void =>
     sum = sum + k
   print($"Sum 1 to 10: {sum}\n")
 
-  print_types()
+  print_types(num, fact, sum)
+  print_void()
 
   print("Complete main method ... \n")
