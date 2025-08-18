@@ -532,7 +532,7 @@ Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr 
     expr->as.binary.right = right;
     expr->as.binary.operator = operator;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -554,7 +554,7 @@ Expr *ast_create_unary_expr(Arena *arena, TokenType operator, Expr *operand, con
     expr->as.unary.operator = operator;
     expr->as.unary.operand = operand;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -577,7 +577,7 @@ Expr *ast_create_literal_expr(Arena *arena, LiteralValue value, Type *type, bool
     expr->as.literal.type = type;
     expr->as.literal.is_interpolated = is_interpolated;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -603,7 +603,7 @@ Expr *ast_create_variable_expr(Arena *arena, Token name, const Token *loc_token)
     expr->as.variable.name.type = name.type;
     expr->as.variable.name.filename = name.filename;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -634,7 +634,7 @@ Expr *ast_create_assign_expr(Arena *arena, Token name, Expr *value, const Token 
     expr->as.assign.name.filename = name.filename;
     expr->as.assign.value = value;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -656,7 +656,7 @@ Expr *ast_create_call_expr(Arena *arena, Expr *callee, Expr **arguments, int arg
     expr->as.call.arguments = arguments;
     expr->as.call.arg_count = arg_count;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -673,7 +673,7 @@ Expr *ast_create_array_expr(Arena *arena, Expr **elements, int element_count, co
     expr->as.array.elements = elements;
     expr->as.array.element_count = element_count;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -694,7 +694,7 @@ Expr *ast_create_array_access_expr(Arena *arena, Expr *array, Expr *index, const
     expr->as.array_access.array = array;
     expr->as.array_access.index = index;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -714,7 +714,7 @@ Expr *ast_create_increment_expr(Arena *arena, Expr *operand, const Token *loc_to
     expr->type = EXPR_INCREMENT;
     expr->as.operand = operand;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -734,7 +734,7 @@ Expr *ast_create_decrement_expr(Arena *arena, Expr *operand, const Token *loc_to
     expr->type = EXPR_DECREMENT;
     expr->as.operand = operand;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -751,7 +751,7 @@ Expr *ast_create_interpolated_expr(Arena *arena, Expr **parts, int part_count, c
     expr->as.interpol.parts = parts;
     expr->as.interpol.part_count = part_count;
     expr->expr_type = NULL;
-    expr->token = (Token *)loc_token;
+    expr->token = ast_dup_token(arena, loc_token);
     return expr;
 }
 
@@ -770,7 +770,7 @@ Stmt *ast_create_expr_stmt(Arena *arena, Expr *expression, const Token *loc_toke
     memset(stmt, 0, sizeof(Stmt));
     stmt->type = STMT_EXPR;
     stmt->as.expression.expression = expression;
-    stmt->token = (Token *)loc_token;
+    stmt->token = ast_dup_token(arena, loc_token);
     return stmt;
 }
 
@@ -801,7 +801,7 @@ Stmt *ast_create_var_decl_stmt(Arena *arena, Token name, Type *type, Expr *initi
     stmt->as.var_decl.name.filename = name.filename; // Added for location reporting.
     stmt->as.var_decl.type = type;
     stmt->as.var_decl.initializer = initializer;
-    stmt->token = (Token *)loc_token;
+    stmt->token = ast_dup_token(arena, loc_token);
     return stmt;
 }
 
@@ -857,7 +857,7 @@ Stmt *ast_create_function_stmt(Arena *arena, Token name, Parameter *params, int 
     stmt->as.function.return_type = return_type;
     stmt->as.function.body = body;
     stmt->as.function.body_count = body_count;
-    stmt->token = (Token *)loc_token;
+    stmt->token = ast_dup_token(arena, loc_token);
     return stmt;
 }
 
@@ -877,7 +877,7 @@ Stmt *ast_create_return_stmt(Arena *arena, Token keyword, Expr *value, const Tok
     stmt->as.return_stmt.keyword.type = keyword.type;
     stmt->as.return_stmt.keyword.filename = keyword.filename; // Added for location reporting.
     stmt->as.return_stmt.value = value;
-    stmt->token = (Token *)loc_token;
+    stmt->token = ast_dup_token(arena, loc_token);
     return stmt;
 }
 
@@ -893,7 +893,7 @@ Stmt *ast_create_block_stmt(Arena *arena, Stmt **statements, int count, const To
     stmt->type = STMT_BLOCK;
     stmt->as.block.statements = statements;
     stmt->as.block.count = count;
-    stmt->token = (Token *)loc_token;
+    stmt->token = ast_dup_token(arena, loc_token);
     return stmt;
 }
 
@@ -914,7 +914,7 @@ Stmt *ast_create_if_stmt(Arena *arena, Expr *condition, Stmt *then_branch, Stmt 
     stmt->as.if_stmt.condition = condition;
     stmt->as.if_stmt.then_branch = then_branch;
     stmt->as.if_stmt.else_branch = else_branch;
-    stmt->token = (Token *)loc_token;
+    stmt->token = ast_dup_token(arena, loc_token);
     return stmt;
 }
 
@@ -934,7 +934,7 @@ Stmt *ast_create_while_stmt(Arena *arena, Expr *condition, Stmt *body, const Tok
     stmt->type = STMT_WHILE;
     stmt->as.while_stmt.condition = condition;
     stmt->as.while_stmt.body = body;
-    stmt->token = (Token *)loc_token;
+    stmt->token = ast_dup_token(arena, loc_token);
     return stmt;
 }
 
@@ -956,7 +956,7 @@ Stmt *ast_create_for_stmt(Arena *arena, Stmt *initializer, Expr *condition, Expr
     stmt->as.for_stmt.condition = condition;
     stmt->as.for_stmt.increment = increment;
     stmt->as.for_stmt.body = body;
-    stmt->token = (Token *)loc_token;
+    stmt->token = ast_dup_token(arena, loc_token);
     return stmt;
 }
 
@@ -981,7 +981,7 @@ Stmt *ast_create_import_stmt(Arena *arena, Token module_name, const Token *loc_t
     stmt->as.import.module_name.line = module_name.line;
     stmt->as.import.module_name.type = module_name.type;
     stmt->as.import.module_name.filename = module_name.filename;
-    stmt->token = (Token *)loc_token;
+    stmt->token = ast_dup_token(arena, loc_token);
     return stmt;
 }
 

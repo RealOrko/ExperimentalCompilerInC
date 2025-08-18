@@ -19,7 +19,19 @@ static void cleanup_arena(Arena *arena)
     arena_free(arena);
 }
 
-// Helper to create a dummy token
+static int tokens_equal(const Token *a, const Token *b)
+{
+    if (a == NULL && b == NULL)
+        return 1;
+    if (a == NULL || b == NULL)
+        return 0;
+    return a->type == b->type &&
+           a->length == b->length &&
+           a->line == b->line &&
+           strcmp(a->start, b->start) == 0 &&
+           strcmp(a->filename, b->filename) == 0;
+}
+
 static Token create_dummy_token(Arena *arena, const char *str)
 {
     Token tok;
@@ -340,7 +352,7 @@ void test_ast_create_binary_expr()
     assert(bin->as.binary.left == left);
     assert(bin->as.binary.right == right);
     assert(bin->as.binary.operator == TOKEN_PLUS);
-    assert(bin->token == loc);
+    assert(tokens_equal(bin->token, loc));
     assert(bin->expr_type == NULL);
 
     // Different operators
@@ -377,7 +389,7 @@ void test_ast_create_unary_expr()
     assert(un->type == EXPR_UNARY);
     assert(un->as.unary.operator == TOKEN_MINUS);
     assert(un->as.unary.operand == operand);
-    assert(un->token == loc);
+    assert(tokens_equal(un->token, loc));
 
     // Different operators
     Expr *un_not = ast_create_unary_expr(&arena, TOKEN_BANG, operand, loc);
@@ -412,7 +424,7 @@ void test_ast_create_literal_expr()
     assert(lit_int->as.literal.value.int_value == 42);
     assert(lit_int->as.literal.type == typ_int);
     assert(lit_int->as.literal.is_interpolated == false);
-    assert(lit_int->token == loc);
+    assert(tokens_equal(lit_int->token, loc));
 
     // Double
     LiteralValue val_double = {.double_value = 3.14};
@@ -468,7 +480,7 @@ void test_ast_create_variable_expr()
     assert(var->type == EXPR_VARIABLE);
     assert(strcmp(var->as.variable.name.start, "varname") == 0);
     assert(var->as.variable.name.length == 7);
-    assert(var->token == loc);
+    assert(tokens_equal(var->token, loc));
 
     // Empty name (length 0)
     Token empty_name = create_dummy_token(&arena, "");
@@ -498,7 +510,7 @@ void test_ast_create_assign_expr()
     assert(ass->type == EXPR_ASSIGN);
     assert(strcmp(ass->as.assign.name.start, "x") == 0);
     assert(ass->as.assign.value == val);
-    assert(ass->token == loc);
+    assert(tokens_equal(ass->token, loc));
 
     // NULL value
     Expr *ass_null_val = ast_create_assign_expr(&arena, name, NULL, loc);
@@ -537,7 +549,7 @@ void test_ast_create_call_expr()
     assert(call->as.call.arg_count == 2);
     assert(call->as.call.arguments[0] == args[0]);
     assert(call->as.call.arguments[1] == args[1]);
-    assert(call->token == loc);
+    assert(tokens_equal(call->token, loc));
 
     // Empty args
     Expr *call_empty = ast_create_call_expr(&arena, callee, NULL, 0, loc);
@@ -581,7 +593,7 @@ void test_ast_create_array_expr()
     assert(arr->as.array.elements[0] == elems[0]);
     assert(arr->as.array.elements[1] == elems[1]);
     assert(arr->as.array.elements[2] == elems[2]);
-    assert(arr->token == loc);
+    assert(tokens_equal(arr->token, loc));
     assert(arr->expr_type == NULL);
 
     // Empty array
@@ -619,7 +631,7 @@ void test_ast_create_array_access_expr()
     assert(access->type == EXPR_ARRAY_ACCESS);
     assert(access->as.array_access.array == array);
     assert(access->as.array_access.index == index);
-    assert(access->token == loc);
+    assert(tokens_equal(access->token, loc));
     assert(access->expr_type == NULL);
 
     // NULL array or index
@@ -648,7 +660,7 @@ void test_ast_create_increment_expr()
     assert(inc != NULL);
     assert(inc->type == EXPR_INCREMENT);
     assert(inc->as.operand == operand);
-    assert(inc->token == loc);
+    assert(tokens_equal(inc->token, loc));
     assert(inc->expr_type == NULL);
 
     // NULL operand
@@ -675,7 +687,7 @@ void test_ast_create_decrement_expr()
     assert(dec != NULL);
     assert(dec->type == EXPR_DECREMENT);
     assert(dec->as.operand == operand);
-    assert(dec->token == loc);
+    assert(tokens_equal(dec->token, loc));
     assert(dec->expr_type == NULL);
 
     // NULL operand
@@ -706,7 +718,7 @@ void test_ast_create_interpolated_expr()
     assert(interp->as.interpol.part_count == 2);
     assert(interp->as.interpol.parts[0] == parts[0]);
     assert(interp->as.interpol.parts[1] == parts[1]);
-    assert(interp->token == loc);
+    assert(tokens_equal(interp->token, loc));
     assert(interp->expr_type == NULL);
 
     // Empty parts
@@ -771,7 +783,7 @@ void test_ast_create_expr_stmt()
     assert(estmt != NULL);
     assert(estmt->type == STMT_EXPR);
     assert(estmt->as.expression.expression == expr);
-    assert(estmt->token == loc);
+    assert(tokens_equal(estmt->token, loc));
 
     // NULL expr
     assert(ast_create_expr_stmt(&arena, NULL, loc) == NULL);
@@ -800,7 +812,7 @@ void test_ast_create_var_decl_stmt()
     assert(strcmp(decl->as.var_decl.name.start, "var") == 0);
     assert(decl->as.var_decl.type == typ);
     assert(decl->as.var_decl.initializer == init);
-    assert(decl->token == loc);
+    assert(tokens_equal(decl->token, loc));
 
     // No initializer
     Stmt *decl_no_init = ast_create_var_decl_stmt(&arena, name, typ, NULL, loc);
@@ -848,7 +860,7 @@ void test_ast_create_function_stmt()
     assert(fn->as.function.return_type == ret);
     assert(fn->as.function.body_count == 1);
     assert(fn->as.function.body[0] == body[0]);
-    assert(fn->token == loc);
+    assert(tokens_equal(fn->token, loc));
 
     // Empty params and body
     Stmt *fn_empty = ast_create_function_stmt(&arena, name, NULL, 0, ret, NULL, 0, loc);
@@ -897,7 +909,7 @@ void test_ast_create_return_stmt()
     assert(ret->type == STMT_RETURN);
     assert(strcmp(ret->as.return_stmt.keyword.start, "return") == 0);
     assert(ret->as.return_stmt.value == val);
-    assert(ret->token == loc);
+    assert(tokens_equal(ret->token, loc));
 
     // No value
     Stmt *ret_no_val = ast_create_return_stmt(&arena, kw, NULL, loc);
@@ -935,7 +947,7 @@ void test_ast_create_block_stmt()
     assert(block->as.block.count == 2);
     assert(block->as.block.statements[0] == stmts[0]);
     assert(block->as.block.statements[1] == stmts[1]);
-    assert(block->token == loc);
+    assert(tokens_equal(block->token, loc));
 
     // Empty block
     Stmt *block_empty = ast_create_block_stmt(&arena, NULL, 0, loc);
@@ -974,7 +986,7 @@ void test_ast_create_if_stmt()
     assert(if_stmt->as.if_stmt.condition == cond);
     assert(if_stmt->as.if_stmt.then_branch == then);
     assert(if_stmt->as.if_stmt.else_branch == els);
-    assert(if_stmt->token == loc);
+    assert(tokens_equal(if_stmt->token, loc));
 
     // No else
     Stmt *if_no_else = ast_create_if_stmt(&arena, cond, then, NULL, loc);
@@ -1009,7 +1021,7 @@ void test_ast_create_while_stmt()
     assert(wh->type == STMT_WHILE);
     assert(wh->as.while_stmt.condition == cond);
     assert(wh->as.while_stmt.body == body);
-    assert(wh->token == loc);
+    assert(tokens_equal(wh->token, loc));
 
     // NULL cond or body
     assert(ast_create_while_stmt(&arena, NULL, body, loc) == NULL);
@@ -1043,7 +1055,7 @@ void test_ast_create_for_stmt()
     assert(fr->as.for_stmt.condition == cond);
     assert(fr->as.for_stmt.increment == inc);
     assert(fr->as.for_stmt.body == body);
-    assert(fr->token == loc);
+    assert(tokens_equal(fr->token, loc));
 
     // Optional parts
     Stmt *fr_partial = ast_create_for_stmt(&arena, NULL, NULL, NULL, body, loc);
@@ -1076,7 +1088,7 @@ void test_ast_create_import_stmt()
     assert(imp->type == STMT_IMPORT);
     assert(strcmp(imp->as.import.module_name.start, "module") == 0);
     assert(imp->as.import.module_name.length == 6);
-    assert(imp->token == loc);
+    assert(tokens_equal(imp->token, loc));
 
     // Empty module name
     Token empty_mod = create_dummy_token(&arena, "");
