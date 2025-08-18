@@ -1,189 +1,196 @@
-Language Specification for Custom C Compiler
-This document outlines the language specification for a custom programming language designed to be compiled by a C-based compiler. The language supports a concise, readable syntax with functional and imperative features. Below is a detailed description of the language's syntax and semantics, based on the provided example code.
-1. General Syntax
+# Sn Programming Language
 
-Indentation: The language uses indentation (2 spaces) to denote blocks, similar to Python, instead of curly braces.
-Arrow Operator (=>): Used to define function bodies, conditionals, loops, and other control structures.
-Semicolons: Statements within the same block do not require semicolons, as line breaks separate statements.
-Comments: Not shown in the example, but the language supports single-line comments starting with // and multi-line comments with /* */.
+The Sn programming language is a simple, procedural programming language designed for clarity and ease of use. This README provides a detailed overview of the language's syntax, features, and semantics based on the provided example program (`main.sn`). The language supports basic control structures, functions, and a variety of data types, with a focus on readable syntax and straightforward functionality.
 
-2. Data Types
-The language supports the following primitive data types:
+## Table of Contents
+- [Overview](#overview)
+- [Syntax and Features](#syntax-and-features)
+  - [Functions](#functions)
+  - [Data Types](#data-types)
+  - [Control Structures](#control-structures)
+  - [Variable Declarations](#variable-declarations)
+  - [Operators](#operators)
+  - [String Interpolation](#string-interpolation)
+  - [Print Statements](#print-statements)
+- [Example Program Analysis](#example-program-analysis)
+- [Running the Program](#running-the-program)
+- [Limitations and Assumptions](#limitations-and-assumptions)
 
-int: 32-bit signed integer (e.g., 5, -10).
-bool: Boolean values (true, false).
-str: String type for text data (e.g., "hello").
-double: 64-bit floating-point number (e.g., 3.14159).
-char: Single character (e.g., 'A').
+## Overview
+Sn is a procedural programming language with a syntax that emphasizes readability and simplicity. It supports functions with return types, basic data types (integers, doubles, strings, characters, and booleans), and standard control structures like conditionals, loops, and function calls. The language uses a distinctive arrow-based syntax (`=>`) for defining function bodies and control flow blocks, which contributes to its clean and concise appearance.
 
-Variables are declared using the var keyword, followed by the variable name, a colon, and the type:
-var num: int = 5
-var text: str = "hello"
+The example program (`main.sn`) demonstrates key features of Sn, including:
+- Function definitions for calculating factorials, checking prime numbers, and repeating strings.
+- Use of variables, loops, conditionals, and string interpolation.
+- Basic input/output via print statements.
 
-3. Functions
-Functions are defined using the fn keyword, followed by the function name, parameters, return type, and body.
-Syntax
-fn <name>(<param1>: <type1>, <param2>: <type2>, ...): <return_type> =>
-  <body>
+## Syntax and Features
 
+### Functions
+Functions in Sn are defined using the `fn` keyword, followed by the function name, parameters with their types, a return type, and a body introduced by the `=>` operator.
 
-Parameters are specified in parentheses, with each parameter followed by its type.
-The return type is specified after a colon.
-The function body is introduced by => and indented.
-The return statement is used to return a value.
+**Syntax:**
+```sn
+fn function_name(param1: type, param2: type): return_type =>
+  // function body
+```
 
-Example
+**Example:**
+```sn
 fn factorial(n: int): int =>
+  print($"factorial: n={n}\n")
   if n <= 1 =>
+    print($"factorial: n <= 1 returning 1\n")
     return 1
-  return n * factorial(n - 1)
+  var j: int = n * factorial(n - 1)
+  print($"factorial: j={j}\n")
+  return j
+```
+- **Parameters**: Parameters are declared with their types (e.g., `n: int`).
+- **Return Type**: Specified after the parameter list (e.g., `: int`).
+- **Body**: Enclosed in `=>`, with statements like `print`, `if`, or `return`.
+- **Recursion**: Supported, as seen in the `factorial` function, which calls itself.
 
+### Data Types
+Sn supports the following data types, as inferred from the example:
+- **int**: Integer numbers (e.g., `5`, `7`).
+- **double**: Floating-point numbers (e.g., `3.14159`).
+- **str**: Strings (e.g., `"hello "`).
+- **char**: Single characters (e.g., `'A'`).
+- **bool**: Boolean values (`true`, `false`).
 
-The factorial function takes an int parameter n and returns an int.
-It uses recursion to compute the factorial.
+Variables are explicitly typed using the `var` keyword and a type annotation.
 
-4. Control Structures
-4.1 If-Else
-Conditional statements use the if keyword, followed by a condition, =>, and an indented block. An optional else clause can follow.
-if <condition> =>
-  <body>
+### Control Structures
+Sn provides standard control structures for conditionals and loops.
+
+#### Conditionals
+**If-Else Syntax:**
+```sn
+if condition =>
+  // statements
 else =>
-  <body>
-
-
-Conditions are expressions evaluating to a bool.
-Example:if is_prime(7) =>
-  print("7 is prime")
-else =>
-  print("7 is not prime")
-
-
-
-4.2 While Loop
-The while loop executes a block while a condition is true.
-while <condition> =>
-  <body>
-
-
-Example:while i * i <= num =>
-  if num % i == 0 =>
-    return false
-  i = i + 1
-
-
-
-4.3 For Loop
-The for loop iterates over a range or sequence, with a loop variable declared inline.
-for var <var>: <type> = <start>; <condition>; <increment> =>
-  <body>
-
-
-Example:for var j: int = 0; j < count; j++ =>
-  result = result + text
-
-
-The loop variable (j) is declared with var and a type.
-The j++ syntax increments the variable by 1.
-
-5. String Interpolation
-Strings support interpolation using the $ prefix and {} to embed expressions.
-$"This is a {variable}"
-
-
-Example:print($"Factorial of {num} is {fact}")
-
-
-The expression inside {} is evaluated and converted to a string.
-Supported types for interpolation: int, double, char, bool, str.
-
-6. Operators
-The language supports standard arithmetic, comparison, and logical operators:
-
-Arithmetic: +, -, *, /, % (modulus).
-Comparison: ==, !=, <, <=, >, >=.
-Logical: Not shown in the example, but assumed to include && (and), || (or), ! (not).
-Assignment: = for assignment, +=, -=, etc., are not shown but may be supported.
-
-7. Built-in Functions
-The language includes a print function for console output.
-print(<expression>)
-
-
-The argument can be a string, interpolated string, or other printable type.
-Example:print("7 is prime")
-print($"Pi approx: {pi_approx}")
-
-
-
-8. Variable Scoping
-
-Variables declared with var are scoped to the block (function, loop, or conditional) in which they are defined.
-Example:var i: int = 2  // Local to the is_prime function
-
-
-
-9. Example Program Analysis
-The provided main function demonstrates the language's features:
-fn main(): void =>
-  var num: int = 5
-  var fact: int = factorial(num)
-  print($"Factorial of {num} is {fact}")
-
+  // statements
+```
+- Conditions are enclosed in `=>` blocks.
+- The `else` clause is optional.
+- Example:
+  ```sn
   if is_prime(7) =>
-    print("7 is prime")
+    print("7 is prime\n")
   else =>
-    print("7 is not prime")
+    print("7 is not prime\n")
+  ```
 
-  var repeated: str = repeat_string("hello ", 3)
-  print(repeated + "world!")
+#### Loops
+Sn supports `while` and `for` loops.
 
-  var sum: int = 0
+**While Loop Syntax:**
+```sn
+while condition =>
+  // statements
+```
+- Example:
+  ```sn
+  while i * i <= num =>
+    if num % i == 0 =>
+      return false
+    i = i + 1
+  ```
+
+**For Loop Syntax:**
+```sn
+for var variable: type = start; condition; increment =>
+  // statements
+```
+- Example:
+  ```sn
   for var k: int = 1; k <= 10; k++ =>
     sum = sum + k
-  print($"Sum 1 to 10: {sum}")
+  ```
+- The `for` loop includes initialization, a condition, and an increment operation, similar to C-style languages.
 
-  var pi_approx: double = 3.14159
-  print($"Pi approx: {pi_approx}")
+### Variable Declarations
+Variables are declared using the `var` keyword, followed by the variable name, type, and an optional initial value.
 
-  var ch: char = 'A'
-  print($"Char: {ch}")
+**Syntax:**
+```sn
+var variable_name: type = value
+```
+- Example:
+  ```sn
+  var num: int = 5
+  var result: str = ""
+  ```
+- Variables must be explicitly typed.
+- Variables can be reassigned, as seen with the `any` variable in the example.
 
-  var flag: bool = true
-  print($"Flag: {flag}")
+### Operators
+Sn supports standard arithmetic, comparison, and logical operators:
+- **Arithmetic**: `+`, `-`, `*`, `%` (e.g., `n * factorial(n - 1)`, `num % i`).
+- **Comparison**: `<=`, `==` (e.g., `n <= 1`, `num % i == 0`).
+- **Assignment**: `=` for assignment and `++` for increment (e.g., `i = i + 1`, `j++`).
+- The language does not appear to support compound assignment operators like `+=` (based on the example, which uses `sum = sum + k`).
 
-  var any: str = $"This is a thing {num}"
-  print(any)
-  ...
+### String Interpolation
+Sn supports string interpolation using the `$` prefix for strings, with expressions embedded in curly braces `{}`.
 
+**Syntax:**
+```sn
+$"text {expression} text"
+```
+- Example:
+  ```sn
+  print($"Factorial of {num} is {fact}\n")
+  ```
+- Interpolated expressions can include variables of any type (e.g., `int`, `double`, `char`, `bool`).
+- The `$` prefix is required for interpolation; plain strings use double quotes without `$`.
 
-Declares variables of types int, double, char, bool, and str.
-Calls functions (factorial, is_prime, repeat_string).
-Uses string interpolation for output.
-Demonstrates control structures (if, for).
+### Print Statements
+The `print` function is used for output, supporting both plain strings and interpolated strings.
 
-10. Implementation Notes for C Compiler
-To implement a compiler in C for this language:
+**Syntax:**
+```sn
+print("text")
+print($"text {expression}")
+```
+- Example:
+  ```sn
+  print("Starting main method ... \n")
+  print($"Sum 1 to 10: {sum}\n")
+  ```
+- Strings often include a newline (`\n`) for formatting.
 
-Lexer/Parser: Use a lexer (e.g., Flex) to tokenize keywords (fn, var, if, etc.), operators, and literals. Use a parser (e.g., Bison) to handle the indentation-based grammar and => syntax.
-Type System: Implement a type checker to enforce type annotations (int, str, etc.) and ensure type safety in operations.
-Code Generation: Generate C or LLVM IR code, mapping language constructs to equivalent C code. For example, the => blocks can be translated to C's {} blocks.
-Runtime: Provide a runtime library for string interpolation (using a format string approach) and the print function (mapping to printf).
-Memory Management: Strings (str) may require dynamic memory management in C (e.g., using malloc and free).
-Error Handling: Ensure the compiler reports meaningful errors for type mismatches, undefined variables, or incorrect indentation.
+## Example Program Analysis
+The provided `main.sn` program demonstrates the core features of Sn. Below is a summary of its functionality:
+- **Factorial Function**: Computes the factorial of a number using recursion.
+- **Is Prime Function**: Checks if a number is prime by testing divisibility up to its square root.
+- **Repeat String Function**: Concatenates a string a specified number of times.
+- **Main Function**: 
+  - Computes the factorial of 5.
+  - Checks if 7 is prime.
+  - Repeats the string `"hello "` three times and appends `"world!"`.
+  - Calculates the sum of numbers from 1 to 10.
+  - Demonstrates various data types (`int`, `double`, `char`, `bool`, `str`) with string interpolation.
 
-11. Limitations and Assumptions
+The program outputs intermediate values for debugging (e.g., `print($"factorial: n={n}\n")`), making it useful for understanding execution flow.
 
-The language does not appear to support arrays, structs, or pointers in the provided example.
-No explicit support for exception handling or advanced data structures.
-The string concatenation operator (+) is supported for strings, but its behavior for other types is undefined.
-The language assumes single-threaded execution, as no concurrency features are shown.
+## Running the Program
+The example program assumes a compiler or interpreter for Sn that translates the code into executable form. To run `main.sn`:
+1. Ensure a Sn compiler or interpreter is installed (not provided in the example).
+2. Compile or interpret the program:
+   ```bash
+   snc main.sn
+   ```
+   (Assuming `snc` is the compiler command.)
+3. The program will output the results of the factorial, prime check, string repetition, sum, and various variable values.
 
-12. Future Extensions
-Potential extensions to the language could include:
+## Limitations and Assumptions
+Based on the example, the following assumptions are made about Sn:
+- **No Standard Library Details**: The example does not indicate a standard library beyond `print`.
+- **No Error Handling**: The language does not show explicit error-handling mechanisms (e.g., try-catch).
+- **No Input Mechanism**: The example lacks input functions, suggesting Sn may rely on hardcoded values or external input not shown.
+- **Single-File Programs**: The example is a single file (`main.sn`), and there is no evidence of module imports or multi-file programs.
+- **Type Safety**: The language appears to be statically typed, with explicit type annotations for variables and parameters.
 
-Support for arrays or lists (e.g., var arr: [int]).
-Function overloading or default parameters.
-Modules or imports for code organization.
-Additional control structures like switch or try-catch.
-
-This specification provides a foundation for implementing a compiler in C that can process the given language's syntax and semantics. For further details or clarifications, refer to the example code or contact the language designer.
+Further exploration of Sn would require additional documentation or examples to clarify features like file I/O, libraries, or advanced data structures.
