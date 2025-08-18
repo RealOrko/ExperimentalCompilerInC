@@ -59,3 +59,9 @@ fn print_types(num:int, fact:int, sum:int): void =>
 
 fn print_void(): void =>
   print("void\n")
+
+fn declare_basic_int_array(): int[] =>
+  var int_arr: int[] = {1, 2, 3}
+
+fn print_basic_int_array(arr: int[]): void =>
+  print($"Int Array: {arr}")

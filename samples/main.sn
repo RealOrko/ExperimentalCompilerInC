@@ -22,4 +22,27 @@ fn main(): void =>
   print_types(num, fact, sum)
   print_void()
 
+  var arr: int[]
+  arr.push(1)
+  print(arr) // Answer should be {1}
+
+  arr.clear()
+  print(arr) //Answer should be {}
+
+  arr.push({1, 2})
+  print(arr) // Answer should be {1, 2}
+  print($"Arr Length: {len(arr)}") // Answer should be 2
+
+  var result: int = arr.pop()
+  print(arr) // Answer should be {1}
+  print(result) // Answer should be 2
+
+  var arr1: int[] = {1, 2}
+  var arr2: int[] = {3, 4}
+  var arr3: int[] = arr1.concat(arr2)
+  print($"Concat: {arr3}")/ Answer should be {1, 2, 3, 4}
+
+  var arr: int[] = declare_basic_int_arr()
+  print_basic_int_array(arr)
+
   print("Complete main method ... \n")
