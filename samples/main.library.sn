@@ -1,0 +1,58 @@
+fn factorial(n: int): int =>
+  print($"factorial: n={n}\n")
+  if n <= 1 =>
+    print($"factorial: n <= 1 returning 1\n")
+    return 1
+  var j: int = n * factorial(n - 1)
+  print($"factorial: j={j}\n")
+  return j
+
+fn is_prime(num: int): bool =>
+  if num <= 1 =>
+    print($"is_prime: num={num}\n")
+    return false
+  var i: int = 2
+  print($"is_prime: i={i}\n")
+  while i * i <= num =>
+    if num % i == 0 =>
+      print($"is_prime: num % i == 0, returning false\n")
+      return false
+    i = i + 1
+    print($"is_prime: i={i} (after increment)\n")
+  return true
+
+fn repeat_string(text: str, count: int): str =>
+  var result: str = ""
+  for var j: int = 0; j < count; j++ =>
+    print($"repeat_string: j={j}\n")
+    print($"repeat_string: count={count}\n")
+    result = result + text
+  return result
+
+fn print_types(): void => 
+  var pi_approx: double = 3.14159
+  print($"Pi approx: {pi_approx}\n")
+
+  var ch: char = 'A'
+  print($"Char: {ch}\n")
+
+  var flag: bool = true
+  print($"Flag: {flag}\n")
+
+  var any: str = $"This is a thing {num}\n"
+  print(any)
+
+  any = $"This is a thing {fact}\n"
+  print(any)
+
+  any = $"This is a thing {sum}\n"
+  print(any)
+
+  any = $"This is a thing {pi_approx}\n"
+  print(any)
+
+  any = $"This is a thing {ch}\n"
+  print(any)
+
+  any = $"This is a thing {flag}\n"
+  print(any)

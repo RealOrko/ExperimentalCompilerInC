@@ -1,6 +1,0 @@
-import "testimport"
-
-fn main(): void =>
-  print("=> START \n")
-  recurse(1)
-  print("<= COMPLETE \n")
