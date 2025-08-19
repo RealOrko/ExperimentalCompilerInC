@@ -14,6 +14,38 @@ void token_init(Token *token, TokenType type, const char *start, int length, int
     token->filename = filename;
 }
 
+int token_is_type_keyword(TokenType type)
+{
+    switch (type)
+    {
+    case TOKEN_INT:
+    case TOKEN_LONG:
+    case TOKEN_DOUBLE:
+    case TOKEN_CHAR:
+    case TOKEN_STR:
+    case TOKEN_BOOL:
+    case TOKEN_VOID:
+        return 1;
+    default:
+        return 0;
+    }
+}
+
+TokenType token_get_array_token_type(TokenType base_type)
+{
+    switch (base_type)
+    {
+    case TOKEN_INT: return TOKEN_INT_ARRAY;
+    case TOKEN_LONG: return TOKEN_LONG_ARRAY;
+    case TOKEN_DOUBLE: return TOKEN_DOUBLE_ARRAY;
+    case TOKEN_CHAR: return TOKEN_CHAR_ARRAY;
+    case TOKEN_STR: return TOKEN_STR_ARRAY;
+    case TOKEN_BOOL: return TOKEN_BOOL_ARRAY;
+    case TOKEN_VOID: return TOKEN_VOID_ARRAY;
+    default: return base_type; 
+    }
+}
+
 void token_set_int_literal(Token *token, int64_t value)
 {
     token->literal.int_value = value;

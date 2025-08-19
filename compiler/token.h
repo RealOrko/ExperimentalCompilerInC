@@ -33,6 +33,13 @@ typedef enum
     TOKEN_STR,
     TOKEN_BOOL,
     TOKEN_VOID,
+    TOKEN_INT_ARRAY,
+    TOKEN_LONG_ARRAY,
+    TOKEN_DOUBLE_ARRAY,
+    TOKEN_CHAR_ARRAY,
+    TOKEN_STR_ARRAY,
+    TOKEN_BOOL_ARRAY,
+    TOKEN_VOID_ARRAY,
     TOKEN_PLUS,
     TOKEN_MINUS,
     TOKEN_STAR,
@@ -84,6 +91,8 @@ typedef struct
 } Token;
 
 void token_init(Token *token, TokenType type, const char *start, int length, int line, const char *filename);
+int token_is_type_keyword(TokenType type);
+TokenType token_get_array_token_type(TokenType base_type);
 void token_set_int_literal(Token *token, int64_t value);
 void token_set_double_literal(Token *token, double value);
 void token_set_char_literal(Token *token, char value);

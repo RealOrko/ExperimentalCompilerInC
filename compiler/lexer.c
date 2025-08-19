@@ -254,9 +254,24 @@ Token lexer_scan_identifier(Lexer *lexer)
         lexer_advance(lexer);
     }
     TokenType type = lexer_identifier_type(lexer);
+    TokenType final_type = type;
+    if (token_is_type_keyword(type))
+    {
+        if (lexer_match(lexer, '['))
+        {
+            if (lexer_match(lexer, ']'))
+            {
+                final_type = token_get_array_token_type(type);
+            }
+            else
+            {
+                return lexer_error_token(lexer, "Expected ']' after '[' in array type");
+            }
+        }
+    }
+    Token token = lexer_make_token(lexer, final_type);
     if (type == TOKEN_BOOL_LITERAL)
     {
-        Token token = lexer_make_token(lexer, type);
         if (memcmp(lexer->start, "true", 4) == 0)
         {
             token_set_bool_literal(&token, 1);
@@ -267,7 +282,7 @@ Token lexer_scan_identifier(Lexer *lexer)
         }
         return token;
     }
-    return lexer_make_token(lexer, type);
+    return token;
 }
 
 Token lexer_scan_number(Lexer *lexer)
