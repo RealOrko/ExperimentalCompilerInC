@@ -290,23 +290,36 @@ static void synchronize(Parser *parser)
 
 Type *parser_type(Parser *parser)
 {
-    if (parser_match(parser, TOKEN_INT))
-        return ast_create_primitive_type(parser->arena, TYPE_INT);
-    if (parser_match(parser, TOKEN_LONG))
-        return ast_create_primitive_type(parser->arena, TYPE_LONG);
-    if (parser_match(parser, TOKEN_DOUBLE))
-        return ast_create_primitive_type(parser->arena, TYPE_DOUBLE);
-    if (parser_match(parser, TOKEN_CHAR))
-        return ast_create_primitive_type(parser->arena, TYPE_CHAR);
-    if (parser_match(parser, TOKEN_STR))
-        return ast_create_primitive_type(parser->arena, TYPE_STRING);
-    if (parser_match(parser, TOKEN_BOOL))
-        return ast_create_primitive_type(parser->arena, TYPE_BOOL);
-    if (parser_match(parser, TOKEN_VOID))
-        return ast_create_primitive_type(parser->arena, TYPE_VOID);
+    Type *type = NULL;
 
-    parser_error_at_current(parser, "Expected type");
-    return ast_create_primitive_type(parser->arena, TYPE_NIL);
+    // Parse the base primitive type.
+    if (parser_match(parser, TOKEN_INT)) {
+        type = ast_create_primitive_type(parser->arena, TYPE_INT);
+    } else if (parser_match(parser, TOKEN_LONG)) {
+        type = ast_create_primitive_type(parser->arena, TYPE_LONG);
+    } else if (parser_match(parser, TOKEN_DOUBLE)) {
+        type = ast_create_primitive_type(parser->arena, TYPE_DOUBLE);
+    } else if (parser_match(parser, TOKEN_CHAR)) {
+        type = ast_create_primitive_type(parser->arena, TYPE_CHAR);
+    } else if (parser_match(parser, TOKEN_STR)) {
+        type = ast_create_primitive_type(parser->arena, TYPE_STRING);
+    } else if (parser_match(parser, TOKEN_BOOL)) {
+        type = ast_create_primitive_type(parser->arena, TYPE_BOOL);
+    } else if (parser_match(parser, TOKEN_VOID)) {
+        type = ast_create_primitive_type(parser->arena, TYPE_VOID);
+    } else {
+        parser_error_at_current(parser, "Expected type");
+        // Return a fallback type to allow parsing to continue without crashing.
+        return ast_create_primitive_type(parser->arena, TYPE_NIL);
+    }
+
+    // Handle optional array suffixes (e.g., [] or [][] for multi-dimensional).
+    while (parser_match(parser, TOKEN_LEFT_BRACKET)) {
+        parser_consume(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after '[' in array type");
+        type = ast_create_array_type(parser->arena, type);
+    }
+
+    return type;
 }
 
 Expr *parser_expression(Parser *parser)
