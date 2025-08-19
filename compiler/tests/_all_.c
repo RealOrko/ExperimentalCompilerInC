@@ -2,6 +2,7 @@
 #include "ast_tests.c"
 #include "file_tests.c"
 #include "parser_tests.c"
+#include "token_tests.c"
 
 int main()
 {
@@ -80,6 +81,19 @@ int main()
     test_literal_types_parsing();
     test_recursive_function_parsing();
     test_full_program_parsing();
+
+    // *** Token ***
+
+    test_token_init();
+    test_token_is_type_keyword();
+    test_token_get_array_token_type();
+    test_token_set_int_literal();
+    test_token_set_double_literal();
+    test_token_set_char_literal();
+    test_token_set_string_literal();
+    test_token_set_bool_literal();
+    test_token_type_to_string();
+    test_token_print();
 
     printf("All tests passed!\n");
 

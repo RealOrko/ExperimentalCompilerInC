@@ -35,14 +35,22 @@ TokenType token_get_array_token_type(TokenType base_type)
 {
     switch (base_type)
     {
-    case TOKEN_INT: return TOKEN_INT_ARRAY;
-    case TOKEN_LONG: return TOKEN_LONG_ARRAY;
-    case TOKEN_DOUBLE: return TOKEN_DOUBLE_ARRAY;
-    case TOKEN_CHAR: return TOKEN_CHAR_ARRAY;
-    case TOKEN_STR: return TOKEN_STR_ARRAY;
-    case TOKEN_BOOL: return TOKEN_BOOL_ARRAY;
-    case TOKEN_VOID: return TOKEN_VOID_ARRAY;
-    default: return base_type; 
+    case TOKEN_INT:
+        return TOKEN_INT_ARRAY;
+    case TOKEN_LONG:
+        return TOKEN_LONG_ARRAY;
+    case TOKEN_DOUBLE:
+        return TOKEN_DOUBLE_ARRAY;
+    case TOKEN_CHAR:
+        return TOKEN_CHAR_ARRAY;
+    case TOKEN_STR:
+        return TOKEN_STR_ARRAY;
+    case TOKEN_BOOL:
+        return TOKEN_BOOL_ARRAY;
+    case TOKEN_VOID:
+        return TOKEN_VOID_ARRAY;
+    default:
+        return base_type;
     }
 }
 
@@ -73,12 +81,6 @@ void token_set_bool_literal(Token *token, int value)
 
 const char *token_type_to_string(TokenType type)
 {
-    if (type < 0 || type >= TOKEN_ERROR)
-    {
-        DEBUG_ERROR("Invalid TokenType: %d", type);
-        return "INVALID";
-    }
-
     switch (type)
     {
     case TOKEN_EOF:
@@ -131,6 +133,20 @@ const char *token_type_to_string(TokenType type)
         return "BOOL";
     case TOKEN_VOID:
         return "VOID";
+    case TOKEN_INT_ARRAY:
+        return "INT_ARRAY";
+    case TOKEN_LONG_ARRAY:
+        return "LONG_ARRAY";
+    case TOKEN_DOUBLE_ARRAY:
+        return "DOUBLE_ARRAY";
+    case TOKEN_CHAR_ARRAY:
+        return "CHAR_ARRAY";
+    case TOKEN_STR_ARRAY:
+        return "STR_ARRAY";
+    case TOKEN_BOOL_ARRAY:
+        return "BOOL_ARRAY";
+    case TOKEN_VOID_ARRAY:
+        return "VOID_ARRAY";
     case TOKEN_PLUS:
         return "PLUS";
     case TOKEN_MINUS:
@@ -196,7 +212,7 @@ const char *token_type_to_string(TokenType type)
     case TOKEN_ERROR:
         return "ERROR";
     default:
-        return "UNKNOWN";
+        return "INVALID";
     }
 }
 
@@ -206,34 +222,34 @@ void token_print(Token *token)
     memcpy(text, token->start, token->length);
     text[token->length] = '\0';
 
-    printf("Token { type: %s, lexeme: '%s', line: %d",
-           token_type_to_string(token->type), text, token->line);
+    DEBUG_VERBOSE("Token { type: %s, lexeme: '%s', line: %d",
+                  token_type_to_string(token->type), text, token->line);
 
     switch (token->type)
     {
     case TOKEN_INT_LITERAL:
-        printf(", value: %ld", token->literal.int_value);
+        DEBUG_VERBOSE(", value: %ld", token->literal.int_value);
         break;
     case TOKEN_LONG_LITERAL:
-        printf(", value: %ldl", token->literal.int_value);
+        DEBUG_VERBOSE(", value: %ldl", token->literal.int_value);
         break;
     case TOKEN_DOUBLE_LITERAL:
-        printf(", value: %fd", token->literal.double_value);
+        DEBUG_VERBOSE(", value: %fd", token->literal.double_value);
         break;
     case TOKEN_CHAR_LITERAL:
-        printf(", value: '%c'", token->literal.char_value);
+        DEBUG_VERBOSE(", value: '%c'", token->literal.char_value);
         break;
     case TOKEN_STRING_LITERAL:
     case TOKEN_INTERPOL_STRING:
-        printf(", value: \"%s\"", token->literal.string_value);
+        DEBUG_VERBOSE(", value: \"%s\"", token->literal.string_value);
         break;
     case TOKEN_BOOL_LITERAL:
-        printf(", value: %s", token->literal.bool_value ? "true" : "false");
+        DEBUG_VERBOSE(", value: %s", token->literal.bool_value ? "true" : "false");
         break;
     default:
         break;
     }
 
-    printf(" }\n");
+    DEBUG_VERBOSE(" }\n");
     free(text);
 }
