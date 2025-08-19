@@ -139,6 +139,16 @@ TokenType lexer_identifier_type(Lexer *lexer)
 {
     switch (lexer->start[0])
     {
+    case 'a':
+        if (lexer->current - lexer->start > 1)
+        {
+            switch (lexer->start[1])
+            {
+            case 'n':
+                return lexer_check_keyword(lexer, 2, 1, "d", TOKEN_AND);
+            }
+        }
+        break;
     case 'b':
         if (lexer->current - lexer->start > 1)
         {
@@ -203,6 +213,16 @@ TokenType lexer_identifier_type(Lexer *lexer)
         return lexer_check_keyword(lexer, 1, 3, "ong", TOKEN_LONG);
     case 'n':
         return lexer_check_keyword(lexer, 1, 2, "il", TOKEN_NIL);
+    case 'o':
+        if (lexer->current - lexer->start > 1)
+        {
+            switch (lexer->start[1])
+            {
+            case 'r':
+                return lexer_check_keyword(lexer, 2, 0, "", TOKEN_OR);
+            }
+        }
+        break;
     case 'r':
         return lexer_check_keyword(lexer, 1, 5, "eturn", TOKEN_RETURN);
     case 's':
@@ -593,6 +613,18 @@ Token lexer_scan_token(Lexer *lexer)
     case ')':
         DEBUG_VERBOSE("Line %d: Emitting RIGHT_PAREN", lexer->line);
         return lexer_make_token(lexer, TOKEN_RIGHT_PAREN);
+    case '{':
+        DEBUG_VERBOSE("Line %d: Emitting LEFT_BRACE", lexer->line);
+        return lexer_make_token(lexer, TOKEN_LEFT_BRACE);
+    case '}':
+        DEBUG_VERBOSE("Line %d: Emitting RIGHT_BRACE", lexer->line);
+        return lexer_make_token(lexer, TOKEN_RIGHT_BRACE);
+    case '[':
+        DEBUG_VERBOSE("Line %d: Emitting LEFT_BRACKET", lexer->line);
+        return lexer_make_token(lexer, TOKEN_LEFT_BRACKET);
+    case ']':
+        DEBUG_VERBOSE("Line %d: Emitting RIGHT_BRACKET", lexer->line);
+        return lexer_make_token(lexer, TOKEN_RIGHT_BRACKET);
     case ':':
         DEBUG_VERBOSE("Line %d: Emitting COLON", lexer->line);
         return lexer_make_token(lexer, TOKEN_COLON);
@@ -638,9 +670,20 @@ Token lexer_scan_token(Lexer *lexer)
         }
         DEBUG_VERBOSE("Line %d: Emitting GREATER", lexer->line);
         return lexer_make_token(lexer, TOKEN_GREATER);
+    case '!':
+        if (lexer_match(lexer, '='))
+        {
+            DEBUG_VERBOSE("Line %d: Emitting BANG_EQUAL", lexer->line);
+            return lexer_make_token(lexer, TOKEN_BANG_EQUAL);
+        }
+        DEBUG_VERBOSE("Line %d: Emitting BANG", lexer->line);
+        return lexer_make_token(lexer, TOKEN_BANG);
     case ',':
         DEBUG_VERBOSE("Line %d: Emitting COMMA", lexer->line);
         return lexer_make_token(lexer, TOKEN_COMMA);
+    case '.':
+        DEBUG_VERBOSE("Line %d: Emitting DOT", lexer->line);
+        return lexer_make_token(lexer, TOKEN_DOT);
     case ';':
         DEBUG_VERBOSE("Line %d: Emitting SEMICOLON", lexer->line);
         return lexer_make_token(lexer, TOKEN_SEMICOLON);
