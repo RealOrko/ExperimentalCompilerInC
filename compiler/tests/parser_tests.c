@@ -324,11 +324,11 @@ void test_literal_types_parsing()
                 {
                     if (stmt5->as.var_decl.initializer->type == EXPR_LITERAL)
                     {
-                        printf("Literal type: %s\n", ast_type_to_string(&arena, stmt5->as.var_decl.initializer->as.literal.type));
-                        printf("Bool value: %d\n", stmt5->as.var_decl.initializer->as.literal.value.bool_value);
+                        DEBUG_VERBOSE("Literal type: %s\n", ast_type_to_string(&arena, stmt5->as.var_decl.initializer->as.literal.type));
+                        DEBUG_VERBOSE("Bool value: %d\n", stmt5->as.var_decl.initializer->as.literal.value.bool_value);
                         if (stmt5->as.var_decl.initializer->token)
                         {
-                            printf("Lexeme: %.*s\n", stmt5->as.var_decl.initializer->token->length, stmt5->as.var_decl.initializer->token->start);
+                            DEBUG_VERBOSE("Lexeme: %.*s\n", stmt5->as.var_decl.initializer->token->length, stmt5->as.var_decl.initializer->token->start);
                         }
                     }
                 }
