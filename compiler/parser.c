@@ -288,35 +288,49 @@ static void synchronize(Parser *parser)
     }
 }
 
-Type *parser_type(Parser *parser)
-{
-    Type *type = NULL;
-
-    // Parse the base primitive type.
-    if (parser_match(parser, TOKEN_INT)) {
-        type = ast_create_primitive_type(parser->arena, TYPE_INT);
-    } else if (parser_match(parser, TOKEN_LONG)) {
-        type = ast_create_primitive_type(parser->arena, TYPE_LONG);
-    } else if (parser_match(parser, TOKEN_DOUBLE)) {
-        type = ast_create_primitive_type(parser->arena, TYPE_DOUBLE);
-    } else if (parser_match(parser, TOKEN_CHAR)) {
-        type = ast_create_primitive_type(parser->arena, TYPE_CHAR);
-    } else if (parser_match(parser, TOKEN_STR)) {
-        type = ast_create_primitive_type(parser->arena, TYPE_STRING);
-    } else if (parser_match(parser, TOKEN_BOOL)) {
-        type = ast_create_primitive_type(parser->arena, TYPE_BOOL);
-    } else if (parser_match(parser, TOKEN_VOID)) {
-        type = ast_create_primitive_type(parser->arena, TYPE_VOID);
-    } else {
-        parser_error_at_current(parser, "Expected type");
-        // Return a fallback type to allow parsing to continue without crashing.
-        return ast_create_primitive_type(parser->arena, TYPE_NIL);
+Type *parser_type(Parser *parser) {
+    if (parser_is_at_end(parser)) {
+        parser_error(parser, "Unexpected end of input while parsing type");
+        return NULL;
     }
 
-    // Handle optional array suffixes (e.g., [] or [][] for multi-dimensional).
-    while (parser_match(parser, TOKEN_LEFT_BRACKET)) {
-        parser_consume(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after '[' in array type");
+    Token token = parser->current;
+    TokenType tt = token.type;
+    parser_advance(parser);
+
+    TypeKind base_kind;
+    bool is_array = false;
+
+    if (tt >= TOKEN_INT_ARRAY && tt <= TOKEN_VOID_ARRAY) {
+        is_array = true;
+        tt = tt - (TOKEN_INT_ARRAY - TOKEN_INT);  // Map back to base primitive token
+    }
+
+    switch (tt) {
+        case TOKEN_INT: base_kind = TYPE_INT; break;
+        case TOKEN_LONG: base_kind = TYPE_LONG; break;
+        case TOKEN_DOUBLE: base_kind = TYPE_DOUBLE; break;
+        case TOKEN_CHAR: base_kind = TYPE_CHAR; break;
+        case TOKEN_STR: base_kind = TYPE_STRING; break;
+        case TOKEN_BOOL: base_kind = TYPE_BOOL; break;
+        case TOKEN_VOID: base_kind = TYPE_VOID; break;
+        default:
+            parser_error_at(parser, &token, "Expected type");
+            return NULL;
+    }
+
+    Type *type = ast_create_primitive_type(parser->arena, base_kind);
+    if (type == NULL) {
+        parser_error_at(parser, &token, "Failed to create primitive type (out of memory?)");
+        return NULL;
+    }
+
+    if (is_array) {
         type = ast_create_array_type(parser->arena, type);
+        if (type == NULL) {
+            parser_error_at(parser, &token, "Failed to create array type (out of memory?)");
+            return NULL;
+        }
     }
 
     return type;

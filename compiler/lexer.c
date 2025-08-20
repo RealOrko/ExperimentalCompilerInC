@@ -247,41 +247,29 @@ TokenType lexer_identifier_type(Lexer *lexer)
     return TOKEN_IDENTIFIER;
 }
 
-Token lexer_scan_identifier(Lexer *lexer)
-{
-    while (isalnum(lexer_peek(lexer)) || lexer_peek(lexer) == '_')
-    {
+Token lexer_scan_identifier(Lexer *lexer) {
+    while (isalnum(lexer_peek(lexer)) || lexer_peek(lexer) == '_') {
         lexer_advance(lexer);
     }
+
     TokenType type = lexer_identifier_type(lexer);
-    TokenType final_type = type;
-    if (token_is_type_keyword(type))
-    {
-        if (lexer_match(lexer, '['))
-        {
-            if (lexer_match(lexer, ']'))
-            {
-                final_type = token_get_array_token_type(type);
-            }
-            else
-            {
-                return lexer_error_token(lexer, "Expected ']' after '[' in array type");
-            }
-        }
-    }
-    Token token = lexer_make_token(lexer, final_type);
-    if (type == TOKEN_BOOL_LITERAL)
-    {
-        if (memcmp(lexer->start, "true", 4) == 0)
-        {
+
+    Token token = lexer_make_token(lexer, type);
+
+    if (type == TOKEN_BOOL_LITERAL) {
+        size_t len = (size_t)(lexer->current - lexer->start);
+        if (len == 4 && memcmp(lexer->start, "true", 4) == 0) {
             token_set_bool_literal(&token, 1);
-        }
-        else
-        {
+        } else if (len == 5 && memcmp(lexer->start, "false", 5) == 0) {
             token_set_bool_literal(&token, 0);
+        } else {
+            // This should not occur if keyword checks are correct, but for robustness
+            DEBUG_ERROR("Invalid boolean literal lexeme");
+            token.type = TOKEN_ERROR;
         }
-        return token;
     }
+
+    DEBUG_VERBOSE("Line %d: Emitting identifier token type %d", lexer->line, token.type);
     return token;
 }
 
