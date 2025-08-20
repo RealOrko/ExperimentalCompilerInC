@@ -10,8 +10,7 @@
 
 void test_arena_init()
 {
-    DEBUG_INFO("Starting test_arena_init");
-    printf("Testing arena_init...\n");
+    DEBUG_INFO("*** Testing arena_init...\n");
     Arena arena;
     size_t initial_size = 16;
     DEBUG_VERBOSE("Initializing arena with size: %zu", initial_size);
@@ -37,8 +36,7 @@ void test_arena_init()
 
 void test_arena_alloc_small()
 {
-    DEBUG_INFO("Starting test_arena_alloc_small");
-    printf("Testing arena_alloc small allocations...\n");
+    DEBUG_INFO("*** Testing arena_alloc small allocations...\n");
     Arena arena;
     DEBUG_VERBOSE("Initializing arena with size 16");
     arena_init(&arena, 16);
@@ -81,8 +79,7 @@ void test_arena_alloc_small()
 
 void test_arena_alloc_large()
 {
-    DEBUG_INFO("Starting test_arena_alloc_large");
-    printf("Testing arena_alloc large allocations...\n");
+    DEBUG_INFO("*** Testing arena_alloc large allocations...\n");
     Arena arena;
     DEBUG_VERBOSE("Initializing arena with size 16");
     arena_init(&arena, 16);
@@ -144,8 +141,7 @@ void test_arena_alloc_large()
 
 void test_arena_alloc_larger_than_double()
 {
-    DEBUG_INFO("Starting test_arena_alloc_larger_than_double");
-    printf("Testing arena_alloc larger than double...\n");
+    DEBUG_INFO("*** Testing arena_alloc larger than double...\n");
     Arena arena;
     DEBUG_VERBOSE("Initializing arena with size 16");
     arena_init(&arena, 16);
@@ -172,8 +168,7 @@ void test_arena_alloc_larger_than_double()
 
 void test_arena_alloc_zero()
 {
-    DEBUG_INFO("Starting test_arena_alloc_zero");
-    printf("Testing arena_alloc zero size...\n");
+    DEBUG_INFO("*** Testing arena_alloc zero size...\n");
     Arena arena;
     DEBUG_VERBOSE("Initializing arena with size 16");
     arena_init(&arena, 16);
@@ -209,8 +204,7 @@ void test_arena_alloc_zero()
 
 void test_arena_strdup()
 {
-    DEBUG_INFO("Starting test_arena_strdup");
-    printf("Testing arena_strdup...\n");
+    DEBUG_INFO("*** Testing arena_strdup...\n");
     Arena arena;
     DEBUG_VERBOSE("Initializing arena with size 16");
     arena_init(&arena, 16);
@@ -254,8 +248,7 @@ void test_arena_strdup()
 
 void test_arena_strndup()
 {
-    DEBUG_INFO("Starting test_arena_strndup");
-    printf("Testing arena_strndup...\n");
+    DEBUG_INFO("*** Testing arena_strndup...\n");
     Arena arena;
     DEBUG_VERBOSE("Initializing arena with size 16");
     arena_init(&arena, 16);
@@ -307,8 +300,7 @@ void test_arena_strndup()
 
 void test_arena_free()
 {
-    DEBUG_INFO("Starting test_arena_free");
-    printf("Testing arena_free...\n");
+    DEBUG_INFO("*** Testing arena_free...\n");
     Arena arena;
     DEBUG_VERBOSE("Initializing arena with size 16");
     arena_init(&arena, 16);

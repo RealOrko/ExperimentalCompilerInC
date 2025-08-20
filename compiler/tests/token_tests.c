@@ -31,7 +31,7 @@ static Token create_test_token(Arena *arena, TokenType type, const char *lexeme,
 
 void test_token_init()
 {
-    printf("Testing token_init...\n");
+    DEBUG_INFO("*** Testing token_init...\n");
     Arena arena;
     setup_tokens(&arena);
 
@@ -91,7 +91,7 @@ void test_token_init()
 
 void test_token_is_type_keyword()
 {
-    printf("Testing token_is_type_keyword...\n");
+    DEBUG_INFO("*** Testing token_is_type_keyword...\n");
 
     // Positive cases
     assert(token_is_type_keyword(TOKEN_INT) == 1);
@@ -117,7 +117,7 @@ void test_token_is_type_keyword()
 
 void test_token_get_array_token_type()
 {
-    printf("Testing token_get_array_token_type...\n");
+    DEBUG_INFO("*** Testing token_get_array_token_type...\n");
 
     // Mapping cases
     assert(token_get_array_token_type(TOKEN_INT) == TOKEN_INT_ARRAY);
@@ -144,7 +144,7 @@ void test_token_get_array_token_type()
 
 void test_token_set_int_literal()
 {
-    printf("Testing token_set_int_literal...\n");
+    DEBUG_INFO("*** Testing token_set_int_literal...\n");
     Arena arena;
     setup_tokens(&arena);
 
@@ -171,7 +171,7 @@ void test_token_set_int_literal()
 
 void test_token_set_double_literal()
 {
-    printf("Testing token_set_double_literal...\n");
+    DEBUG_INFO("*** Testing token_set_double_literal...\n");
     Arena arena;
     setup_tokens(&arena);
 
@@ -204,7 +204,7 @@ void test_token_set_double_literal()
 
 void test_token_set_char_literal()
 {
-    printf("Testing token_set_char_literal...\n");
+    DEBUG_INFO("*** Testing token_set_char_literal...\n");
     Arena arena;
     setup_tokens(&arena);
 
@@ -233,7 +233,7 @@ void test_token_set_char_literal()
 
 void test_token_set_string_literal()
 {
-    printf("Testing token_set_string_literal...\n");
+    DEBUG_INFO("*** Testing token_set_string_literal...\n");
     Arena arena;
     setup_tokens(&arena);
 
@@ -262,7 +262,7 @@ void test_token_set_string_literal()
 
 void test_token_set_bool_literal()
 {
-    printf("Testing token_set_bool_literal...\n");
+    DEBUG_INFO("*** Testing token_set_bool_literal...\n");
     Arena arena;
     setup_tokens(&arena);
 
@@ -285,7 +285,7 @@ void test_token_set_bool_literal()
 
 void test_token_type_to_string()
 {
-    printf("Testing token_type_to_string...\n");
+    DEBUG_INFO("*** Testing token_type_to_string...\n");
 
     // Sample some
     assert(strcmp(token_type_to_string(TOKEN_EOF), "EOF") == 0);
@@ -370,7 +370,7 @@ void test_token_type_to_string()
 
 void test_token_print()
 {
-    printf("Testing token_print (no crash, manual output check)...\n");
+    DEBUG_INFO("*** Testing token_print (no crash, manual output check)...\n");
     Arena arena;
     setup_tokens(&arena);
 

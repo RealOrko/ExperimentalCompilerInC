@@ -34,8 +34,7 @@ void remove_test_file(const char *path)
 
 void test_file_read_null_arena()
 {
-    DEBUG_INFO("Starting test_file_read_null_arena");
-    printf("Testing file_read with NULL arena...\n");
+    DEBUG_INFO("*** Testing file_read with NULL arena...\n");
 
     char *result = file_read(NULL, "some_path");
     assert(result == NULL);
@@ -45,8 +44,7 @@ void test_file_read_null_arena()
 
 void test_file_read_null_path()
 {
-    DEBUG_INFO("Starting test_file_read_null_path");
-    printf("Testing file_read with NULL path...\n");
+    DEBUG_INFO("*** Testing file_read with NULL path...\n");
 
     Arena arena;
     arena_init(&arena, 1024);
@@ -59,8 +57,7 @@ void test_file_read_null_path()
 
 void test_file_read_nonexistent_file()
 {
-    DEBUG_INFO("Starting test_file_read_nonexistent_file");
-    printf("Testing file_read with nonexistent file...\n");
+    DEBUG_INFO("*** Testing file_read with nonexistent file...\n");
 
     Arena arena;
     arena_init(&arena, 1024);
@@ -73,8 +70,7 @@ void test_file_read_nonexistent_file()
 
 void test_file_read_empty_file()
 {
-    DEBUG_INFO("Starting test_file_read_empty_file");
-    printf("Testing file_read with empty file...\n");
+    DEBUG_INFO("*** Testing file_read with empty file...\n");
 
     // Create empty file
     create_test_file(empty_file_path, NULL);
@@ -94,8 +90,7 @@ void test_file_read_empty_file()
 
 void test_file_read_small_file()
 {
-    DEBUG_INFO("Starting test_file_read_small_file");
-    printf("Testing file_read with small file...\n");
+    DEBUG_INFO("*** Testing file_read with small file...\n");
 
     const char *content = "Hello, world!\n";
     create_test_file(test_file_path, content);
@@ -114,8 +109,7 @@ void test_file_read_small_file()
 
 void test_file_read_large_file()
 {
-    DEBUG_INFO("Starting test_file_read_large_file");
-    printf("Testing file_read with large file...\n");
+    DEBUG_INFO("*** Testing file_read with large file...\n");
 
     // Create a large file (~1MB)
     const size_t large_size = 1024 * 1024;
@@ -149,8 +143,7 @@ void test_file_read_large_file()
 
 void test_file_read_seek_failure()
 {
-    DEBUG_INFO("Starting test_file_read_seek_failure");
-    printf("Testing file_read with simulated seek failure (manual check required)...\n");
+    DEBUG_INFO("*** Testing file_read with simulated seek failure (manual check required)...\n");
 
     // This is hard to simulate without mocking or special files.
     // For comprehensive testing, we can note that in real scenarios like pipes or special files,
@@ -176,8 +169,7 @@ void test_file_read_seek_failure()
 
 void test_file_read_read_failure()
 {
-    DEBUG_INFO("Starting test_file_read_read_failure");
-    printf("Testing file_read with read failure (hard to simulate)...\n");
+    DEBUG_INFO("*** Testing file_read with read failure (hard to simulate)...\n");
 
     // Hard to simulate partial read without mocking.
     // Create a file and read it successfully as placeholder.
@@ -202,8 +194,7 @@ void test_file_read_read_failure()
 
 void test_file_read_special_characters()
 {
-    DEBUG_INFO("Starting test_file_read_special_characters");
-    printf("Testing file_read with special characters...\n");
+    DEBUG_INFO("*** Testing file_read with special characters...\n");
 
     const char special_data[] = {'A', '\0', 'B', '\n', '\t', '\r', '\\', '"', '\b', 0}; // Extra null for string, but fwrite len-1
     size_t data_len = sizeof(special_data) - 1;                                         // Without trailing null

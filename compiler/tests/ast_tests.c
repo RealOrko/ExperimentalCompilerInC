@@ -46,7 +46,7 @@ static Token create_dummy_token(Arena *arena, const char *str)
 // Test Type functions
 void test_ast_create_primitive_type()
 {
-    printf("Testing ast_create_primitive_type...\n");
+    DEBUG_INFO("*** Testing ast_create_primitive_type...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -92,7 +92,7 @@ void test_ast_create_primitive_type()
 
 void test_ast_create_array_type()
 {
-    printf("Testing ast_create_array_type...\n");
+    DEBUG_INFO("*** Testing ast_create_array_type...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -120,7 +120,7 @@ void test_ast_create_array_type()
 
 void test_ast_create_function_type()
 {
-    printf("Testing ast_create_function_type...\n");
+    DEBUG_INFO("*** Testing ast_create_function_type...\n");
     Arena arena;
     setup_arena(&arena);
     Type *ret = ast_create_primitive_type(&arena, TYPE_VOID);
@@ -158,7 +158,7 @@ void test_ast_create_function_type()
 
 void test_ast_clone_type()
 {
-    printf("Testing ast_clone_type...\n");
+    DEBUG_INFO("*** Testing ast_clone_type...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -213,7 +213,7 @@ void test_ast_clone_type()
 
 void test_ast_type_equals()
 {
-    printf("Testing ast_type_equals...\n");
+    DEBUG_INFO("*** Testing ast_type_equals...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -280,7 +280,7 @@ void test_ast_type_equals()
 
 void test_ast_type_to_string()
 {
-    printf("Testing ast_type_to_string...\n");
+    DEBUG_INFO("*** Testing ast_type_to_string...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -338,7 +338,7 @@ void test_ast_type_to_string()
 // Test Expr creation
 void test_ast_create_binary_expr()
 {
-    printf("Testing ast_create_binary_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_binary_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -377,7 +377,7 @@ void test_ast_create_binary_expr()
 
 void test_ast_create_unary_expr()
 {
-    printf("Testing ast_create_unary_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_unary_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -408,7 +408,7 @@ void test_ast_create_unary_expr()
 
 void test_ast_create_literal_expr()
 {
-    printf("Testing ast_create_literal_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_literal_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -469,7 +469,7 @@ void test_ast_create_literal_expr()
 
 void test_ast_create_variable_expr()
 {
-    printf("Testing ast_create_variable_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_variable_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -498,7 +498,7 @@ void test_ast_create_variable_expr()
 
 void test_ast_create_assign_expr()
 {
-    printf("Testing ast_create_assign_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_assign_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -532,7 +532,7 @@ void test_ast_create_assign_expr()
 
 void test_ast_create_call_expr()
 {
-    printf("Testing ast_create_call_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_call_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -576,7 +576,7 @@ void test_ast_create_call_expr()
 
 void test_ast_create_array_expr()
 {
-    printf("Testing ast_create_array_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_array_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -618,7 +618,7 @@ void test_ast_create_array_expr()
 
 void test_ast_create_array_access_expr()
 {
-    printf("Testing ast_create_array_access_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_array_access_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -649,7 +649,7 @@ void test_ast_create_array_access_expr()
 
 void test_ast_create_increment_expr()
 {
-    printf("Testing ast_create_increment_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_increment_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -676,7 +676,7 @@ void test_ast_create_increment_expr()
 
 void test_ast_create_decrement_expr()
 {
-    printf("Testing ast_create_decrement_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_decrement_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -703,7 +703,7 @@ void test_ast_create_decrement_expr()
 
 void test_ast_create_interpolated_expr()
 {
-    printf("Testing ast_create_interpolated_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_interpolated_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -743,7 +743,7 @@ void test_ast_create_interpolated_expr()
 
 void test_ast_create_comparison_expr()
 {
-    printf("Testing ast_create_comparison_expr...\n");
+    DEBUG_INFO("*** Testing ast_create_comparison_expr...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -772,7 +772,7 @@ void test_ast_create_comparison_expr()
 // Test Stmt creation
 void test_ast_create_expr_stmt()
 {
-    printf("Testing ast_create_expr_stmt...\n");
+    DEBUG_INFO("*** Testing ast_create_expr_stmt...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -798,7 +798,7 @@ void test_ast_create_expr_stmt()
 
 void test_ast_create_var_decl_stmt()
 {
-    printf("Testing ast_create_var_decl_stmt...\n");
+    DEBUG_INFO("*** Testing ast_create_var_decl_stmt...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -838,7 +838,7 @@ void test_ast_create_var_decl_stmt()
 
 void test_ast_create_function_stmt()
 {
-    printf("Testing ast_create_function_stmt...\n");
+    DEBUG_INFO("*** Testing ast_create_function_stmt...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -897,7 +897,7 @@ void test_ast_create_function_stmt()
 
 void test_ast_create_return_stmt()
 {
-    printf("Testing ast_create_return_stmt...\n");
+    DEBUG_INFO("*** Testing ast_create_return_stmt...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -932,7 +932,7 @@ void test_ast_create_return_stmt()
 
 void test_ast_create_block_stmt()
 {
-    printf("Testing ast_create_block_stmt...\n");
+    DEBUG_INFO("*** Testing ast_create_block_stmt...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -971,7 +971,7 @@ void test_ast_create_block_stmt()
 
 void test_ast_create_if_stmt()
 {
-    printf("Testing ast_create_if_stmt...\n");
+    DEBUG_INFO("*** Testing ast_create_if_stmt...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -1008,7 +1008,7 @@ void test_ast_create_if_stmt()
 
 void test_ast_create_while_stmt()
 {
-    printf("Testing ast_create_while_stmt...\n");
+    DEBUG_INFO("*** Testing ast_create_while_stmt...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -1038,7 +1038,7 @@ void test_ast_create_while_stmt()
 
 void test_ast_create_for_stmt()
 {
-    printf("Testing ast_create_for_stmt...\n");
+    DEBUG_INFO("*** Testing ast_create_for_stmt...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -1077,7 +1077,7 @@ void test_ast_create_for_stmt()
 
 void test_ast_create_import_stmt()
 {
-    printf("Testing ast_create_import_stmt...\n");
+    DEBUG_INFO("*** Testing ast_create_import_stmt...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -1107,7 +1107,7 @@ void test_ast_create_import_stmt()
 // Test Module
 void test_ast_init_module()
 {
-    printf("Testing ast_init_module...\n");
+    DEBUG_INFO("*** Testing ast_init_module...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -1131,7 +1131,7 @@ void test_ast_init_module()
 
 void test_ast_module_add_statement()
 {
-    printf("Testing ast_module_add_statement...\n");
+    DEBUG_INFO("*** Testing ast_module_add_statement...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -1167,7 +1167,7 @@ void test_ast_module_add_statement()
 // Test cloning token
 void test_ast_clone_token()
 {
-    printf("Testing ast_clone_token...\n");
+    DEBUG_INFO("*** Testing ast_clone_token...\n");
     Arena arena;
     setup_arena(&arena);
 
@@ -1203,7 +1203,7 @@ void test_ast_clone_token()
 // Printing functions: Test no crash, perhaps capture output if needed, but for now, just call
 void test_ast_print()
 {
-    printf("Testing ast_print_stmt and ast_print_expr (no crash)...\n");
+    DEBUG_INFO("*** Testing ast_print_stmt and ast_print_expr (no crash)...\n");
     Arena arena;
     setup_arena(&arena);
 

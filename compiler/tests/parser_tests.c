@@ -28,7 +28,7 @@ static void cleanup_parser(Arena *arena, Lexer *lexer, Parser *parser, SymbolTab
 
 void test_empty_program_parsing()
 {
-    printf("Testing parser_execute empty program...\n");
+    DEBUG_INFO("*** Testing parser_execute empty program...\n");
 
     Arena arena;
     Lexer lexer;
@@ -50,7 +50,7 @@ void test_empty_program_parsing()
 
 void test_var_decl_parsing()
 {
-    printf("Testing parser_execute variable declaration...\n");
+    DEBUG_INFO("*** Testing parser_execute variable declaration...\n");
 
     Arena arena;
     Lexer lexer;
@@ -78,7 +78,7 @@ void test_var_decl_parsing()
 
 void test_function_no_params_parsing()
 {
-    printf("Testing parser_execute function no params...\n");
+    DEBUG_INFO("*** Testing parser_execute function no params...\n");
 
     Arena arena;
     Lexer lexer;
@@ -115,7 +115,7 @@ void test_function_no_params_parsing()
 
 void test_if_statement_parsing()
 {
-    printf("Testing parser_execute if statement...\n");
+    DEBUG_INFO("*** Testing parser_execute if statement...\n");
 
     Arena arena;
     Lexer lexer;
@@ -178,7 +178,7 @@ void test_if_statement_parsing()
 
 void test_while_loop_parsing()
 {
-    printf("Testing parser_execute while loop...\n");
+    DEBUG_INFO("*** Testing parser_execute while loop...\n");
 
     Arena arena;
     Lexer lexer;
@@ -217,7 +217,7 @@ void test_while_loop_parsing()
 
 void test_for_loop_parsing()
 {
-    printf("Testing parser_execute for loop...\n");
+    DEBUG_INFO("*** Testing parser_execute for loop...\n");
 
     Arena arena;
     Lexer lexer;
@@ -253,7 +253,7 @@ void test_for_loop_parsing()
 
 void test_interpolated_string_parsing()
 {
-    printf("Testing parser_execute interpolated string...\n");
+    DEBUG_INFO("*** Testing parser_execute interpolated string...\n");
 
     Arena arena;
     Lexer lexer;
@@ -295,7 +295,7 @@ void test_interpolated_string_parsing()
 
 void test_literal_types_parsing()
 {
-    printf("Testing parser_execute various literals...\n");
+    DEBUG_INFO("*** Testing parser_execute various literals...\n");
 
     Arena arena;
     Lexer lexer;
@@ -373,7 +373,7 @@ void test_literal_types_parsing()
 
 void test_recursive_function_parsing()
 {
-    printf("Testing parser_execute recursive function...\n");
+    DEBUG_INFO("*** Testing parser_execute recursive function...\n");
 
     Arena arena;
     Lexer lexer;
@@ -418,7 +418,7 @@ void test_recursive_function_parsing()
 
 void test_full_program_parsing()
 {
-    printf("Testing parser_execute full program...\n");
+    DEBUG_INFO("*** Testing parser_execute full program...\n");
     Arena arena;
     Lexer lexer;
     Parser parser;
@@ -544,7 +544,7 @@ void test_full_program_parsing()
 void test_simple_program_parsing()
 {
     // Existing test, kept as is
-    printf("Testing parser_execute simple program...\n");
+    DEBUG_INFO("*** Testing parser_execute simple program...\n");
 
     Arena arena;
     arena_init(&arena, 4096);
