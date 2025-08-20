@@ -34,4 +34,4 @@ BEGIN {
         print $0
     }
 }
-' scripts/prompt.template > log/prompt.txt
+' scripts/prompt-all.template > log/prompt.txt
