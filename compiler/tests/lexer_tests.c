@@ -303,7 +303,7 @@ void test_lexer_indentation() {
 
     token = lexer_scan_token(&lexer);
     assert(token.type == TOKEN_IDENTIFIER);
-    //assert(strcmp(token.lexeme, "test") == 0);
+    assert(strcmp(token.start, "test") == 0);
 
     token = lexer_scan_token(&lexer);
     assert(token.type == TOKEN_LEFT_PAREN);
@@ -378,7 +378,7 @@ void test_lexer_unterminated_string() {
 
     Token token = lexer_scan_token(&lexer);
     assert(token.type == TOKEN_ERROR);
-    //assert(strcmp(token.lexeme, "Unterminated string") == 0);
+    assert(strcmp(token.start, "Unterminated string") == 0);
 
     lexer_cleanup(&lexer);
     arena_free(&arena);
@@ -397,7 +397,7 @@ void test_lexer_invalid_escape() {
 
     Token token = lexer_scan_token(&lexer);
     assert(token.type == TOKEN_ERROR);
-    //assert(strcmp(token.lexeme, "Invalid escape sequence") == 0);
+    assert(strcmp(token.start, "Invalid escape sequence") == 0);
 
     lexer_cleanup(&lexer);
     arena_free(&arena);
@@ -419,7 +419,7 @@ void test_lexer_comments() {
 
     token = lexer_scan_token(&lexer);
     assert(token.type == TOKEN_IDENTIFIER);
-    //assert(strcmp(token.lexeme, "x") == 0);
+    assert(strcmp(token.start, "x") == 0);
 
     token = lexer_scan_token(&lexer);
     assert(token.type == TOKEN_NEWLINE);
@@ -429,7 +429,7 @@ void test_lexer_comments() {
 
     token = lexer_scan_token(&lexer);
     assert(token.type == TOKEN_IDENTIFIER);
-    //assert(strcmp(token.lexeme, "y") == 0);
+    assert(strcmp(token.start, "y") == 0);
 
     token = lexer_scan_token(&lexer);
     assert(token.type == TOKEN_EOF);
