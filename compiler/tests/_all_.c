@@ -3,13 +3,14 @@
 #include "file_tests.c"
 #include "parser_tests.c"
 #include "token_tests.c"
+#include "lexer_tests.c"
 
 int main()
 {
 
     // *** Debugging ***
     printf("Running tests with debug level: %d\n", DEBUG_LEVEL_VERBOSE);
-    init_debug(DEBUG_LEVEL_ERROR);
+    init_debug(DEBUG_LEVEL_VERBOSE);
 
     // *** Arena ***
 
@@ -73,7 +74,7 @@ int main()
     test_empty_program_parsing();
     test_var_decl_parsing();
     test_function_no_params_parsing();
-    test_if_statement_parsing(); // NOT sure about this one, needs more debugging
+    test_if_statement_parsing();
     test_simple_program_parsing();
     test_while_loop_parsing();
     test_for_loop_parsing();
@@ -94,6 +95,27 @@ int main()
     test_token_set_bool_literal();
     test_token_type_to_string();
     test_token_print();
+
+    // *** Lexer ***
+
+    test_lexer_init();
+    test_lexer_simple_identifier();
+    test_lexer_keywords();
+    test_lexer_bool_literals();
+    test_lexer_number_literals();
+    test_lexer_string_literal();
+    test_lexer_interpol_string();
+    test_lexer_char_literal();
+    test_lexer_operators();
+    test_lexer_indentation();
+    test_lexer_inconsistent_indent();
+    test_lexer_unterminated_string();
+    test_lexer_invalid_escape();
+    test_lexer_comments();
+    test_lexer_empty_line_ignore();
+    test_lexer_dedent_at_eof();
+    test_lexer_invalid_character();
+    test_lexer_multiline_string();
 
     printf("All tests passed!\n");
 

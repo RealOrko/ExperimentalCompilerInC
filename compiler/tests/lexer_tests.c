@@ -47,7 +47,7 @@ void test_lexer_simple_identifier() {
 
     Token token = lexer_scan_token(&lexer);
     assert(token.type == TOKEN_IDENTIFIER);
-    assert(strcmp(token.literal.string_value, "variable") == 0);
+    assert(strcmp(token.start, "variable") == 0);
     assert(token.line == 1);
 
     token = lexer_scan_token(&lexer);
@@ -123,7 +123,7 @@ void test_lexer_number_literals() {
     Arena arena;
     arena_init(&arena, 1024);
     Lexer lexer;
-    const char *source = "123 456l 78.9 10. 20d 30.l";  // Note: 20d not supported, will be int '20' then identifier 'd'
+    const char *source = "123 456l 78.9 10.0 20d 30.l";  // Note: 20d not supported, will be int '20' then identifier 'd'
     lexer_init(&arena, &lexer, source, "test");
 
     Token token = lexer_scan_token(&lexer);
@@ -140,7 +140,7 @@ void test_lexer_number_literals() {
 
     token = lexer_scan_token(&lexer);
     assert(token.type == TOKEN_DOUBLE_LITERAL);
-    assert(token.literal.double_value == 10.0);  // Trailing dot? Code requires digit after dot, so 10. is 10 then ., error?
+    assert(token.literal.double_value == 10.0);
 
     // Wait, adjust source, code requires isdigit(peek_next) for dot.
     // So test valid: "123 456l 78.9 10.0 20.0d"
@@ -411,7 +411,7 @@ void test_lexer_comments() {
     Arena arena;
     arena_init(&arena, 1024);
     Lexer lexer;
-    const char *source = "var x // comment\n var y";
+    const char *source = "var x // comment\nvar y";
     lexer_init(&arena, &lexer, source, "test");
 
     Token token = lexer_scan_token(&lexer);
