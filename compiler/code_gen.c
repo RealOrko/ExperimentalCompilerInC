@@ -148,28 +148,6 @@ static const char *get_rt_to_string_func(TypeKind kind)
     return NULL;
 }
 
-static const char *get_rt_print_func(TypeKind kind)
-{
-    DEBUG_VERBOSE("Entering get_rt_print_func");
-    switch (kind)
-    {
-    case TYPE_INT:
-    case TYPE_LONG:
-        return "rt_print_long";
-    case TYPE_DOUBLE:
-        return "rt_print_double";
-    case TYPE_CHAR:
-        return "rt_print_char";
-    case TYPE_STRING:
-        return "rt_print_string";
-    case TYPE_BOOL:
-        return "rt_print_bool";
-    default:
-        exit(1);
-    }
-    return NULL;
-}
-
 static const char *get_default_value(Type *type)
 {
     DEBUG_VERBOSE("Entering get_default_value");

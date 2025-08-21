@@ -366,59 +366,31 @@ static void synchronize(Parser *parser)
 
 Type *parser_type(Parser *parser) {
     DEBUG_VERBOSE("Entering parser_type");
-    if (parser_is_at_end(parser)) {
-        parser_error(parser, "Unexpected end of input while parsing type");
-        DEBUG_VERBOSE("Error: Unexpected end of input");
-        return NULL;
-    }
-
-    Token token = parser->current;
-    TokenType tt = token.type;
-    parser_advance(parser);
-    DEBUG_VERBOSE("Advanced past type token: type=%d", tt);
-
-    TypeKind base_kind;
-    bool is_array = false;
-
-    if (tt >= TOKEN_INT_ARRAY && tt <= TOKEN_VOID_ARRAY) {
-        is_array = true;
-        tt = tt - (TOKEN_INT_ARRAY - TOKEN_INT);
-        DEBUG_VERBOSE("Detected array type, base type=%d", tt);
-    }
-
+    Type *type = NULL;
+    TokenType tt = parser->current.type;
+    TypeKind kind;
     switch (tt) {
-        case TOKEN_INT: base_kind = TYPE_INT; break;
-        case TOKEN_LONG: base_kind = TYPE_LONG; break;
-        case TOKEN_DOUBLE: base_kind = TYPE_DOUBLE; break;
-        case TOKEN_CHAR: base_kind = TYPE_CHAR; break;
-        case TOKEN_STR: base_kind = TYPE_STRING; break;
-        case TOKEN_BOOL: base_kind = TYPE_BOOL; break;
-        case TOKEN_VOID: base_kind = TYPE_VOID; break;
-        default:
-            parser_error_at(parser, &token, "Expected type");
-            DEBUG_VERBOSE("Error: Expected type, got %d", tt);
-            return NULL;
-    }
-
-    Type *type = ast_create_primitive_type(parser->arena, base_kind);
-    if (type == NULL) {
-        parser_error_at(parser, &token, "Failed to create primitive type (out of memory?)");
-        DEBUG_VERBOSE("Error: Failed to create primitive type");
+    case TOKEN_INT: kind = TYPE_INT; break;
+    case TOKEN_LONG: kind = TYPE_LONG; break;
+    case TOKEN_DOUBLE: kind = TYPE_DOUBLE; break;
+    case TOKEN_CHAR: kind = TYPE_CHAR; break;
+    case TOKEN_STR: kind = TYPE_STRING; break;
+    case TOKEN_BOOL: kind = TYPE_BOOL; break;
+    case TOKEN_VOID: kind = TYPE_VOID; break;
+    case TOKEN_NIL: kind = TYPE_NIL; break;
+    default:
+        parser_error_at_current(parser, "Expected type");
+        DEBUG_VERBOSE("Error: Expected type, got token type %d", tt);
         return NULL;
     }
-    DEBUG_VERBOSE("Created primitive type: kind=%d", base_kind);
-
-    if (is_array) {
+    parser_advance(parser);
+    type = ast_create_primitive_type(parser->arena, kind);
+    // Handle array types by wrapping the base type in array types for each [] pair
+    while (parser_match(parser, TOKEN_LEFT_BRACKET)) {
+        parser_consume(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after '[' in array type");
         type = ast_create_array_type(parser->arena, type);
-        if (type == NULL) {
-            parser_error_at(parser, &token, "Failed to create array type (out of memory?)");
-            DEBUG_VERBOSE("Error: Failed to create array type");
-            return NULL;
-        }
-        DEBUG_VERBOSE("Created array type");
     }
-
-    DEBUG_VERBOSE("Exiting parser_type");
+    DEBUG_VERBOSE("Exiting parser_type: parsed type %s", ast_type_to_string(parser->arena, type));
     return type;
 }
 
@@ -582,38 +554,35 @@ Expr *parser_unary(Parser *parser)
     return result;
 }
 
-Expr *parser_postfix(Parser *parser)
-{
+Expr *parser_postfix(Parser *parser) {
     DEBUG_VERBOSE("Entering parser_postfix");
     Expr *expr = parser_primary(parser);
-    for (;;)
-    {
-        if (parser_match(parser, TOKEN_LEFT_PAREN))
-        {
+
+    while (true) {
+        if (parser_match(parser, TOKEN_LEFT_PAREN)) {
             expr = parser_call(parser, expr);
-            DEBUG_VERBOSE("Processed function call");
-        }
-        else if (parser_match(parser, TOKEN_LEFT_BRACKET))
-        {
-            expr = parser_array_access(parser, expr);
-            DEBUG_VERBOSE("Processed array access");
-        }
-        else if (parser_match(parser, TOKEN_PLUS_PLUS))
-        {
+            DEBUG_VERBOSE("Parsed call expression");
+        } else if (parser_match(parser, TOKEN_LEFT_BRACKET)) {
+            Expr *index = parser_expression(parser);
+            parser_consume(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after index.");
+            expr = ast_create_array_access_expr(parser->arena, expr, index, &parser->previous);
+            DEBUG_VERBOSE("Parsed array access expression");
+        } else if (parser_match(parser, TOKEN_DOT)) {
+            parser_consume(parser, TOKEN_IDENTIFIER, "Expected member name after '.'.");
+            Token name = parser->previous;
+            expr = ast_create_member_expr(parser->arena, expr, name, &parser->previous);
+            DEBUG_VERBOSE("Parsed member access expression");
+        } else if (parser_match(parser, TOKEN_PLUS_PLUS)) {
             expr = ast_create_increment_expr(parser->arena, expr, &parser->previous);
-            DEBUG_VERBOSE("Created increment expression");
-        }
-        else if (parser_match(parser, TOKEN_MINUS_MINUS))
-        {
+            DEBUG_VERBOSE("Parsed increment expression");
+        } else if (parser_match(parser, TOKEN_MINUS_MINUS)) {
             expr = ast_create_decrement_expr(parser->arena, expr, &parser->previous);
-            DEBUG_VERBOSE("Created decrement expression");
-        }
-        else
-        {
-            DEBUG_VERBOSE("No postfix operator, breaking loop");
+            DEBUG_VERBOSE("Parsed decrement expression");
+        } else {
             break;
         }
     }
+
     DEBUG_VERBOSE("Exiting parser_postfix");
     return expr;
 }
@@ -1555,20 +1524,32 @@ Stmt *parser_block_statement(Parser *parser)
 Stmt *parser_expression_statement(Parser *parser)
 {
     DEBUG_VERBOSE("Entering parser_expression_statement");
-    Expr *expr = parser_expression(parser);
+    Expr *expression = parser_expression(parser);
     DEBUG_VERBOSE("Parsed expression");
 
-    if (!parser_match(parser, TOKEN_SEMICOLON) && !parser_check(parser, TOKEN_NEWLINE) && !parser_is_at_end(parser))
+    if (parser_match(parser, TOKEN_SEMICOLON))
     {
-        parser_consume(parser, TOKEN_SEMICOLON, "Expected ';' or newline after expression");
-        DEBUG_VERBOSE("Consumed SEMICOLON or NEWLINE after expression");
+        // Consumed semicolon; this is fine for statements ending with ';'.
     }
-    else if (parser_match(parser, TOKEN_SEMICOLON))
+    else if (parser_check(parser, TOKEN_NEWLINE))
     {
-        DEBUG_VERBOSE("Consumed SEMICOLON after expression");
+        // Consume newline if present.
+        parser_consume(parser, TOKEN_NEWLINE, "Expected newline after expression");
     }
+    else if (parser_is_at_end(parser))
+    {
+        // Accept end-of-file immediately after the expression without requiring a newline.
+        // This handles files that do not end with a trailing newline.
+        DEBUG_VERBOSE("Accepted end-of-file after expression without trailing newline");
+    }
+    else
+    {
+        // Error if neither ';' nor newline nor EOF follows the expression.
+        parser_error(parser, "Expected ';' or newline after expression");
+    }
+    DEBUG_VERBOSE("Consumed SEMICOLON or NEWLINE after expression or accepted EOF");
 
-    Stmt *result = ast_create_expr_stmt(parser->arena, expr, &parser->previous);
+    Stmt *result = ast_create_expr_stmt(parser->arena, expression, &parser->previous);
     DEBUG_VERBOSE("Exiting parser_expression_statement: created expression statement");
     return result;
 }

@@ -509,14 +509,12 @@ Token lexer_scan_token(Lexer *lexer)
             }
 
             int current_indent = 0;
-            const char *indent_start = lexer->current;
             while (lexer_peek(lexer) == ' ' || lexer_peek(lexer) == '\t') {
                 current_indent++;
                 lexer_advance(lexer);
             }
             DEBUG_VERBOSE("Line %d: Calculated indent = %d", lexer->line, current_indent);
 
-            const char *content_start = lexer->current;
             const char *saved_current = lexer->current;
             lexer_skip_whitespace(lexer);
             bool ignore_line = lexer_is_at_end(lexer) || lexer_peek(lexer) == '\n';

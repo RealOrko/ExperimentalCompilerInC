@@ -222,6 +222,14 @@ void ast_print_expr(Arena *arena, Expr *expr, int indent_level)
             ast_print_expr(arena, expr->as.interpol.parts[i], indent_level + 1);
         }
         break;
+
+    case EXPR_MEMBER:
+        DEBUG_VERBOSE_INDENT(indent_level, "MemberAccess:");
+        ast_print_expr(arena, expr->as.member.object, indent_level + 1);
+        DEBUG_VERBOSE_INDENT(indent_level + 1, "Member: %.*s",
+                             expr->as.member.name.length,
+                             expr->as.member.name.start);
+        break;
     }
 }
 
@@ -511,6 +519,30 @@ const char *ast_type_to_string(Arena *arena, Type *type)
     default:
         return arena_strdup(arena, "unknown");
     }
+}
+
+Expr *ast_create_member_expr(Arena *arena, Expr *object, Token name, const Token *loc_token)
+{
+    if (object == NULL)
+    {
+        DEBUG_ERROR("Cannot create member access with NULL object");
+        return NULL;
+    }
+
+    Expr *expr = arena_alloc(arena, sizeof(Expr));
+    if (expr == NULL)
+    {
+        DEBUG_ERROR("Failed to allocate Expr for member access");
+        return NULL;
+    }
+
+    expr->type = EXPR_MEMBER;
+    expr->token = ast_clone_token(arena, loc_token);
+    expr->as.member.object = object;
+    expr->as.member.name = *ast_clone_token(arena, &name); // Clone the name token
+    expr->expr_type = NULL;                                // To be set during type checking
+
+    return expr;
 }
 
 Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr *right, const Token *loc_token)

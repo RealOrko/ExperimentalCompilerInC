@@ -1,4 +1,11 @@
-// ast.h
+// Changes to ast.h:
+// - Add EXPR_MEMBER to ExprType enum.
+// - Add MemberExpr struct.
+// - Add ast_create_member_expr function declaration.
+// - Update the Expr struct union to include MemberExpr.
+
+// Updated ast.h content (full file for completeness, but focus on changes):
+
 #ifndef AST_H
 #define AST_H
 
@@ -58,7 +65,8 @@ typedef enum
     EXPR_ARRAY_ACCESS,
     EXPR_INCREMENT,
     EXPR_DECREMENT,
-    EXPR_INTERPOLATED
+    EXPR_INTERPOLATED,
+    EXPR_MEMBER // New: For dot notation member access (e.g., arr.length or arr.push)
 } ExprType;
 
 typedef struct
@@ -117,6 +125,12 @@ typedef struct
     int part_count;
 } InterpolExpr;
 
+typedef struct
+{
+    Expr *object;
+    Token name;
+} MemberExpr; // New: Represents object.member
+
 struct Expr
 {
     ExprType type;
@@ -134,6 +148,7 @@ struct Expr
         ArrayAccessExpr array_access;
         Expr *operand;
         InterpolExpr interpol;
+        MemberExpr member; // New
     } as;
 
     Type *expr_type;
@@ -257,8 +272,8 @@ Type *ast_create_function_type(Arena *arena, Type *return_type, Type **param_typ
 int ast_type_equals(Type *a, Type *b);
 const char *ast_type_to_string(Arena *arena, Type *type);
 
-Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr *right, const Token *loc_token);
-Expr *ast_create_unary_expr(Arena *arena, TokenType operator, Expr *operand, const Token *loc_token);
+Expr *ast_create_binary_expr(Arena *arena, Expr *left, TokenType operator, Expr * right, const Token *loc_token);
+Expr *ast_create_unary_expr(Arena *arena, TokenType operator, Expr * operand, const Token *loc_token);
 Expr *ast_create_literal_expr(Arena *arena, LiteralValue value, Type *type, bool is_interpolated, const Token *loc_token);
 Expr *ast_create_variable_expr(Arena *arena, Token name, const Token *loc_token);
 Expr *ast_create_assign_expr(Arena *arena, Token name, Expr *value, const Token *loc_token);
@@ -269,6 +284,7 @@ Expr *ast_create_increment_expr(Arena *arena, Expr *operand, const Token *loc_to
 Expr *ast_create_decrement_expr(Arena *arena, Expr *operand, const Token *loc_token);
 Expr *ast_create_interpolated_expr(Arena *arena, Expr **parts, int part_count, const Token *loc_token);
 Expr *ast_create_comparison_expr(Arena *arena, Expr *left, Expr *right, TokenType comparison_type, const Token *loc_token);
+Expr *ast_create_member_expr(Arena *arena, Expr *object, Token name, const Token *loc_token); // New
 
 Stmt *ast_create_expr_stmt(Arena *arena, Expr *expression, const Token *loc_token);
 Stmt *ast_create_var_decl_stmt(Arena *arena, Token name, Type *type, Expr *initializer, const Token *loc_token);
