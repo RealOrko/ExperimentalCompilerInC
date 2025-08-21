@@ -1,3 +1,4 @@
+// token.c
 #include "token.h"
 #include "debug.h"
 #include <stdio.h>
@@ -113,15 +114,6 @@ void token_set_string_literal(Token *token, const char *value)
     DEBUG_VERBOSE("Exiting token_set_string_literal");
 }
 
-void token_set_bool_literal(Token *token, int value)
-{
-    DEBUG_VERBOSE("Entering token_set_bool_literal: value=%d", value);
-
-    token->literal.bool_value = value;
-
-    DEBUG_VERBOSE("Exiting token_set_bool_literal");
-}
-
 const char *token_type_to_string(TokenType type)
 {
     DEBUG_VERBOSE("Entering token_type_to_string: type=%d", type);
@@ -150,8 +142,11 @@ const char *token_type_to_string(TokenType type)
     case TOKEN_INTERPOL_STRING:
         result = "INTERPOL_STRING";
         break;
-    case TOKEN_BOOL_LITERAL:
-        result = "BOOL_LITERAL";
+    case TOKEN_TRUE:
+        result = "TRUE";
+        break;
+    case TOKEN_FALSE:
+        result = "FALSE";
         break;
     case TOKEN_IDENTIFIER:
         result = "IDENTIFIER";
@@ -359,8 +354,11 @@ void token_print(Token *token)
     case TOKEN_INTERPOL_STRING:
         DEBUG_VERBOSE(", value: \"%s\"", token->literal.string_value);
         break;
-    case TOKEN_BOOL_LITERAL:
-        DEBUG_VERBOSE(", value: %s", token->literal.bool_value ? "true" : "false");
+    case TOKEN_TRUE:
+        DEBUG_VERBOSE(", value: true");
+        break;
+    case TOKEN_FALSE:
+        DEBUG_VERBOSE(", value: false");
         break;
     default:
         break;

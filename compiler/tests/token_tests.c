@@ -1,4 +1,4 @@
-// tests/token_tests.c
+// token_tests.c
 
 #include <assert.h>
 #include <stdio.h>
@@ -260,29 +260,6 @@ void test_token_set_string_literal()
     cleanup_tokens(&arena);
 }
 
-void test_token_set_bool_literal()
-{
-    DEBUG_INFO("\n*** Testing token_set_bool_literal...\n");
-    Arena arena;
-    setup_tokens(&arena);
-
-    Token tok = create_test_token(&arena, TOKEN_BOOL_LITERAL, "true", 1, "test.sn");
-    token_set_bool_literal(&tok, 1);
-    assert(tok.literal.bool_value == 1);
-
-    token_set_bool_literal(&tok, 0);
-    assert(tok.literal.bool_value == 0);
-
-    // Non-zero as true
-    token_set_bool_literal(&tok, 42);
-    assert(tok.literal.bool_value == 42); // But typically 1/0, function sets int
-
-    token_set_bool_literal(&tok, -1);
-    assert(tok.literal.bool_value == -1);
-
-    cleanup_tokens(&arena);
-}
-
 void test_token_type_to_string()
 {
     DEBUG_INFO("\n*** Testing token_type_to_string...\n");
@@ -304,7 +281,8 @@ void test_token_type_to_string()
     assert(strcmp(token_type_to_string(TOKEN_CHAR_LITERAL), "CHAR_LITERAL") == 0);
     assert(strcmp(token_type_to_string(TOKEN_STRING_LITERAL), "STRING_LITERAL") == 0);
     assert(strcmp(token_type_to_string(TOKEN_INTERPOL_STRING), "INTERPOL_STRING") == 0);
-    assert(strcmp(token_type_to_string(TOKEN_BOOL_LITERAL), "BOOL_LITERAL") == 0);
+    assert(strcmp(token_type_to_string(TOKEN_TRUE), "TRUE") == 0);
+    assert(strcmp(token_type_to_string(TOKEN_FALSE), "FALSE") == 0);
     assert(strcmp(token_type_to_string(TOKEN_IDENTIFIER), "IDENTIFIER") == 0);
     assert(strcmp(token_type_to_string(TOKEN_FN), "FN") == 0);
     assert(strcmp(token_type_to_string(TOKEN_VAR), "VAR") == 0);
@@ -409,13 +387,11 @@ void test_token_print()
     token_print(&tok_interpol);
 
     // Bool true
-    Token tok_bool_t = create_test_token(&arena, TOKEN_BOOL_LITERAL, "true", 8, "test.sn");
-    token_set_bool_literal(&tok_bool_t, 1);
+    Token tok_bool_t = create_test_token(&arena, TOKEN_TRUE, "true", 8, "test.sn");
     token_print(&tok_bool_t);
 
     // Bool false
-    Token tok_bool_f = create_test_token(&arena, TOKEN_BOOL_LITERAL, "false", 9, "test.sn");
-    token_set_bool_literal(&tok_bool_f, 0);
+    Token tok_bool_f = create_test_token(&arena, TOKEN_FALSE, "false", 9, "test.sn");
     token_print(&tok_bool_f);
 
     // No value printed for non-literals

@@ -1,3 +1,4 @@
+// token.h
 #ifndef TOKEN_H
 #define TOKEN_H
 
@@ -15,7 +16,8 @@ typedef enum
     TOKEN_CHAR_LITERAL,
     TOKEN_STRING_LITERAL,
     TOKEN_INTERPOL_STRING,
-    TOKEN_BOOL_LITERAL,
+    TOKEN_TRUE,
+    TOKEN_FALSE,
     TOKEN_IDENTIFIER,
     TOKEN_FN,
     TOKEN_VAR,
@@ -77,7 +79,6 @@ typedef union
     double double_value;
     char char_value;
     const char *string_value;
-    int bool_value;
 } LiteralValue;
 
 typedef struct
@@ -97,7 +98,6 @@ void token_set_int_literal(Token *token, int64_t value);
 void token_set_double_literal(Token *token, double value);
 void token_set_char_literal(Token *token, char value);
 void token_set_string_literal(Token *token, const char *value);
-void token_set_bool_literal(Token *token, int value);
 const char *token_type_to_string(TokenType type);
 void token_print(Token *token);
 
