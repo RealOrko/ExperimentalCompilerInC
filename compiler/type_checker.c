@@ -16,10 +16,13 @@ static Type *type_check_expr(Expr *expr, SymbolTable *table);
 static void type_error(Token *token, const char *msg)
 {
     char error_buffer[256];
-    if (token && token->line > 0 && token->filename) {
-        snprintf(error_buffer, sizeof(error_buffer), "%s:%d: Type error: %s", 
+    if (token && token->line > 0 && token->filename)
+    {
+        snprintf(error_buffer, sizeof(error_buffer), "%s:%d: Type error: %s",
                  token->filename, token->line, msg);
-    } else {
+    }
+    else
+    {
         snprintf(error_buffer, sizeof(error_buffer), "Type error: %s", msg);
     }
     DEBUG_ERROR("%s", error_buffer);
@@ -33,7 +36,7 @@ static bool is_numeric_type(Type *type)
 
 static bool is_comparison_operator(TokenType op)
 {
-    return op == TOKEN_EQUAL_EQUAL || op == TOKEN_BANG_EQUAL || op == TOKEN_LESS || 
+    return op == TOKEN_EQUAL_EQUAL || op == TOKEN_BANG_EQUAL || op == TOKEN_LESS ||
            op == TOKEN_LESS_EQUAL || op == TOKEN_GREATER || op == TOKEN_GREATER_EQUAL;
 }
 
@@ -44,8 +47,8 @@ static bool is_arithmetic_operator(TokenType op)
 
 static bool is_printable_type(Type *type)
 {
-    return type && (type->kind == TYPE_INT || type->kind == TYPE_LONG || 
-                    type->kind == TYPE_DOUBLE || type->kind == TYPE_CHAR || 
+    return type && (type->kind == TYPE_INT || type->kind == TYPE_LONG ||
+                    type->kind == TYPE_DOUBLE || type->kind == TYPE_CHAR ||
                     type->kind == TYPE_STRING || type->kind == TYPE_BOOL);
 }
 
@@ -244,6 +247,86 @@ static Type *type_check_call(Expr *expr, SymbolTable *table)
     return ast_clone_type(table->arena, callee_type->as.function.return_type);
 }
 
+static Type *type_check_array(Expr *expr, SymbolTable *table)
+{
+    if (expr->as.array.element_count == 0)
+    {
+        return ast_create_array_type(table->arena, ast_create_primitive_type(table->arena, TYPE_ANY));
+    }
+
+    Type *elem_type = type_check_expr(expr->as.array.elements[0], table);
+    if (elem_type == NULL)
+    {
+        return NULL;
+    }
+
+    for (int i = 1; i < expr->as.array.element_count; i++)
+    {
+        Type *t = type_check_expr(expr->as.array.elements[i], table);
+        if (t == NULL || !ast_type_equals(t, elem_type))
+        {
+            type_error(expr->token, "Array elements have mismatched types");
+            return NULL;
+        }
+    }
+
+    return ast_create_array_type(table->arena, ast_clone_type(table->arena, elem_type));
+}
+
+static Type *type_check_array_access(Expr *expr, SymbolTable *table)
+{
+    Type *array_type = type_check_expr(expr->as.array_access.array, table);
+    if (array_type == NULL || array_type->kind != TYPE_ARRAY)
+    {
+        type_error(expr->token, "Array access on non-array type");
+        return NULL;
+    }
+
+    Type *index_type = type_check_expr(expr->as.array_access.index, table);
+    if (index_type == NULL || index_type->kind != TYPE_INT)
+    {
+        type_error(expr->token, "Array index must be integer");
+        return NULL;
+    }
+
+    return ast_clone_type(table->arena, array_type->as.array.element_type);
+}
+
+static Type *type_check_member(Expr *expr, SymbolTable *table)
+{
+    Type *object_type = type_check_expr(expr->as.member.object, table);
+    if (object_type == NULL)
+    {
+        type_error(expr->token, "Invalid object in member access");
+        return NULL;
+    }
+
+    if (object_type->kind != TYPE_ARRAY)
+    {
+        type_error(expr->token, "Member access on non-array type");
+        return NULL;
+    }
+
+    const char *member_name = expr->as.member.name.start;
+    if (strcmp(member_name, "length") == 0)
+    {
+        return ast_create_primitive_type(table->arena, TYPE_INT);
+    }
+    else if (strcmp(member_name, "push") == 0)
+    {
+        Type *param_types[1] = {ast_clone_type(table->arena, object_type->as.array.element_type)};
+        Type *void_type = ast_create_primitive_type(table->arena, TYPE_VOID);
+        return ast_create_function_type(table->arena, void_type, param_types, 1);
+    }
+    else
+    {
+        char msg[256];
+        snprintf(msg, sizeof(msg), "Unknown array member '%s'", member_name);
+        type_error(expr->token, msg);
+        return NULL;
+    }
+}
+
 Type *type_check_expr(Expr *expr, SymbolTable *table)
 {
     if (expr == NULL)
@@ -272,10 +355,10 @@ Type *type_check_expr(Expr *expr, SymbolTable *table)
         t = type_check_call(expr, table);
         break;
     case EXPR_ARRAY:
-        t = ast_create_array_type(table->arena, ast_create_primitive_type(table->arena, TYPE_NIL));
+        t = type_check_array(expr, table);
         break;
     case EXPR_ARRAY_ACCESS:
-        t = ast_create_primitive_type(table->arena, TYPE_NIL);
+        t = type_check_array_access(expr, table);
         break;
     case EXPR_INCREMENT:
     case EXPR_DECREMENT:
@@ -291,6 +374,9 @@ Type *type_check_expr(Expr *expr, SymbolTable *table)
     }
     case EXPR_INTERPOLATED:
         t = type_check_interpolated(expr, table);
+        break;
+    case EXPR_MEMBER:
+        t = type_check_member(expr, table);
         break;
     }
     expr->expr_type = t;
@@ -322,15 +408,15 @@ static void type_check_var_decl(Stmt *stmt, SymbolTable *table, Type *return_typ
 static void type_check_function(Stmt *stmt, SymbolTable *table)
 {
     symbol_table_push_scope(table);
-    
+
     for (int i = 0; i < stmt->as.function.param_count; i++)
     {
         Parameter param = stmt->as.function.params[i];
         symbol_table_add_symbol_with_kind(table, param.name, param.type, SYMBOL_PARAM);
     }
-    
+
     table->current->next_local_offset = table->current->next_param_offset;
-    
+
     for (int i = 0; i < stmt->as.function.body_count; i++)
     {
         type_check_stmt(stmt->as.function.body[i], table, stmt->as.function.return_type);
