@@ -91,9 +91,6 @@ void test_function_no_params_parsing()
 
     Module *module = parser_execute(&parser, "test.sn");
 
-    if (module)
-    {
-    }
     assert(module != NULL);
     assert(module->count == 1);
     Stmt *fn = module->statements[0];
@@ -108,6 +105,7 @@ void test_function_no_params_parsing()
     assert(strcmp(print_stmt->as.expression.expression->as.call.callee->as.variable.name.start, "print") == 0);
     assert(print_stmt->as.expression.expression->as.call.arg_count == 1);
     assert(print_stmt->as.expression.expression->as.call.arguments[0]->type == EXPR_LITERAL);
+    DEBUG_ERROR("String value: %s", print_stmt->as.expression.expression->as.call.arguments[0]->as.literal.value.string_value);
     assert(strcmp(print_stmt->as.expression.expression->as.call.arguments[0]->as.literal.value.string_value, "hello\n") == 0);
 
     cleanup_parser(&arena, &lexer, &parser, &symbol_table);

@@ -4,6 +4,7 @@
 #include "lexer.h"
 #include "arena.h"
 #include "ast.h"
+#include "string.h"
 #include "symbol_table.h"
 
 typedef struct

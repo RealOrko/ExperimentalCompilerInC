@@ -5,8 +5,8 @@ LDFLAGS = -fsanitize=address
 #LDFLAGS = 
 
 SRCDIR = .
-SRCS = arena.c file.c runtime.c token.c lexer.c ast.c parser.c symbol_table.c code_gen.c compiler.c debug.c type_checker.c main.c
-HEADERS = arena.h file.h runtime.h token.h lexer.h ast.h parser.h symbol_table.h code_gen.h compiler.h debug.h type_checker.h
+SRCS = string.c arena.c file.c runtime.c token.c lexer.c ast.c parser.c symbol_table.c code_gen.c compiler.c debug.c type_checker.c main.c
+HEADERS = string.h arena.h file.h runtime.h token.h lexer.h ast.h parser.h symbol_table.h code_gen.h compiler.h debug.h type_checker.h
 BIN_DIR = ../bin
 OBJS = $(addprefix $(BIN_DIR)/, $(notdir $(SRCS:.c=.o)))
 DEPS = $(OBJS:.o=.d)
@@ -39,7 +39,7 @@ TEST_TARGET = $(BIN_DIR)/tests
 
 tests: create-bin-dir $(TEST_TARGET)
 
-$(TEST_TARGET): $(TEST_OBJS) $(BIN_DIR)/arena.o $(BIN_DIR)/debug.o $(BIN_DIR)/ast.o $(BIN_DIR)/lexer.o $(BIN_DIR)/parser.o $(BIN_DIR)/symbol_table.o $(BIN_DIR)/token.o $(BIN_DIR)/file.o
+$(TEST_TARGET): $(TEST_OBJS) $(BIN_DIR)/string.o $(BIN_DIR)/arena.o $(BIN_DIR)/debug.o $(BIN_DIR)/ast.o $(BIN_DIR)/lexer.o $(BIN_DIR)/parser.o $(BIN_DIR)/symbol_table.o $(BIN_DIR)/token.o $(BIN_DIR)/file.o
 	$(CC) $(LDFLAGS) -o $@ $^
 
 $(BIN_DIR)/%.o: $(TEST_SRCDIR)/%.c

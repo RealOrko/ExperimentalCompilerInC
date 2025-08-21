@@ -2,6 +2,7 @@
 #include "parser.h"
 #include "debug.h"
 #include "file.h"
+#include "string.h"
 #include <stdio.h>
 #include <string.h>
 
@@ -364,20 +365,38 @@ static void synchronize(Parser *parser)
     DEBUG_VERBOSE("Exiting synchronize: reached end");
 }
 
-Type *parser_type(Parser *parser) {
+Type *parser_type(Parser *parser)
+{
     DEBUG_VERBOSE("Entering parser_type");
     Type *type = NULL;
     TokenType tt = parser->current.type;
     TypeKind kind;
-    switch (tt) {
-    case TOKEN_INT: kind = TYPE_INT; break;
-    case TOKEN_LONG: kind = TYPE_LONG; break;
-    case TOKEN_DOUBLE: kind = TYPE_DOUBLE; break;
-    case TOKEN_CHAR: kind = TYPE_CHAR; break;
-    case TOKEN_STR: kind = TYPE_STRING; break;
-    case TOKEN_BOOL: kind = TYPE_BOOL; break;
-    case TOKEN_VOID: kind = TYPE_VOID; break;
-    case TOKEN_NIL: kind = TYPE_NIL; break;
+    switch (tt)
+    {
+    case TOKEN_INT:
+        kind = TYPE_INT;
+        break;
+    case TOKEN_LONG:
+        kind = TYPE_LONG;
+        break;
+    case TOKEN_DOUBLE:
+        kind = TYPE_DOUBLE;
+        break;
+    case TOKEN_CHAR:
+        kind = TYPE_CHAR;
+        break;
+    case TOKEN_STR:
+        kind = TYPE_STRING;
+        break;
+    case TOKEN_BOOL:
+        kind = TYPE_BOOL;
+        break;
+    case TOKEN_VOID:
+        kind = TYPE_VOID;
+        break;
+    case TOKEN_NIL:
+        kind = TYPE_NIL;
+        break;
     default:
         parser_error_at_current(parser, "Expected type");
         DEBUG_VERBOSE("Error: Expected type, got token type %d", tt);
@@ -386,7 +405,8 @@ Type *parser_type(Parser *parser) {
     parser_advance(parser);
     type = ast_create_primitive_type(parser->arena, kind);
     // Handle array types by wrapping the base type in array types for each [] pair
-    while (parser_match(parser, TOKEN_LEFT_BRACKET)) {
+    while (parser_match(parser, TOKEN_LEFT_BRACKET))
+    {
         parser_consume(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after '[' in array type");
         type = ast_create_array_type(parser->arena, type);
     }
@@ -554,31 +574,44 @@ Expr *parser_unary(Parser *parser)
     return result;
 }
 
-Expr *parser_postfix(Parser *parser) {
+Expr *parser_postfix(Parser *parser)
+{
     DEBUG_VERBOSE("Entering parser_postfix");
     Expr *expr = parser_primary(parser);
 
-    while (true) {
-        if (parser_match(parser, TOKEN_LEFT_PAREN)) {
+    while (true)
+    {
+        if (parser_match(parser, TOKEN_LEFT_PAREN))
+        {
             expr = parser_call(parser, expr);
             DEBUG_VERBOSE("Parsed call expression");
-        } else if (parser_match(parser, TOKEN_LEFT_BRACKET)) {
+        }
+        else if (parser_match(parser, TOKEN_LEFT_BRACKET))
+        {
             Expr *index = parser_expression(parser);
             parser_consume(parser, TOKEN_RIGHT_BRACKET, "Expected ']' after index.");
             expr = ast_create_array_access_expr(parser->arena, expr, index, &parser->previous);
             DEBUG_VERBOSE("Parsed array access expression");
-        } else if (parser_match(parser, TOKEN_DOT)) {
+        }
+        else if (parser_match(parser, TOKEN_DOT))
+        {
             parser_consume(parser, TOKEN_IDENTIFIER, "Expected member name after '.'.");
             Token name = parser->previous;
             expr = ast_create_member_expr(parser->arena, expr, name, &parser->previous);
             DEBUG_VERBOSE("Parsed member access expression");
-        } else if (parser_match(parser, TOKEN_PLUS_PLUS)) {
+        }
+        else if (parser_match(parser, TOKEN_PLUS_PLUS))
+        {
             expr = ast_create_increment_expr(parser->arena, expr, &parser->previous);
             DEBUG_VERBOSE("Parsed increment expression");
-        } else if (parser_match(parser, TOKEN_MINUS_MINUS)) {
+        }
+        else if (parser_match(parser, TOKEN_MINUS_MINUS))
+        {
             expr = ast_create_decrement_expr(parser->arena, expr, &parser->previous);
             DEBUG_VERBOSE("Parsed decrement expression");
-        } else {
+        }
+        else
+        {
             break;
         }
     }
@@ -590,46 +623,7 @@ Expr *parser_postfix(Parser *parser) {
 Expr *parser_primary(Parser *parser)
 {
     DEBUG_VERBOSE("Entering parser_primary");
-    if (parser_match(parser, TOKEN_INT_LITERAL))
-    {
-        LiteralValue value;
-        value.int_value = parser->previous.literal.int_value;
-        Expr *result = ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_INT), false, &parser->previous);
-        DEBUG_VERBOSE("Created INT literal expression");
-        return result;
-    }
-    if (parser_match(parser, TOKEN_LONG_LITERAL))
-    {
-        LiteralValue value;
-        value.int_value = parser->previous.literal.int_value;
-        Expr *result = ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_LONG), false, &parser->previous);
-        DEBUG_VERBOSE("Created LONG literal expression");
-        return result;
-    }
-    if (parser_match(parser, TOKEN_DOUBLE_LITERAL))
-    {
-        LiteralValue value;
-        value.double_value = parser->previous.literal.double_value;
-        Expr *result = ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_DOUBLE), false, &parser->previous);
-        DEBUG_VERBOSE("Created DOUBLE literal expression");
-        return result;
-    }
-    if (parser_match(parser, TOKEN_CHAR_LITERAL))
-    {
-        LiteralValue value;
-        value.char_value = parser->previous.literal.char_value;
-        Expr *result = ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_CHAR), false, &parser->previous);
-        DEBUG_VERBOSE("Created CHAR literal expression");
-        return result;
-    }
-    if (parser_match(parser, TOKEN_STRING_LITERAL))
-    {
-        LiteralValue value;
-        value.string_value = arena_strdup(parser->arena, parser->previous.literal.string_value);
-        Expr *result = ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_STRING), false, &parser->previous);
-        DEBUG_VERBOSE("Created STRING literal expression");
-        return result;
-    }
+
     if (parser_match(parser, TOKEN_BOOL_LITERAL))
     {
         LiteralValue value;
@@ -641,190 +635,165 @@ Expr *parser_primary(Parser *parser)
     if (parser_match(parser, TOKEN_NIL))
     {
         LiteralValue value;
-        value.int_value = 0;
-        Expr *result = ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_NIL), false, &parser->previous);
-        DEBUG_VERBOSE("Created NIL literal expression");
-        return result;
+        value.int_value = 0; // Dummy value
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_NIL), false, &parser->previous);
+    }
+    if (parser_match(parser, TOKEN_INT_LITERAL))
+    {
+        LiteralValue value;
+        value.int_value = parser->previous.literal.int_value;
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_INT), false, &parser->previous);
+    }
+    if (parser_match(parser, TOKEN_LONG_LITERAL))
+    {
+        LiteralValue value;
+        value.int_value = parser->previous.literal.int_value;
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_LONG), false, &parser->previous);
+    }
+    if (parser_match(parser, TOKEN_DOUBLE_LITERAL))
+    {
+        LiteralValue value;
+        value.double_value = parser->previous.literal.double_value;
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_DOUBLE), false, &parser->previous);
+    }
+    if (parser_match(parser, TOKEN_CHAR_LITERAL)) {
+        // Simple unescape for char (extend as needed).
+        char ch = parser->previous.start[1];
+        if (parser->previous.length == 4 && parser->previous.start[1] == '\\') {
+            switch (parser->previous.start[2]) {
+                case 'n': ch = '\n'; break;
+                case 't': ch = '\t'; break;
+                case 'r': ch = '\r'; break;
+                case 'b': ch = '\b'; break;
+                case 'f': ch = '\f'; break;
+                case '\\': ch = '\\'; break;
+                case '\'': ch = '\''; break;
+                default: ch = parser->previous.start[2]; break;
+            }
+        }
+        LiteralValue lv = { .char_value = ch };
+        DEBUG_VERBOSE("Parsed char literal: %c", ch);
+        return ast_create_literal_expr(parser->arena, lv, ast_create_primitive_type(parser->arena, TYPE_CHAR), false, &parser->previous);
+    }
+    if (parser_match(parser, TOKEN_STRING_LITERAL)) {
+        char *unescaped = unescape_string(parser->arena, parser->previous.start + 1, parser->previous.length - 2);
+        if (unescaped == NULL) {
+            parser_error_at_current(parser, "Out of memory for string literal");
+            return NULL;
+        }
+        LiteralValue lv = { .string_value = unescaped };
+        DEBUG_VERBOSE("Parsed string literal: %s", unescaped);
+        return ast_create_literal_expr(parser->arena, lv, ast_create_primitive_type(parser->arena, TYPE_STRING), false, &parser->previous);
+    }
+    if (parser_match(parser, TOKEN_INTERPOL_STRING))
+    {
+        // Parse interpolated string
+        char *source = arena_strndup(parser->arena, parser->previous.start, parser->previous.length);
+        if (parser->interp_count >= parser->interp_capacity)
+        {
+            parser->interp_capacity = parser->interp_capacity == 0 ? 8 : parser->interp_capacity * 2;
+            char **new_sources = arena_alloc(parser->arena, sizeof(char *) * parser->interp_capacity);
+            if (new_sources == NULL)
+            {
+                exit(1);
+            }
+            if (parser->interp_sources != NULL && parser->interp_count > 0)
+            {
+                memcpy(new_sources, parser->interp_sources, sizeof(char *) * parser->interp_count);
+            }
+            parser->interp_sources = new_sources;
+        }
+        parser->interp_sources[parser->interp_count++] = source;
+
+        // For now, create a placeholder literal; actual parsing happens later
+        LiteralValue value;
+        value.string_value = source;
+        return ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_STRING), true, &parser->previous);
     }
     if (parser_match(parser, TOKEN_IDENTIFIER))
     {
-        Token var_token = parser->previous;
-        var_token.start = arena_strndup(parser->arena, parser->previous.start, parser->previous.length);
-        Expr *result = ast_create_variable_expr(parser->arena, var_token, &parser->previous);
-        DEBUG_VERBOSE("Created variable expression: %.*s", var_token.length, var_token.start);
-        return result;
+        return ast_create_variable_expr(parser->arena, parser->previous, &parser->previous);
     }
     if (parser_match(parser, TOKEN_LEFT_PAREN))
     {
-        DEBUG_VERBOSE("Found LEFT_PAREN, parsing grouped expression");
         Expr *expr = parser_expression(parser);
-        parser_consume(parser, TOKEN_RIGHT_PAREN, "Expected ')' after expression");
-        DEBUG_VERBOSE("Consumed RIGHT_PAREN");
+        parser_consume(parser, TOKEN_RIGHT_PAREN, "Expect ')' after expression.");
+        DEBUG_VERBOSE("Exiting parser_primary: grouped expression");
         return expr;
     }
-
-    if (parser_match(parser, TOKEN_INTERPOL_STRING))
+    if (parser_match(parser, TOKEN_LEFT_BRACE))
     {
-        DEBUG_VERBOSE("Entering interpolated string parsing");
-        Token interpol_token = parser->previous;
-        const char *content = parser->previous.literal.string_value;
-        Expr **parts = NULL;
+        Token loc_token = parser->previous;
+        Expr **elements = NULL;
+        int element_count = 0;
         int capacity = 0;
-        int count = 0;
 
-        const char *p = content;
-        const char *segment_start = p;
-
-        while (*p)
+        if (!parser_match(parser, TOKEN_RIGHT_BRACE))
         {
-            if (*p == '{')
+            // Parse first element
+            Expr *elem = parser_expression(parser);
+            if (elem == NULL)
             {
-                if (p > segment_start)
-                {
-                    int len = p - segment_start;
-                    char *seg = arena_strndup(parser->arena, segment_start, len);
-                    LiteralValue v;
-                    v.string_value = seg;
-                    Expr *seg_expr = ast_create_literal_expr(parser->arena, v, ast_create_primitive_type(parser->arena, TYPE_STRING), false, &interpol_token);
-
-                    if (count >= capacity)
-                    {
-                        capacity = capacity == 0 ? 8 : capacity * 2;
-                        Expr **new_parts = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
-                        if (new_parts == NULL)
-                        {
-                            DEBUG_VERBOSE("Error: Out of memory for interpolated parts");
-                            exit(1);
-                        }
-                        if (parts != NULL && count > 0)
-                        {
-                            memcpy(new_parts, parts, sizeof(Expr *) * count);
-                        }
-                        parts = new_parts;
-                        DEBUG_VERBOSE("Reallocated parts array, new capacity=%d", capacity);
-                    }
-                    parts[count++] = seg_expr;
-                    DEBUG_VERBOSE("Added string segment to interpolated parts, count=%d", count);
-                }
-
-                p++;
-                const char *expr_start = p;
-                while (*p && *p != '}')
-                    p++;
-                if (!*p)
-                {
-                    parser_error_at_current(parser, "Unterminated interpolated expression");
-                    DEBUG_VERBOSE("Error: Unterminated interpolated expression");
-                    LiteralValue zero = {0};
-                    return ast_create_literal_expr(parser->arena, zero, ast_create_primitive_type(parser->arena, TYPE_STRING), false, NULL);
-                }
-                int expr_len = p - expr_start;
-                char *expr_src = arena_strndup(parser->arena, expr_start, expr_len);
-                DEBUG_VERBOSE("Extracted interpolated expression: %s", expr_src);
-
-                Lexer sub_lexer;
-                lexer_init(parser->arena, &sub_lexer, expr_src, "interpolated");
-                Parser sub_parser;
-                parser_init(parser->arena, &sub_parser, &sub_lexer, parser->symbol_table);
-                sub_parser.symbol_table = parser->symbol_table;
-                DEBUG_VERBOSE("Initialized sub-parser for interpolated expression");
-
-                Expr *inner = parser_expression(&sub_parser);
-                if (inner == NULL || sub_parser.had_error)
-                {
-                    parser_error_at_current(parser, "Invalid expression in interpolation");
-                    DEBUG_VERBOSE("Error: Invalid expression in interpolation");
-                    LiteralValue zero = {0};
-                    return ast_create_literal_expr(parser->arena, zero, ast_create_primitive_type(parser->arena, TYPE_STRING), false, NULL);
-                }
-
-                if (count >= capacity)
-                {
-                    capacity = capacity == 0 ? 8 : capacity * 2;
-                    Expr **new_parts = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
-                    if (new_parts == NULL)
-                    {
-                        DEBUG_VERBOSE("Error: Out of memory for interpolated parts");
-                        exit(1);
-                    }
-                    if (parts != NULL && count > 0)
-                    {
-                        memcpy(new_parts, parts, sizeof(Expr *) * count);
-                    }
-                    parts = new_parts;
-                    DEBUG_VERBOSE("Reallocated parts array, new capacity=%d", capacity);
-                }
-                parts[count++] = inner;
-                DEBUG_VERBOSE("Added expression to interpolated parts, count=%d", count);
-
-                if (parser->interp_count >= parser->interp_capacity)
-                {
-                    parser->interp_capacity = parser->interp_capacity ? parser->interp_capacity * 2 : 8;
-                    char **new_interp_sources = arena_alloc(parser->arena, sizeof(char *) * parser->interp_capacity);
-                    if (new_interp_sources == NULL)
-                    {
-                        DEBUG_VERBOSE("Error: Out of memory for interp_sources");
-                        exit(1);
-                    }
-                    if (parser->interp_sources != NULL && parser->interp_count > 0)
-                    {
-                        memcpy(new_interp_sources, parser->interp_sources, sizeof(char *) * parser->interp_count);
-                    }
-                    parser->interp_sources = new_interp_sources;
-                    DEBUG_VERBOSE("Reallocated interp_sources, new capacity=%d", parser->interp_capacity);
-                }
-                parser->interp_sources[parser->interp_count++] = expr_src;
-                DEBUG_VERBOSE("Stored interpolated source, interp_count=%d", parser->interp_count);
-
-                p++;
-                segment_start = p;
+                parser_error_at_current(parser, "Expected expression in array literal");
+                DEBUG_VERBOSE("Error: Expected expression in array literal");
+                return NULL;
             }
-            else
+
+            // Allocate initial capacity
+            capacity = 8;
+            elements = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
+            if (elements == NULL)
             {
-                p++;
+                parser_error_at_current(parser, "Out of memory");
+                DEBUG_VERBOSE("Error: Out of memory for array elements");
+                return NULL;
             }
+            elements[element_count++] = elem;
+
+            // Parse remaining elements, allowing trailing comma
+            while (parser_match(parser, TOKEN_COMMA))
+            {
+                if (parser_check(parser, TOKEN_RIGHT_BRACE))
+                {
+                    break; // Trailing comma allowed
+                }
+
+                elem = parser_expression(parser);
+                if (elem == NULL)
+                {
+                    parser_error_at_current(parser, "Expected expression after ',' in array literal");
+                    DEBUG_VERBOSE("Error: Expected expression after ','");
+                    continue;
+                }
+
+                if (element_count >= capacity)
+                {
+                    capacity *= 2;
+                    Expr **new_elements = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
+                    if (new_elements == NULL)
+                    {
+                        parser_error_at_current(parser, "Out of memory");
+                        DEBUG_VERBOSE("Error: Out of memory for array elements");
+                        return NULL;
+                    }
+                    memcpy(new_elements, elements, sizeof(Expr *) * element_count);
+                    elements = new_elements;
+                }
+                elements[element_count++] = elem;
+            }
+
+            parser_consume(parser, TOKEN_RIGHT_BRACE, "Expect '}' after array literal.");
         }
+        // Empty array if immediate '}' after '{'
 
-        if (p > segment_start)
-        {
-            int len = p - segment_start;
-            char *seg = arena_strndup(parser->arena, segment_start, len);
-            LiteralValue v;
-            v.string_value = seg;
-            Expr *seg_expr = ast_create_literal_expr(parser->arena, v, ast_create_primitive_type(parser->arena, TYPE_STRING), false, &interpol_token);
-
-            if (count >= capacity)
-            {
-                capacity = capacity == 0 ? 8 : capacity * 2;
-                Expr **new_parts = arena_alloc(parser->arena, sizeof(Expr *) * capacity);
-                if (new_parts == NULL)
-                {
-                    DEBUG_VERBOSE("Error: Out of memory for interpolated parts");
-                    exit(1);
-                }
-                if (parts != NULL && count > 0)
-                {
-                    memcpy(new_parts, parts, sizeof(Expr *) * count);
-                }
-                parts = new_parts;
-                DEBUG_VERBOSE("Reallocated parts array, new capacity=%d", capacity);
-            }
-            parts[count++] = seg_expr;
-            DEBUG_VERBOSE("Added final string segment to interpolated parts, count=%d", count);
-        }
-
-        Expr *result = ast_create_interpolated_expr(parser->arena, parts, count, &interpol_token);
-        DEBUG_VERBOSE("Created interpolated expression with %d parts", count);
+        Expr *result = ast_create_array_expr(parser->arena, elements, element_count, &loc_token);
+        DEBUG_VERBOSE("Exiting parser_primary: created array expr with %d elements", element_count);
         return result;
     }
 
     parser_error_at_current(parser, "Expected expression");
-    DEBUG_VERBOSE("Error: Expected expression in parser_primary");
-    LiteralValue value;
-    value.int_value = 0;
-    Expr *result = ast_create_literal_expr(parser->arena, value, ast_create_primitive_type(parser->arena, TYPE_NIL), false, NULL);
-    DEBUG_VERBOSE("Exiting parser_primary: returning NIL due to error");
-    return result;
+    DEBUG_VERBOSE("Exiting parser_primary: error, expected expression");
+    return NULL;
 }
 
 Expr *parser_call(Parser *parser, Expr *callee)
@@ -1561,8 +1530,13 @@ Stmt *parser_import_statement(Parser *parser)
     Token module_name;
     if (parser_match(parser, TOKEN_STRING_LITERAL))
     {
+        char *unescaped = unescape_string(parser->arena, parser->current.start + 1, parser->current.length - 2);
+        if (unescaped == NULL) {
+            parser_error_at_current(parser, "Out of memory for import module name");
+            return NULL;
+        }
         module_name = parser->previous;
-        module_name.start = arena_strdup(parser->arena, parser->previous.literal.string_value);
+        module_name.start = unescaped;
         if (module_name.start == NULL)
         {
             parser_error_at_current(parser, "Out of memory");
@@ -1687,9 +1661,11 @@ Module *parse_module_with_imports(Arena *arena, SymbolTable *symbol_table, const
     const char *dir_end = strrchr(filename, '/');
     size_t dir_len = dir_end ? (size_t)(dir_end - filename + 1) : 0;
     char *dir = NULL;
-    if (dir_len > 0) {
+    if (dir_len > 0)
+    {
         dir = arena_alloc(arena, dir_len + 1);
-        if (!dir) {
+        if (!dir)
+        {
             DEBUG_ERROR("Failed to allocate memory for directory path");
             parser_cleanup(&parser);
             lexer_cleanup(&lexer);
@@ -1718,9 +1694,12 @@ Module *parse_module_with_imports(Arena *arena, SymbolTable *symbol_table, const
                 lexer_cleanup(&lexer);
                 return NULL;
             }
-            if (dir_len > 0) {
+            if (dir_len > 0)
+            {
                 strcpy(import_path, dir);
-            } else {
+            }
+            else
+            {
                 import_path[0] = '\0';
             }
             strcat(import_path, mod_name.start);
