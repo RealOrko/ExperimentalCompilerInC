@@ -138,7 +138,7 @@ void test_token_get_array_token_type()
     assert(token_get_array_token_type(TOKEN_INT_ARRAY) == TOKEN_INT_ARRAY);
 
     // Invalid
-    assert(token_get_array_token_type(-1) == -1);
+    assert(token_get_array_token_type((TokenType)-1) == (TokenType)-1);
     assert(token_get_array_token_type(1000) == 1000);
 }
 
@@ -322,7 +322,7 @@ void test_token_type_to_string()
     assert(strcmp(token_type_to_string(TOKEN_STR), "STR") == 0);
     assert(strcmp(token_type_to_string(TOKEN_BOOL), "BOOL") == 0);
     assert(strcmp(token_type_to_string(TOKEN_VOID), "VOID") == 0);
-    assert(strcmp(token_type_to_string(TOKEN_INT_ARRAY), "INT_ARRAY") == 0); 
+    assert(strcmp(token_type_to_string(TOKEN_INT_ARRAY), "INT_ARRAY") == 0);
     assert(strcmp(token_type_to_string(TOKEN_LONG_ARRAY), "LONG_ARRAY") == 0);
     assert(strcmp(token_type_to_string(TOKEN_DOUBLE_ARRAY), "DOUBLE_ARRAY") == 0);
     assert(strcmp(token_type_to_string(TOKEN_CHAR_ARRAY), "CHAR_ARRAY") == 0);
